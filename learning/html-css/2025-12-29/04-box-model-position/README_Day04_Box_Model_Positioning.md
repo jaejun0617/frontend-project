@@ -1,4 +1,4 @@
-# Day 4 — Box Model & Positioning
+# docs: Day 4 — Box Model & Positioning
 
 **Date:** Mon, Dec 29, 2025  
 **Goal:** Box Model과 Positioning 원리를 이해하고, 좌표·레이어 사고로 **입체적인 레이어드 포스터 UI**를 구현한다.
