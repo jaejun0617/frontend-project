@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ko">
+   <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Day 8 - Products Modal</title>
+
+      <!-- CSS 파일 연결 -->
+      <link rel="stylesheet" href="./css/demo.css" />
+   </head>
+
+   <body>
+      <div class="wrapper">
+         <!-- Header -->
+         <header class="site__header">
+            <nav class="site__nav">
+               <div class="site__day"><a href="#">D8</a></div>
+               <h1 class="site__title">Day 8 - Products Modal</h1>
+            </nav>
+         </header>
+
+         <!-- Main -->
+         <main class="main">
+            <section class="products">
+               <!--
+          productsList(ul)에 클릭 이벤트를 1개만 달아 처리할 예정(이벤트 위임)
+        -->
+               <ul class="products__list" id="productsList">
+                  <!-- Product 1 -->
+                  <li class="product__item">
+                     <article
+                        class="product__card"
+                        data-product-id="1"
+                        data-title="상품 1"
+                        data-price="11000"
+                        data-brand="브랜드 A"
+                     >
+                        <!-- data-open="modal" 영역을 클릭하면 모달 오픈 -->
+                        <figure class="product__card__media" data-open="modal">
+                           <!-- 실제 이미지 src는 네가 채우면 됨 -->
+                           <img
+                              src=""
+                              alt="상품 1 이미지"
+                              loading="lazy"
+                              width="520"
+                              height="390"
+                           />
+                        </figure>
+
+                        <div class="product__card__body">
+                           <p class="product__card__brand">브랜드 A</p>
+
+                           <!-- 제목 클릭해도 모달 오픈 -->
+                           <h3 class="product__card__title" data-open="modal">
+                              상품 1
+                           </h3>
+
+                           <p class="product__card__desc">
+                              상품 1에 대한 간단한 설명입니다.
+                           </p>
+
+                           <div class="product__card__price">
+                              <data value="11000">11,000원</data>
+                           </div>
+                        </div>
+
+                        <div class="product__card__actions">
+                           <button
+                              type="button"
+                              class="btn primary"
+                              data-action="buy"
+                           >
+                              구매하기
+                           </button>
+
+                           <!-- 담기 버튼: 클릭 시 텍스트 변경/비활성화/토스트 표시 -->
+                           <button type="button" class="btn" data-action="cart">
+                              담기
+                           </button>
+                        </div>
+                     </article>
+                  </li>
+
+                  <!-- Product 2 -->
+                  <li class="product__item">
+                     <article
+                        class="product__card"
+                        data-product-id="2"
+                        data-title="상품 2"
+                        data-price="22000"
+                        data-brand="브랜드 B"
+                     >
+                        <figure class="product__card__media" data-open="modal">
+                           <img
+                              src=""
+                              alt="상품 2 이미지"
+                              loading="lazy"
+                              width="520"
+                              height="390"
+                           />
+                        </figure>
+
+                        <div class="product__card__body">
+                           <p class="product__card__brand">브랜드 B</p>
+                           <h3 class="product__card__title" data-open="modal">
+                              상품 2
+                           </h3>
+                           <p class="product__card__desc">
+                              상품 2에 대한 간단한 설명입니다.
+                           </p>
+
+                           <div class="product__card__price">
+                              <data value="22000">22,000원</data>
+                           </div>
+                        </div>
+
+                        <div class="product__card__actions">
+                           <button
+                              type="button"
+                              class="btn primary"
+                              data-action="buy"
+                           >
+                              구매하기
+                           </button>
+                           <button type="button" class="btn" data-action="cart">
+                              담기
+                           </button>
+                        </div>
+                     </article>
+                  </li>
+
+                  <!-- Product 3 -->
+                  <li class="product__item">
+                     <article
+                        class="product__card"
+                        data-product-id="3"
+                        data-title="상품 3"
+                        data-price="33000"
+                        data-brand="브랜드 C"
+                     >
+                        <figure class="product__card__media" data-open="modal">
+                           <img
+                              src=""
+                              alt="상품 3 이미지"
+                              loading="lazy"
+                              width="520"
+                              height="390"
+                           />
+                        </figure>
+
+                        <div class="product__card__body">
+                           <p class="product__card__brand">브랜드 C</p>
+                           <h3 class="product__card__title" data-open="modal">
+                              상품 3
+                           </h3>
+                           <p class="product__card__desc">
+                              상품 3에 대한 간단한 설명입니다.
+                           </p>
+
+                           <div class="product__card__price">
+                              <data value="33000">33,000원</data>
+                           </div>
+                        </div>
+
+                        <div class="product__card__actions">
+                           <button
+                              type="button"
+                              class="btn primary"
+                              data-action="buy"
+                           >
+                              구매하기
+                           </button>
+                           <button type="button" class="btn" data-action="cart">
+                              담기
+                           </button>
+                        </div>
+                     </article>
+                  </li>
+
+                  <!-- Product 4 -->
+                  <li class="product__item">
+                     <article
+                        class="product__card"
+                        data-product-id="4"
+                        data-title="상품 4"
+                        data-price="44000"
+                        data-brand="브랜드 D"
+                     >
+                        <figure class="product__card__media" data-open="modal">
+                           <img
+                              src=""
+                              alt="상품 4 이미지"
+                              loading="lazy"
+                              width="520"
+                              height="390"
+                           />
+                        </figure>
+
+                        <div class="product__card__body">
+                           <p class="product__card__brand">브랜드 D</p>
+                           <h3 class="product__card__title" data-open="modal">
+                              상품 4
+                           </h3>
+                           <p class="product__card__desc">
+                              상품 4에 대한 간단한 설명입니다.
+                           </p>
+
+                           <div class="product__card__price">
+                              <data value="44000">44,000원</data>
+                           </div>
+                        </div>
+
+                        <div class="product__card__actions">
+                           <button
+                              type="button"
+                              class="btn primary"
+                              data-action="buy"
+                           >
+                              구매하기
+                           </button>
+                           <button type="button" class="btn" data-action="cart">
+                              담기
+                           </button>
+                        </div>
+                     </article>
+                  </li>
+               </ul>
+            </section>
+         </main>
+      </div>
+
+      <!-- =========================================================
+       Modal (페이지에 1개만)
+       - 클릭한 카드의 텍스트 + 이미지 정보를 JS가 여기로 주입함
+     ========================================================= -->
+      <div id="modalRoot" aria-hidden="true">
+         <div class="modal-backdrop" id="backdrop"></div>
+
+         <div
+            class="modal-panel"
+            id="panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modalTitle"
+         >
+            <h2 id="modalTitle" class="modal-title">구매하기</h2>
+
+            <!-- 모달 상단 이미지 영역 -->
+            <figure class="modal-media">
+               <!-- JS가 클릭한 상품 이미지로 src/alt를 바꿔치기 -->
+               <img id="modalImg" src="" alt="" />
+            </figure>
+
+            <p class="modal-line">
+               <strong id="modalBrand">브랜드</strong>
+               —
+               <span id="modalProductTitle">상품명</span>
+            </p>
+
+            <p class="modal-line">
+               결제 금액:
+               <strong id="modalPrice">0원</strong>
+            </p>
+
+            <div class="modal-actions">
+               <button id="closeBtn" type="button" class="btn">닫기</button>
+               <button id="confirmBtn" type="button" class="btn primary">
+                  확인
+               </button>
+            </div>
+         </div>
+      </div>
+
+      <!-- =========================================================
+       Toast (담기 알림)
+     ========================================================= -->
+      <div class="toast" id="toast" aria-live="polite" aria-atomic="true">
+         <span id="toastText">담겼습니다.</span>
+      </div>
+
+      <!-- JS 파일 연결 (body 끝에 두면 DOM 로딩 후 실행되어 안전함) -->
+      <script src="./js/demo.js"></script>
+   </body>
+</html>

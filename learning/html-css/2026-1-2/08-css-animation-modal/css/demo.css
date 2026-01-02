@@ -1,0 +1,232 @@
+:root {
+   --ease-modal: cubic-bezier(0.16, 1, 0.3, 1);
+   --dur: 420ms;
+}
+
+body {
+   font-family:
+      system-ui,
+      -apple-system,
+      sans-serif;
+   margin: 24px;
+}
+
+.wrapper {
+   max-width: 980px;
+   margin: 0 auto;
+}
+
+/* ===== Header ===== */
+.site__nav {
+   display: flex;
+   align-items: center;
+   gap: 12px;
+   margin-bottom: 18px;
+}
+.site__day a {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   width: 42px;
+   height: 42px;
+   border-radius: 10px;
+   border: 1px solid #ddd;
+   text-decoration: none;
+   color: #111;
+}
+.site__title {
+   font-size: 18px;
+   margin: 0;
+}
+
+/* ===== Products ===== */
+.products__list {
+   list-style: none;
+   padding: 0;
+   margin: 0;
+   display: grid;
+   grid-template-columns: repeat(2, minmax(0, 1fr));
+   gap: 14px;
+}
+
+@media (max-width: 720px) {
+   .products__list {
+      grid-template-columns: 1fr;
+   }
+}
+
+.product__card {
+   border: 1px solid #eee;
+   border-radius: 14px;
+   overflow: hidden;
+   background: #fff;
+}
+
+/* 이미지/제목은 클릭해서 모달을 열 수 있으므로 커서 변경 */
+.product__card__media,
+.product__card__title {
+   cursor: pointer;
+}
+
+.product__card__media {
+   aspect-ratio: 4 / 3;
+   overflow: hidden;
+   background: #f6f6f6;
+}
+
+.product__card__media img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover;
+   display: block;
+}
+
+.product__card__body {
+   padding: 14px;
+   display: grid;
+   gap: 6px;
+}
+
+.product__card__brand {
+   margin: 0;
+   color: #666;
+   font-size: 14px;
+}
+
+.product__card__title {
+   margin: 0;
+   font-size: 16px;
+}
+
+.product__card__desc {
+   margin: 0;
+   color: #444;
+   font-size: 14px;
+   line-height: 1.45;
+}
+
+.product__card__price {
+   margin-top: 4px;
+   font-weight: 700;
+}
+
+.product__card__actions {
+   display: flex;
+   gap: 8px;
+   padding: 0 14px 14px;
+}
+
+/* 버튼 공통 */
+.btn {
+   cursor: pointer;
+   padding: 10px 12px;
+   border: 1px solid #ddd;
+   border-radius: 10px;
+   background: #fff;
+}
+
+.btn.primary {
+   background: #111;
+   color: #fff;
+   border-color: #111;
+}
+
+/* 담김 상태 버튼(비활성) 스타일 */
+.btn.is-added {
+   background: #f3f3f3;
+   border-color: #e5e5e5;
+   color: #666;
+   cursor: not-allowed;
+}
+
+/* ===== Modal ===== */
+.modal-backdrop {
+   position: fixed;
+   inset: 0;
+   background: rgba(0, 0, 0, 0.55);
+   opacity: 0;
+   visibility: hidden;
+   transition:
+      opacity var(--dur) var(--ease-modal),
+      visibility 0s linear var(--dur);
+}
+
+.modal-panel {
+   position: fixed;
+   left: 50%;
+   top: 50%;
+   transform: translate(-50%, calc(-50% + 16px));
+   width: min(520px, 92vw);
+   background: #fff;
+   border-radius: 14px;
+   padding: 18px;
+   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
+   opacity: 0;
+   visibility: hidden;
+   transition:
+      opacity var(--dur) var(--ease-modal),
+      transform var(--dur) var(--ease-modal),
+      visibility 0s linear var(--dur);
+}
+
+/* 열린 상태 */
+.is-open .modal-backdrop {
+   opacity: 1;
+   visibility: visible;
+   transition: opacity var(--dur) var(--ease-modal);
+}
+
+.is-open .modal-panel {
+   opacity: 1;
+   visibility: visible;
+   transform: translate(-50%, -50%);
+   transition:
+      opacity var(--dur) var(--ease-modal),
+      transform var(--dur) var(--ease-modal);
+}
+
+/* 모달 내부 */
+.modal-title {
+   margin: 0 0 10px;
+   font-size: 18px;
+}
+
+.modal-media {
+   margin: 0 0 10px;
+   border-radius: 12px;
+   overflow: hidden;
+   background: #f6f6f6;
+   aspect-ratio: 4 / 3;
+}
+
+.modal-media img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover;
+   display: block;
+}
+
+.modal-line {
+   margin: 0;
+   line-height: 1.5;
+}
+
+.modal-line + .modal-line {
+   margin-top: 10px;
+}
+
+.modal-actions {
+   display: flex;
+   justify-content: flex-end;
+   gap: 8px;
+   margin-top: 14px;
+}
+
+/* 접근성: 모션 최소화 */
+@media (prefers-reduced-motion: reduce) {
+   .modal-backdrop,
+   .modal-panel,
+   .toast {
+      transition: none !important;
+   }
+}
