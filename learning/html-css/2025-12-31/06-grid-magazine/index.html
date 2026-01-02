@@ -3,122 +3,430 @@
    <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <link rel="stylesheet" href="/css/style.css" />
-      <title>Day 6 Grid Layout Site</title>
+      <title>Day 6 — Grid Gallery</title>
+      <link rel="stylesheet" href="./css/style.css" />
    </head>
+
    <body>
       <div class="wrapper">
          <header class="site__header">
-            <nav class="header__nav">
-               <div class="header__logo">
-                  <a href="#">D6</a>
-                  <span>Day 6 Grid Layout Site</span>
-               </div>
-               <div class="header__menu">
-                  <ul class="header__menu__list">
-                     <li><a href="#">menu</a></li>
-                     <li><a href="#">menu</a></li>
-                     <li><a href="#">menu</a></li>
-                     <li><a href="#">menu</a></li>
-                     <li><a href="#">menu</a></li>
-                  </ul>
-               </div>
-               <div class="header__action">
-                  <ul class="header_action_list">
-                     <li><a href="#">아이콘</a></li>
-                     <li><a href="#">아이콘</a></li>
-                     <li><a href="#">아이콘</a></li>
-                  </ul>
-               </div>
-            </nav>
+            <div class="container">
+               <strong style="font-size: 1.8rem">D6</strong>
+               <span style="margin-left: 10px; color: rgba(255, 255, 255, 0.7)">
+                  Grid Gallery
+               </span>
+            </div>
          </header>
-         <main class="main grid">
-            <section class="hero__section">
-               <div class="container">
-                  <div class="hero__inner">
-                     <div class="hero__slider">
-                        <div class="slider__item"></div>
-                        <div class="slider__item"></div>
-                        <div class="slider__item"></div>
-                        <div class="slider__item"></div>
-                        <div class="slider__item"></div>
-                        <div class="slider__item"></div>
-                     </div>
-                  </div>
+
+         <section class="hero__section">
+            <div class="container">
+               <h1 style="font-size: 3.2rem; margin-bottom: 8px">
+                  Day 6 — Grid Mosaic
+               </h1>
+            </div>
+         </section>
+
+         <!-- =========================
+              SPRING
+         ========================= -->
+         <section class="season__spring">
+            <div class="section-head">
+               <h2>봄</h2>
+            </div>
+
+            <div class="mosaic-wrap">
+               <div class="mosaic mosaic--spring">
+                  <figure class="tile t1">
+                     <img
+                        loading="lazy"
+                        alt="spring 01"
+                        src="./assets/images/spring/spring__1.png"
+                     />
+                  </figure>
+                  <figure class="tile t2">
+                     <img
+                        loading="lazy"
+                        alt="spring 02"
+                        src="./assets/images/spring/spring__2.png"
+                     />
+                  </figure>
+                  <figure class="tile t3">
+                     <img
+                        loading="lazy"
+                        alt="spring 03"
+                        src="./assets/images/spring/spring__3.png"
+                     />
+                  </figure>
+                  <figure class="tile t4">
+                     <img
+                        loading="lazy"
+                        alt="spring 04"
+                        src="./assets/images/spring/spring__4.png"
+                     />
+                  </figure>
+                  <figure class="tile t5">
+                     <img
+                        loading="lazy"
+                        alt="spring 05"
+                        src="./assets/images/spring/spring__5.png"
+                     />
+                  </figure>
+                  <figure class="tile t6">
+                     <img
+                        loading="lazy"
+                        alt="spring 06"
+                        src="./assets/images/spring/spring__6.png"
+                     />
+                  </figure>
+                  <figure class="tile t7">
+                     <img
+                        loading="lazy"
+                        alt="spring 07"
+                        src="./assets/images/spring/spring__7.png"
+                     />
+                  </figure>
+                  <figure class="tile t8">
+                     <img
+                        loading="lazy"
+                        alt="spring 08"
+                        src="./assets/images/spring/spring__8.png"
+                     />
+                  </figure>
+                  <figure class="tile t9">
+                     <img
+                        loading="lazy"
+                        alt="spring 09"
+                        src="./assets/images/spring/spring__9.png"
+                     />
+                  </figure>
+                  <figure class="tile t10">
+                     <img
+                        loading="lazy"
+                        alt="spring 10"
+                        src="./assets/images/spring/spring__10.png"
+                     />
+                  </figure>
+                  <figure class="tile t11">
+                     <img
+                        loading="lazy"
+                        alt="spring 11"
+                        src="./assets/images/spring/spring__11.png"
+                     />
+                  </figure>
+                  <figure class="tile t12">
+                     <img
+                        loading="lazy"
+                        alt="spring 12"
+                        src="./assets/images/spring/spring__12.png"
+                     />
+                  </figure>
                </div>
-            </section>
-            <section class="season">
-               <div class="season__spring__bg bg">봄</div>
-               <div class="season__summer__bg bg">여름</div>
-               <div class="season__autumn__bg bg">가을</div>
-               <div class="season__winter__bg bg">겨울</div>
-            </section>
-            <section class="season__spring">
-               <div class="spring__card__1 spring"></div>
-               <div class="spring__card__2 spring"></div>
-               <div class="spring__card__3 spring"></div>
-               <div class="spring__card__4 spring"></div>
-               <div class="spring__card__5 spring"></div>
-               <div class="spring__card__6 spring"></div>
-               <div class="spring__card__7 spring"></div>
-               <div class="spring__card__8 spring"></div>
-               <div class="spring__card__9 spring"></div>
-               <div class="spring__card__10 spring"></div>
-               <div class="spring__card__11 spring"></div>
-               <div class="spring__card__12 spring"></div>
-            </section>
-            <section class="season__summer">
-               <div class="summer__card__1 summer"></div>
-               <div class="summer__card__2 summer"></div>
-               <div class="summer__card__3 summer"></div>
-               <div class="summer__card__4 summer"></div>
-               <div class="summer__card__5 summer"></div>
-               <div class="summer__card__6 summer"></div>
-               <div class="summer__card__7 summer"></div>
-               <div class="summer__card__8 summer"></div>
-               <div class="summer__card__9 summer"></div>
-               <div class="summer__card__10 summer"></div>
-               <div class="summer__card__11 summer"></div>
-               <div class="summer__card__12 summer"></div>
-            </section>
-            <section class="season__autumn">
-               <div class="autumn__card__1 autumn"></div>
-               <div class="autumn__card__2 autumn"></div>
-               <div class="autumn__card__3 autumn"></div>
-               <div class="autumn__card__4 autumn"></div>
-               <div class="autumn__card__5 autumn"></div>
-               <div class="autumn__card__6 autumn"></div>
-               <div class="autumn__card__7 autumn"></div>
-               <div class="autumn__card__8 autumn"></div>
-               <div class="autumn__card__9 autumn"></div>
-               <div class="autumn__card__10 autumn"></div>
-               <div class="autumn__card__11 autumn"></div>
-               <div class="autumn__card__12 autumn"></div>
-            </section>
-            <section class="season__winter">
-               <div class="winter__card__1 winter"></div>
-               <div class="winter__card__2 winter"></div>
-               <div class="winter__card__3 winter"></div>
-               <div class="winter__card__4 winter"></div>
-               <div class="winter__card__5 winter"></div>
-               <div class="winter__card__6 winter"></div>
-               <div class="winter__card__7 winter"></div>
-               <div class="winter__card__8 winter"></div>
-               <div class="winter__card__9 winter"></div>
-               <div class="winter__card__10 winter"></div>
-               <div class="winter__card__11 winter"></div>
-               <div class="winter__card__12 winter"></div>
-            </section>
-         </main>
+            </div>
+         </section>
+
+         <!-- =========================
+              SUMMER (spring 이미지 재사용/섞기)
+              순서: 7,8,9,10,11,12,1,2,3,4,5,6
+         ========================= -->
+         <section class="season__summer">
+            <div class="section-head">
+               <h2>여름</h2>
+            </div>
+
+            <div class="mosaic-wrap">
+               <div class="mosaic mosaic--summer">
+                  <figure class="tile t1">
+                     <img
+                        loading="lazy"
+                        alt="summer 01"
+                        src="./assets/images/spring/spring__7.png"
+                     />
+                  </figure>
+                  <figure class="tile t2">
+                     <img
+                        loading="lazy"
+                        alt="summer 02"
+                        src="./assets/images/spring/spring__8.png"
+                     />
+                  </figure>
+                  <figure class="tile t3">
+                     <img
+                        loading="lazy"
+                        alt="summer 03"
+                        src="./assets/images/spring/spring__9.png"
+                     />
+                  </figure>
+                  <figure class="tile t4">
+                     <img
+                        loading="lazy"
+                        alt="summer 04"
+                        src="./assets/images/spring/spring__10.png"
+                     />
+                  </figure>
+                  <figure class="tile t5">
+                     <img
+                        loading="lazy"
+                        alt="summer 05"
+                        src="./assets/images/spring/spring__11.png"
+                     />
+                  </figure>
+                  <figure class="tile t6">
+                     <img
+                        loading="lazy"
+                        alt="summer 06"
+                        src="./assets/images/spring/spring__12.png"
+                     />
+                  </figure>
+                  <figure class="tile t7">
+                     <img
+                        loading="lazy"
+                        alt="summer 07"
+                        src="./assets/images/spring/spring__1.png"
+                     />
+                  </figure>
+                  <figure class="tile t8">
+                     <img
+                        loading="lazy"
+                        alt="summer 08"
+                        src="./assets/images/spring/spring__2.png"
+                     />
+                  </figure>
+                  <figure class="tile t9">
+                     <img
+                        loading="lazy"
+                        alt="summer 09"
+                        src="./assets/images/spring/spring__3.png"
+                     />
+                  </figure>
+                  <figure class="tile t10">
+                     <img
+                        loading="lazy"
+                        alt="summer 10"
+                        src="./assets/images/spring/spring__4.png"
+                     />
+                  </figure>
+                  <figure class="tile t11">
+                     <img
+                        loading="lazy"
+                        alt="summer 11"
+                        src="./assets/images/spring/spring__5.png"
+                     />
+                  </figure>
+                  <figure class="tile t12">
+                     <img
+                        loading="lazy"
+                        alt="summer 12"
+                        src="./assets/images/spring/spring__6.png"
+                     />
+                  </figure>
+               </div>
+            </div>
+         </section>
+
+         <!-- =========================
+              AUTUMN (spring 이미지 재사용/섞기)
+              순서: 4,2,11,6,1,9,12,3,8,5,10,7
+         ========================= -->
+         <section class="season__autumn">
+            <div class="section-head">
+               <h2>가을</h2>
+            </div>
+
+            <div class="mosaic-wrap">
+               <div class="mosaic mosaic--autumn">
+                  <figure class="tile t1">
+                     <img
+                        loading="lazy"
+                        alt="autumn 01"
+                        src="./assets/images/spring/spring__4.png"
+                     />
+                  </figure>
+                  <figure class="tile t2">
+                     <img
+                        loading="lazy"
+                        alt="autumn 02"
+                        src="./assets/images/spring/spring__2.png"
+                     />
+                  </figure>
+                  <figure class="tile t3">
+                     <img
+                        loading="lazy"
+                        alt="autumn 03"
+                        src="./assets/images/spring/spring__11.png"
+                     />
+                  </figure>
+                  <figure class="tile t4">
+                     <img
+                        loading="lazy"
+                        alt="autumn 04"
+                        src="./assets/images/spring/spring__6.png"
+                     />
+                  </figure>
+                  <figure class="tile t5">
+                     <img
+                        loading="lazy"
+                        alt="autumn 05"
+                        src="./assets/images/spring/spring__1.png"
+                     />
+                  </figure>
+                  <figure class="tile t6">
+                     <img
+                        loading="lazy"
+                        alt="autumn 06"
+                        src="./assets/images/spring/spring__9.png"
+                     />
+                  </figure>
+                  <figure class="tile t7">
+                     <img
+                        loading="lazy"
+                        alt="autumn 07"
+                        src="./assets/images/spring/spring__12.png"
+                     />
+                  </figure>
+                  <figure class="tile t8">
+                     <img
+                        loading="lazy"
+                        alt="autumn 08"
+                        src="./assets/images/spring/spring__3.png"
+                     />
+                  </figure>
+                  <figure class="tile t9">
+                     <img
+                        loading="lazy"
+                        alt="autumn 09"
+                        src="./assets/images/spring/spring__8.png"
+                     />
+                  </figure>
+                  <figure class="tile t10">
+                     <img
+                        loading="lazy"
+                        alt="autumn 10"
+                        src="./assets/images/spring/spring__5.png"
+                     />
+                  </figure>
+                  <figure class="tile t11">
+                     <img
+                        loading="lazy"
+                        alt="autumn 11"
+                        src="./assets/images/spring/spring__10.png"
+                     />
+                  </figure>
+                  <figure class="tile t12">
+                     <img
+                        loading="lazy"
+                        alt="autumn 12"
+                        src="./assets/images/spring/spring__7.png"
+                     />
+                  </figure>
+               </div>
+            </div>
+         </section>
+
+         <!-- =========================
+              WINTER (spring 이미지 재사용/섞기)
+              순서: 12,10,8,6,4,2,11,9,7,5,3,1
+         ========================= -->
+         <section class="season__winter">
+            <div class="section-head">
+               <h2>겨울</h2>
+            </div>
+
+            <div class="mosaic-wrap">
+               <div class="mosaic mosaic--winter">
+                  <figure class="tile t1">
+                     <img
+                        loading="lazy"
+                        alt="winter 01"
+                        src="./assets/images/spring/spring__12.png"
+                     />
+                  </figure>
+                  <figure class="tile t2">
+                     <img
+                        loading="lazy"
+                        alt="winter 02"
+                        src="./assets/images/spring/spring__10.png"
+                     />
+                  </figure>
+                  <figure class="tile t3">
+                     <img
+                        loading="lazy"
+                        alt="winter 03"
+                        src="./assets/images/spring/spring__8.png"
+                     />
+                  </figure>
+                  <figure class="tile t4">
+                     <img
+                        loading="lazy"
+                        alt="winter 04"
+                        src="./assets/images/spring/spring__6.png"
+                     />
+                  </figure>
+                  <figure class="tile t5">
+                     <img
+                        loading="lazy"
+                        alt="winter 05"
+                        src="./assets/images/spring/spring__4.png"
+                     />
+                  </figure>
+                  <figure class="tile t6">
+                     <img
+                        loading="lazy"
+                        alt="winter 06"
+                        src="./assets/images/spring/spring__2.png"
+                     />
+                  </figure>
+                  <figure class="tile t7">
+                     <img
+                        loading="lazy"
+                        alt="winter 07"
+                        src="./assets/images/spring/spring__11.png"
+                     />
+                  </figure>
+                  <figure class="tile t8">
+                     <img
+                        loading="lazy"
+                        alt="winter 08"
+                        src="./assets/images/spring/spring__9.png"
+                     />
+                  </figure>
+                  <figure class="tile t9">
+                     <img
+                        loading="lazy"
+                        alt="winter 09"
+                        src="./assets/images/spring/spring__7.png"
+                     />
+                  </figure>
+                  <figure class="tile t10">
+                     <img
+                        loading="lazy"
+                        alt="winter 10"
+                        src="./assets/images/spring/spring__5.png"
+                     />
+                  </figure>
+                  <figure class="tile t11">
+                     <img
+                        loading="lazy"
+                        alt="winter 11"
+                        src="./assets/images/spring/spring__3.png"
+                     />
+                  </figure>
+                  <figure class="tile t12">
+                     <img
+                        loading="lazy"
+                        alt="winter 12"
+                        src="./assets/images/spring/spring__1.png"
+                     />
+                  </figure>
+               </div>
+            </div>
+         </section>
+
          <footer class="site__footer">
             <div class="container">
-               <div class="footer__inner">
-                  <p>
-                     © 2025 재준 · Day 6 Grid Layout Site<br />
-                     본 사이트는 학습 및 포트폴리오용으로 제작되었으며, 사용된
-                     이미지는 AI 생성 이미지입니다.
-                  </p>
-               </div>
+               <p>
+                  © 2025 재준 · Day 6 Grid Layout Site<br />
+                  본 사이트는 Ai 이미지를 사용 했씁니다
+               </p>
             </div>
          </footer>
       </div>
