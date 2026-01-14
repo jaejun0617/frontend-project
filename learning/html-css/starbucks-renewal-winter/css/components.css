@@ -232,7 +232,11 @@ button {
 }
 
 /* =========================================================
-    3) SECTION 02 — Featured Picks: 카드 쇼케이스
+    1) SECTION 01 — Hero
+    ========================================================= */
+
+/* =========================================================
+    2) SECTION 02 — Featured Picks: 카드 쇼케이스
     ========================================================= */
 
 /* 섹션2 배경/오버플로우 */
@@ -459,7 +463,7 @@ button {
 }
 
 /* =========================================================
-    4) SECTION 03 — Menu Preview: CSS 필터링 그리드
+    3) SECTION 03 — Menu Preview: CSS 필터링 그리드
     ========================================================= */
 
 /* 섹션 공통 타이틀 오버레이 */
@@ -787,7 +791,7 @@ button {
 }
 
 /* =========================================================
-    5) SECTION 04 — Rewards: 오버레이 카드 + 힌트 + 진행 라인
+    4) SECTION 04 — Rewards: 오버레이 카드 + 힌트 + 진행 라인
     ========================================================= */
 
 /* 리워드 섹션 배경/정렬 */
@@ -1176,9 +1180,402 @@ button {
       pointer-events: auto;
    }
 }
+/* =========================================================
+    5) SECTION 05
+    ========================================================= */
 
 /* =========================================================
-    6) SECTION 05 — Store Experience: 배경 100% + 우측 오버레이 패널
+   Section 06 — Brand Story (Tabs + Zigzag)
+   ========================================================= */
+
+/* 섹션 프레임 */
+.brand__story {
+   min-height: clamp(1400px, 160vh, 2800px);
+
+   padding-block: clamp(36px, 6vh, 72px);
+}
+
+/* 내부 래퍼 */
+.brand__inner {
+   display: grid;
+   gap: clamp(18px, 3vh, 28px);
+}
+
+/* 섹션 헤더 */
+.brand__head {
+   text-align: center;
+   display: grid;
+   gap: 10px;
+}
+
+.brand__title {
+   margin: 0;
+   font-size: clamp(22px, 2.2vw, 32px);
+   letter-spacing: var(--ls-tight);
+   color: var(--text-900);
+}
+
+.brand__sub {
+   margin: 0 auto;
+   max-width: 60ch;
+   font-size: clamp(14px, 1.15vw, 18px);
+   color: var(--text-600);
+   line-height: 1.5;
+}
+
+/* 탭 컨테이너 */
+.brand__tabs {
+   position: relative;
+   display: grid;
+   gap: 14px;
+}
+
+/* 라디오 숨김 */
+.brand__tabs > input[type='radio'] {
+   position: absolute;
+   inline-size: 1px;
+   block-size: 1px;
+   overflow: hidden;
+   clip: rect(0 0 0 0);
+   white-space: nowrap;
+}
+
+/* 탭 버튼 바 */
+.brand__tabbar {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 10px;
+   justify-content: center;
+   align-items: center;
+}
+
+/* 탭 버튼 */
+.brand__tabbar label {
+   cursor: pointer;
+   user-select: none;
+
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+
+   height: 42px;
+   padding: 0 16px;
+   border-radius: 999px;
+
+   font-size: 14px;
+   font-weight: 900;
+   letter-spacing: 0.01em;
+
+   background: color-mix(in oklab, var(--bg-50), #ffffff 30%);
+   border: 1px solid var(--line-200);
+   color: var(--text-700);
+
+   transition:
+      transform 180ms var(--ease-out),
+      background 180ms var(--ease-out),
+      border-color 180ms var(--ease-out);
+}
+
+.brand__tabbar label:hover {
+   transform: translateY(-1px);
+   border-color: var(--line-300);
+}
+
+/* 활성 탭 */
+#tab-coffee:checked ~ .brand__tabbar label[for='tab-coffee'],
+#tab-sourcing:checked ~ .brand__tabbar label[for='tab-sourcing'],
+#tab-sustain:checked ~ .brand__tabbar label[for='tab-sustain'],
+#tab-community:checked ~ .brand__tabbar label[for='tab-community'] {
+   background: color-mix(in oklab, var(--brand-700), #000 8%);
+   border-color: color-mix(in oklab, var(--brand-700), #fff 45%);
+   color: #fff;
+}
+
+/* 패널 래퍼 */
+.brand__panels {
+   position: relative;
+   min-height: auto;
+}
+
+/* 패널 기본: 숨김 */
+.brand__panel {
+   position: absolute;
+   inset: 0;
+}
+
+/* 체크된 탭 패널 표시 */
+#tab-coffee:checked ~ .brand__panels #panel-coffee,
+#tab-sourcing:checked ~ .brand__panels #panel-sourcing,
+#tab-sustain:checked ~ .brand__panels #panel-sustain,
+#tab-community:checked ~ .brand__panels #panel-community {
+   opacity: 1;
+   visibility: visible;
+   pointer-events: auto;
+   transform: translateY(0);
+   transition:
+      opacity 220ms var(--ease-out),
+      transform 220ms var(--ease-out),
+      visibility 0ms;
+   position: relative;
+}
+
+/* 패널 페이드 */
+.brand__panel {
+   position: absolute;
+   inset: 0;
+   display: block;
+   opacity: 0;
+   visibility: hidden;
+   pointer-events: none;
+
+   /* 전환 애니메이션 */
+   transform: translateY(8px);
+   transition:
+      opacity 220ms var(--ease-out),
+      transform 220ms var(--ease-out),
+      visibility 0ms linear 220ms;
+}
+
+@keyframes brandFade {
+   from {
+      opacity: 0;
+      transform: translateY(8px);
+   }
+   to {
+      opacity: 1;
+      transform: translateY(0);
+   }
+}
+
+/* =========================================================
+     Zigzag layout
+     ========================================================= */
+
+.zigzag {
+   display: grid;
+   gap: clamp(18px, 3vh, 28px);
+}
+
+/* 한 줄 카피 */
+.zigzag__line {
+   margin: 0;
+   padding: 12px 14px;
+   height: 300px;
+   display: flex;
+
+   align-items: center;
+   justify-content: center;
+   font-size: 16px;
+   font-weight: 900;
+   letter-spacing: 0.01em;
+
+   color: #ffffff;
+   background: color-mix(in oklab, var(--bg-50), #ffffff 35%);
+   border: 1px solid var(--line-200);
+}
+
+/* 지그재그 행 */
+.zigzag__row {
+   display: grid;
+   grid-template-columns: 60% 40%;
+   gap: clamp(14px, 2vw, 22px);
+   align-items: center;
+
+   padding: clamp(12px, 1.4vw, 18px);
+   border-radius: var(--radius-sm);
+
+   background: color-mix(in oklab, var(--bg-50), #ffffff 45%);
+   border: 1px solid var(--line-200);
+}
+
+/* 반대 방향 */
+.zigzag__row--reverse {
+   grid-template-columns: 40% 60%;
+}
+
+.zigzag__row--reverse .zigzag__media {
+   order: 2;
+}
+.zigzag__row--reverse .zigzag__content {
+   order: 1;
+}
+
+/* 이미지 */
+.zigzag__media {
+   contain: paint;
+}
+
+.zigzag__media img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover;
+   transform: translateZ(0);
+   transition: transform 320ms var(--ease-out);
+}
+
+.zigzag__row:hover .zigzag__media img {
+   transform: scale(1.03);
+}
+
+/* 텍스트 */
+.zigzag__content {
+   display: grid;
+   gap: 10px;
+   padding: clamp(8px, 1vw, 12px);
+}
+
+.zigzag__eyebrow {
+   margin: 0;
+   font-size: 12px;
+   font-weight: 900;
+   letter-spacing: 0.06em;
+   text-transform: uppercase;
+   color: color-mix(in oklab, var(--brand-700), #000 10%);
+}
+
+.zigzag__title {
+   margin: 0;
+   font-size: clamp(18px, 1.6vw, 24px);
+   letter-spacing: var(--ls-tight);
+   color: var(--text-900);
+   line-height: 1.25;
+}
+
+.zigzag__desc {
+   margin: 0;
+   font-size: 14px;
+   color: var(--text-600);
+   line-height: 1.65;
+   max-width: 52ch;
+}
+
+/* 미니 카드 3개 */
+.mini__cards {
+   list-style: none;
+   margin: 6px 0 0;
+   padding: 0;
+
+   display: grid;
+   grid-template-columns: repeat(3, minmax(0, 1fr));
+   gap: 10px;
+}
+
+.mini__card {
+   border-radius: 14px;
+   padding: 12px 12px 10px;
+
+   background: color-mix(in oklab, var(--bg-0), #ffffff 20%);
+   border: 1px solid color-mix(in oklab, var(--line-200), #ffffff 15%);
+   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+
+   display: grid;
+   gap: 6px;
+}
+
+.mini__card strong {
+   font-size: 12px;
+   font-weight: 900;
+   color: var(--text-900);
+   letter-spacing: 0.01em;
+}
+
+.mini__card span {
+   font-size: 12px;
+   color: var(--text-600);
+   line-height: 1.45;
+}
+
+/* 링크 버튼 */
+.brand__link {
+   margin-top: 6px;
+   justify-self: start;
+
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+
+   height: 44px;
+   padding: 0 16px;
+   border-radius: 999px;
+
+   font-size: 14px;
+   font-weight: 900;
+   color: #fff;
+
+   background: color-mix(in oklab, var(--brand-700), #000 10%);
+   box-shadow: 0 14px 26px rgba(0, 0, 0, 0.12);
+
+   transition:
+      transform 180ms var(--ease-out),
+      box-shadow 180ms var(--ease-out),
+      background 180ms var(--ease-out);
+}
+
+.brand__link:hover {
+   transform: translateY(-1px);
+   background: color-mix(in oklab, var(--brand-600), #000 6%);
+   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
+}
+
+.coffee__bg {
+   background: url(../assets/img/section__6/coffee__bg.png) center / cover
+      no-repeat;
+}
+.sourcing__bg {
+   background: url(../assets/img/section__6/sourcing__bg.png) center / cover
+      no-repeat;
+}
+
+.sustain__bg {
+   background: url(../assets/img/section__6/sustain__bg.png) center / cover
+      no-repeat;
+}
+
+.community__bg {
+   background: url(../assets/img/section__6/community__bg.png) center / cover
+      no-repeat;
+}
+
+/* =========================================================
+     Responsive
+     ========================================================= */
+
+@media (max-width: 1024px) {
+   .zigzag__row,
+   .zigzag__row--reverse {
+      grid-template-columns: 1fr;
+   }
+
+   .zigzag__row--reverse .zigzag__media,
+   .zigzag__row--reverse .zigzag__content {
+      order: initial;
+   }
+
+   .mini__cards {
+      grid-template-columns: 1fr;
+   }
+
+   .brand__link {
+      width: 100%;
+      justify-self: stretch;
+   }
+}
+
+/* 모션 최소화 */
+@media (prefers-reduced-motion: reduce) {
+   .brand__panel {
+      animation: none !important;
+   }
+   .zigzag__media img {
+      transition: none !important;
+   }
+   .zigzag__row:hover .zigzag__media img {
+      transform: none !important;
+   }
+}
+
+/* =========================================================
+    7) SECTION 07 — Store Experience: 배경 100% + 우측 오버레이 패널
     ========================================================= */
 
 /* 섹션5 프레임 */
@@ -1458,396 +1855,4 @@ button {
    .store__cta {
       width: 100%;
    }
-}
-
-/* =========================================================
-   Section 06 — Brand Story (Tabs + Zigzag)
-   ========================================================= */
-
-/* 섹션 프레임 */
-.brand__story {
-   background: var(--bg-0);
-   padding-block: clamp(36px, 6vh, 84px);
-   min-height: auto;
-}
-
-/* 내부 래퍼 */
-.brand__inner {
-   display: grid;
-   gap: clamp(18px, 3vh, 28px);
-}
-
-/* 섹션 헤더 */
-.brand__head {
-   text-align: center;
-   display: grid;
-   gap: 10px;
-}
-
-.brand__title {
-   margin: 0;
-   font-size: clamp(22px, 2.2vw, 32px);
-   letter-spacing: var(--ls-tight);
-   color: var(--text-900);
-}
-
-.brand__sub {
-   margin: 0 auto;
-   max-width: 60ch;
-   font-size: clamp(14px, 1.15vw, 18px);
-   color: var(--text-600);
-   line-height: 1.5;
-}
-
-/* 탭 컨테이너 */
-.brand__tabs {
-   position: relative;
-   display: grid;
-   gap: 14px;
-}
-
-/* 라디오 숨김 */
-.brand__tabs > input[type='radio'] {
-   position: absolute;
-   inline-size: 1px;
-   block-size: 1px;
-   overflow: hidden;
-   clip: rect(0 0 0 0);
-   white-space: nowrap;
-}
-
-/* 탭 버튼 바 */
-.brand__tabbar {
-   display: flex;
-   flex-wrap: wrap;
-   gap: 10px;
-   justify-content: center;
-   align-items: center;
-}
-
-/* 탭 버튼 */
-.brand__tabbar label {
-   cursor: pointer;
-   user-select: none;
-
-   display: inline-flex;
-   align-items: center;
-   justify-content: center;
-
-   height: 42px;
-   padding: 0 16px;
-   border-radius: 999px;
-
-   font-size: 14px;
-   font-weight: 900;
-   letter-spacing: 0.01em;
-
-   background: color-mix(in oklab, var(--bg-50), #ffffff 30%);
-   border: 1px solid var(--line-200);
-   color: var(--text-700);
-
-   transition:
-      transform 180ms var(--ease-out),
-      background 180ms var(--ease-out),
-      border-color 180ms var(--ease-out);
-}
-
-.brand__tabbar label:hover {
-   transform: translateY(-1px);
-   border-color: var(--line-300);
-}
-
-/* 활성 탭 */
-#tab-coffee:checked ~ .brand__tabbar label[for='tab-coffee'],
-#tab-sourcing:checked ~ .brand__tabbar label[for='tab-sourcing'],
-#tab-sustain:checked ~ .brand__tabbar label[for='tab-sustain'],
-#tab-community:checked ~ .brand__tabbar label[for='tab-community'] {
-   background: color-mix(in oklab, var(--brand-700), #000 8%);
-   border-color: color-mix(in oklab, var(--brand-700), #fff 45%);
-   color: #fff;
-}
-
-/* 패널 래퍼 */
-.brand__panels {
-   position: relative;
-   min-height: clamp(980px, 70vh, 1180px);
-   border-radius: var(--radius-sm);
-}
-
-/* 패널 기본: 숨김 */
-.brand__panel {
-   display: none;
-}
-
-/* 체크된 탭 패널 표시 */
-#tab-coffee:checked ~ .brand__panels #panel-coffee,
-#tab-sourcing:checked ~ .brand__panels #panel-sourcing,
-#tab-sustain:checked ~ .brand__panels #panel-sustain,
-#tab-community:checked ~ .brand__panels #panel-community {
-   opacity: 1;
-   visibility: visible;
-   pointer-events: auto;
-   transform: translateY(0);
-   transition:
-      opacity 220ms var(--ease-out),
-      transform 220ms var(--ease-out),
-      visibility 0ms;
-}
-
-/* 패널 페이드 */
-.brand__panel {
-   position: absolute;
-   inset: 0;
-   display: block;
-   opacity: 0;
-   visibility: hidden;
-   pointer-events: none;
-
-   /* 전환 애니메이션 */
-   transform: translateY(8px);
-   transition:
-      opacity 220ms var(--ease-out),
-      transform 220ms var(--ease-out),
-      visibility 0ms linear 220ms;
-}
-
-@keyframes brandFade {
-   from {
-      opacity: 0;
-      transform: translateY(8px);
-   }
-   to {
-      opacity: 1;
-      transform: translateY(0);
-   }
-}
-
-/* =========================================================
-     Zigzag layout
-     ========================================================= */
-
-.zigzag {
-   display: grid;
-   gap: clamp(18px, 3vh, 28px);
-}
-
-/* 한 줄 카피 */
-.zigzag__line {
-   margin: 0;
-   padding: 12px 14px;
-   height: 300px;
-   display: flex;
-
-   align-items: center;
-   justify-content: center;
-   font-size: 16px;
-   font-weight: 900;
-   letter-spacing: 0.01em;
-
-   color: #ffffff;
-   background: color-mix(in oklab, var(--bg-50), #ffffff 35%);
-   border: 1px solid var(--line-200);
-}
-
-/* 지그재그 행 */
-.zigzag__row {
-   display: grid;
-   grid-template-columns: 60% 40%;
-   gap: clamp(14px, 2vw, 22px);
-   align-items: center;
-
-   padding: clamp(12px, 1.4vw, 18px);
-   border-radius: var(--radius-sm);
-
-   background: color-mix(in oklab, var(--bg-50), #ffffff 45%);
-   border: 1px solid var(--line-200);
-}
-
-/* 반대 방향 */
-.zigzag__row--reverse {
-   grid-template-columns: 40% 60%;
-}
-
-.zigzag__row--reverse .zigzag__media {
-   order: 2;
-}
-.zigzag__row--reverse .zigzag__content {
-   order: 1;
-}
-
-/* 이미지 */
-.zigzag__media {
-   contain: paint;
-}
-
-.zigzag__media img {
-   width: 100%;
-   height: 100%;
-   object-fit: cover;
-   transform: translateZ(0);
-   transition: transform 320ms var(--ease-out);
-}
-
-.zigzag__row:hover .zigzag__media img {
-   transform: scale(1.03);
-}
-
-/* 텍스트 */
-.zigzag__content {
-   display: grid;
-   gap: 10px;
-   padding: clamp(8px, 1vw, 12px);
-}
-
-.zigzag__eyebrow {
-   margin: 0;
-   font-size: 12px;
-   font-weight: 900;
-   letter-spacing: 0.06em;
-   text-transform: uppercase;
-   color: color-mix(in oklab, var(--brand-700), #000 10%);
-}
-
-.zigzag__title {
-   margin: 0;
-   font-size: clamp(18px, 1.6vw, 24px);
-   letter-spacing: var(--ls-tight);
-   color: var(--text-900);
-   line-height: 1.25;
-}
-
-.zigzag__desc {
-   margin: 0;
-   font-size: 14px;
-   color: var(--text-600);
-   line-height: 1.65;
-   max-width: 52ch;
-}
-
-/* 미니 카드 3개 */
-.mini__cards {
-   list-style: none;
-   margin: 6px 0 0;
-   padding: 0;
-
-   display: grid;
-   grid-template-columns: repeat(3, minmax(0, 1fr));
-   gap: 10px;
-}
-
-.mini__card {
-   border-radius: 14px;
-   padding: 12px 12px 10px;
-
-   background: color-mix(in oklab, var(--bg-0), #ffffff 20%);
-   border: 1px solid color-mix(in oklab, var(--line-200), #ffffff 15%);
-   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
-
-   display: grid;
-   gap: 6px;
-}
-
-.mini__card strong {
-   font-size: 12px;
-   font-weight: 900;
-   color: var(--text-900);
-   letter-spacing: 0.01em;
-}
-
-.mini__card span {
-   font-size: 12px;
-   color: var(--text-600);
-   line-height: 1.45;
-}
-
-/* 링크 버튼 */
-.brand__link {
-   margin-top: 6px;
-   justify-self: start;
-
-   display: inline-flex;
-   align-items: center;
-   justify-content: center;
-
-   height: 44px;
-   padding: 0 16px;
-   border-radius: 999px;
-
-   font-size: 14px;
-   font-weight: 900;
-   color: #fff;
-
-   background: color-mix(in oklab, var(--brand-700), #000 10%);
-   box-shadow: 0 14px 26px rgba(0, 0, 0, 0.12);
-
-   transition:
-      transform 180ms var(--ease-out),
-      box-shadow 180ms var(--ease-out),
-      background 180ms var(--ease-out);
-}
-
-.brand__link:hover {
-   transform: translateY(-1px);
-   background: color-mix(in oklab, var(--brand-600), #000 6%);
-   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.16);
-}
-
-.coffee__bg {
-   background: url(../assets/img/section__6/coffee__bg.png) center / cover
-      no-repeat;
-}
-.sourcing__bg {
-   background: url(../assets/img/section__6/sourcing__bg.png) center / cover
-      no-repeat;
-}
-
-.sustain__bg {
-   background: url(../assets/img/section__6/sustain__bg.png) center / cover
-      no-repeat;
-}
-
-.community__bg {
-   background: url(../assets/img/section__6/community__bg.png) center / cover
-      no-repeat;
-}
-/* =========================================================
-     Responsive
-     ========================================================= */
-
-@media (max-width: 1024px) {
-   .zigzag__row,
-   .zigzag__row--reverse {
-      grid-template-columns: 1fr;
-   }
-
-   .zigzag__row--reverse .zigzag__media,
-   .zigzag__row--reverse .zigzag__content {
-      order: initial;
-   }
-
-   .mini__cards {
-      grid-template-columns: 1fr;
-   }
-
-   .brand__link {
-      width: 100%;
-      justify-self: stretch;
-   }
-}
-
-/* 모션 최소화 */
-@media (prefers-reduced-motion: reduce) {
-   .brand__panel {
-      animation: none !important;
-   }
-   .zigzag__media img {
-      transition: none !important;
-   }
-   .zigzag__row:hover .zigzag__media img {
-      transform: none !important;
-   }
-}
-
-.final__cta {
-   min-height: 100svh;
 }
