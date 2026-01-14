@@ -3,7 +3,11 @@
    <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
+      <!-- Swiper CSS -->
+      <link
+         rel="stylesheet"
+         href="https://cdn.jsdelivr.net/npm/swiper@12/swiper-bundle.min.css"
+      />
       <!-- 전역 디자인 기준값(토큰) -->
       <link rel="stylesheet" href="./css/tokens.css" />
 
@@ -38,8 +42,50 @@
 
          <!-- 페이지 메인 콘텐츠 영역 -->
          <main class="site__main">
-            <!-- 섹션1: 히어로(스켈레톤 상태) -->
-            <section class="home__hero"></section>
+            <!-- 섹션1: 히어로-->
+            <section class="hero">
+               <div class="swiper hero-swiper">
+                  <div class="swiper-wrapper">
+                     <div class="swiper-slide">
+                        <img src="./assets/img/Hero/hero__bg__01.png" />
+                        <div class="copy">
+                           <h1>A warm light in a cold night</h1>
+                           <p>차가운 겨울 밤, 불이 켜진 한 공간</p>
+                           <span
+                              >Step inside, winter slows down.<br />문을 여는
+                              순간, 겨울은 조금 느려집니다.</span
+                           >
+                        </div>
+                     </div>
+
+                     <div class="swiper-slide">
+                        <img src="./assets/img/Hero/hero__bg__02.png" />
+                        <div class="copy">
+                           <h1>A place to stay, not just stop</h1>
+                           <p>잠시 들르는 곳이 아닌, 머무는 공간</p>
+                           <span
+                              >Where warmth lingers through winter.<br />겨울
+                              내내 온기가 머무는 곳.</span
+                           >
+                        </div>
+                     </div>
+
+                     <div class="swiper-slide">
+                        <img src="./assets/img/Hero/hero__bg__03.png" />
+                        <div class="copy">
+                           <h1>Winter, served warm</h1>
+                           <p>겨울을, 따뜻하게 담다</p>
+                           <span
+                              >Coffee, food, and moments to share.<br />커피와
+                              음식, 그리고 함께하는 시간.</span
+                           >
+                        </div>
+                     </div>
+                  </div>
+
+                  <div class="swiper-pagination"></div>
+               </div>
+            </section>
 
             <!-- 섹션2: 추천 픽 카드 섹션 -->
             <section class="featured__picks" aria-label="Featured Picks">
@@ -1390,8 +1436,11 @@
             </p>
          </footer>
       </div>
+      <!-- Swiper JS -->
+      <script src="https://cdn.jsdelivr.net/npm/swiper@12/swiper-bundle.min.js"></script>
 
-      <!-- 섹션5 매장 선택 인터랙션 스크립트 -->
+      <script src="./js/swiper.js"></script>
+      <!-- 섹션7 매장 선택 인터랙션 스크립트 -->
       <script src="./js/script.js"></script>
    </body>
 </html>

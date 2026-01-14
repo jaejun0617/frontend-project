@@ -166,9 +166,7 @@ button {
 
 /* 페이지 전체 그리드(헤더/메인/푸터) */
 .wrapper {
-   min-height: 100vh;
-   display: grid;
-   grid-template-rows: auto 1fr auto;
+   height: 100svh;
 }
 
 /* 공통 컨테이너 */
@@ -231,10 +229,66 @@ button {
    max-width: 60ch;
 }
 
-/* =========================================================
-    1) SECTION 01 — Hero
-    ========================================================= */
+/* =========================
+   HERO — Winter Swiper
+========================= */
+/* hero */
+.hero {
+   width: 100%;
+   height: 100svh;
+}
 
+/* swiper 필수 */
+.swiper {
+   width: 100%;
+   height: 100%;
+}
+
+.swiper-slide {
+   position: relative;
+}
+
+.swiper-slide img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover;
+}
+
+.copy {
+   position: absolute;
+   inset: 0;
+   display: grid;
+   place-content: center;
+   text-align: center;
+   color: white;
+
+   background: rgba(0, 0, 0, 0.25);
+}
+.copy h1 {
+   font-size: clamp(30px, 3vw, 50px);
+   font-weight: 700;
+   line-height: 1.15;
+   letter-spacing: -0.02em;
+   text-shadow: 0px 14px 10px #0b0e12;
+}
+
+.copy p {
+   margin-top: 8px;
+   font-size: 20px;
+   font-weight: 500;
+   line-height: 1.4;
+   opacity: 0.9;
+   text-shadow: 0px 14px 10px #0b0e12;
+}
+
+.copy span {
+   display: block;
+   margin-top: 14px;
+   font-size: 16px;
+   line-height: 1.6;
+   opacity: 0.85;
+   text-shadow: 0px 14px 10px #0b0e12;
+}
 /* =========================================================
     2) SECTION 02 — Featured Picks: 카드 쇼케이스
     ========================================================= */
@@ -521,6 +575,10 @@ button {
    }
    .featured__img img {
       width: 500px;
+   }
+   .hero {
+      width: 100%;
+      height: 50svh;
    }
 }
 
