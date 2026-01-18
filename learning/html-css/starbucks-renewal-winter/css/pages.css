@@ -1,54 +1,344 @@
 /* =========================================================
    pages.css
-   역할: 페이지별로 필요한 "조합"과 "미세 보정"을 담당한다
-   - 공통 컴포넌트/레이아웃을 재사용
-   - 특정 페이지에서만 필요한 차이만 정의
+   역할: 페이지별로 필요한 미세 보정
    ========================================================= */
 
-/* ---------------------------------------------------------
-   1️⃣ 홈(index) 페이지 전용 보정
-   - Hero 내부 텍스트 정렬 미세 조정
-   - 랜딩 전용 섹션 간격
-   --------------------------------------------------------- */
+/* =========================================================
+   HOME PAGE (index.html) - 현재 페이지
+   ========================================================= */
 
-/* ---------------------------------------------------------
-   2️⃣ 메뉴(menu) 페이지 전용 보정
-   - 카테고리 영역 레이아웃 보정
-   - 카드 그리드 간격/정렬 미세 조정
-   --------------------------------------------------------- */
+/* Hero Section 상단 여백 조정 (고정 헤더 고려) */
+.hero {
+   margin-top: 0;
+}
 
-/* ---------------------------------------------------------
-   3️⃣ 리워드(rewards) 페이지 전용 보정
-   - 혜택 단계형 섹션 정렬
-   - CTA 영역 강조 배치
-   --------------------------------------------------------- */
+/* Featured Picks - 홈페이지 전용 강조 */
+.featured__picks .container {
+   max-width: 100%;
+}
 
-/* ---------------------------------------------------------
-   4️⃣ 브랜드(brand) 페이지 전용 보정
-   - 스토리 섹션 흐름
-   - 텍스트 중심 레이아웃 간격
-   --------------------------------------------------------- */
+/* Menu Preview - 홈페이지 전용 패딩 */
+.menu__preview {
+   padding-top: clamp(48px, 8vh, 96px);
+   padding-bottom: clamp(48px, 8vh, 96px);
+}
 
-/* ---------------------------------------------------------
-   5️⃣ 스토어(store) 페이지 전용 보정
-   - 필터/리스트 영역 배치
-   - 카드/리스트 전환 시 정렬
-   --------------------------------------------------------- */
+/* Rewards Teaser - 홈페이지 배경 고정 */
+@media (min-width: 1025px) {
+   .rewards__teaser {
+      background-attachment: fixed;
+   }
+}
 
-/* ---------------------------------------------------------
-   6️⃣ 컨택트(contact) 페이지 전용 보정
-   - 폼 레이아웃 폭/정렬
-   - 도움말/에러 메시지 위치
-   --------------------------------------------------------- */
+/* Seasonal Bridge - 홈페이지 전용 높이 조정 */
+.seasonal__bridge {
+   min-height: 80svh;
+}
 
-/* ---------------------------------------------------------
-   7️⃣ 페이지별 반응형 미세 조정
-   - 특정 페이지에서만 발생하는 깨짐 보정
-   --------------------------------------------------------- */
+/* Brand Story - 홈페이지 전용 여백 */
+.brand__story {
+   padding-top: clamp(48px, 8vh, 96px);
+}
 
-/* ---------------------------------------------------------
-   8️⃣ 페이지 전용 상태 클래스
-   - is-hero-wide
-   - has-filter
-   - is-story
-   --------------------------------------------------------- */
+/* Store Experience - 홈페이지 전용 높이 */
+.store__experience {
+   min-height: 100svh;
+}
+
+/* =========================================================
+   MENU PAGE (menu.html)
+   ========================================================= */
+
+/* Menu 페이지: 카테고리 필터 상단 고정 */
+.page-menu .menu__filter__tabs {
+   position: sticky;
+   top: var(--header-h);
+   z-index: 100;
+   background: var(--bg-0);
+   padding-block: 1rem;
+   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Menu 페이지: 그리드 간격 확대 */
+.page-menu .menu__grid {
+   gap: clamp(16px, 2vw, 24px);
+}
+
+/* Menu 페이지: 카드 호버 강화 */
+.page-menu .menu__card__inner:hover {
+   transform: translateY(-12px) scale(1.02);
+}
+
+/* =========================================================
+   REWARDS PAGE (rewards.html)
+   ========================================================= */
+
+/* Rewards 페이지: 전체 배경 */
+.page-rewards {
+   background: linear-gradient(to bottom, var(--brand-100), var(--bg-0));
+}
+
+/* Rewards 페이지: 힌트 패널 항상 표시 */
+.page-rewards .rewards__hint__panel {
+   position: static;
+   opacity: 1;
+   transform: none;
+   filter: none;
+   pointer-events: auto;
+   margin-top: 1rem;
+}
+
+/* Rewards 페이지: 진행 바 강조 */
+.page-rewards .rewards__progress {
+   padding: 1rem;
+   background: rgba(255, 255, 255, 0.1);
+   border-radius: var(--radius-sm);
+}
+
+/* =========================================================
+   BRAND PAGE (brand.html)
+   ========================================================= */
+
+/* Brand 페이지: 탭 고정 */
+.page-brand .brand__tabbar {
+   position: sticky;
+   top: var(--header-h);
+   z-index: 100;
+   background: var(--bg-0);
+   padding-block: 1rem;
+   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Brand 페이지: 지그재그 간격 확대 */
+.page-brand .zigzag {
+   gap: clamp(24px, 4vh, 36px);
+}
+
+/* Brand 페이지: 미니 카드 호버 효과 */
+.page-brand .mini__card {
+   transition: transform 200ms var(--ease-out);
+}
+
+.page-brand .mini__card:hover {
+   transform: translateY(-2px);
+}
+
+/* =========================================================
+   STORE PAGE (store.html)
+   ========================================================= */
+
+/* Store 페이지: 맵/리스트 전환 레이아웃 */
+.page-store .store__layout {
+   display: grid;
+   grid-template-columns: 1fr 400px;
+   gap: 2rem;
+   min-height: calc(100vh - var(--header-h));
+}
+
+/* Store 페이지: 필터 사이드바 */
+.page-store .store__sidebar {
+   background: var(--bg-50);
+   padding: 2rem;
+   border-radius: var(--radius-sm);
+   height: fit-content;
+   position: sticky;
+   top: calc(var(--header-h) + 1rem);
+}
+
+/* Store 페이지: 매장 카드 리스트 */
+.page-store .store__card {
+   padding: 1.5rem;
+   background: white;
+   border-radius: var(--radius-sm);
+   border: 1px solid var(--line-200);
+   transition: all 200ms var(--ease-out);
+}
+
+.page-store .store__card:hover {
+   transform: translateY(-4px);
+   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* =========================================================
+   EVENT PAGE (event.html)
+   ========================================================= */
+
+/* Event 페이지: 카드 그리드 */
+.page-event .event__grid {
+   display: grid;
+   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+   gap: 2rem;
+   padding-block: 3rem;
+}
+
+/* Event 페이지: 카드 스타일 */
+.page-event .event__card {
+   border-radius: var(--radius-sm);
+   overflow: hidden;
+   background: white;
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+   transition: all 280ms var(--ease-out);
+}
+
+.page-event .event__card:hover {
+   transform: translateY(-8px);
+   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* =========================================================
+   SERVICE PAGE (service.html)
+   ========================================================= */
+
+/* Service 페이지: FAQ 아코디언 */
+.page-service .faq__item {
+   border-bottom: 1px solid var(--line-200);
+}
+
+.page-service .faq__question {
+   width: 100%;
+   text-align: left;
+   padding: 1.5rem 0;
+   font-weight: var(--fw-semibold);
+   cursor: pointer;
+   transition: color 200ms ease;
+}
+
+.page-service .faq__question:hover {
+   color: var(--brand-600);
+}
+
+.page-service .faq__answer {
+   max-height: 0;
+   overflow: hidden;
+   transition: max-height 300ms var(--ease-out);
+}
+
+.page-service .faq__item.is-open .faq__answer {
+   max-height: 500px;
+   padding-bottom: 1.5rem;
+}
+
+/* =========================================================
+   RESPONSIVE ADJUSTMENTS - 페이지별
+   ========================================================= */
+
+/* 태블릿: 1024px 이하 */
+@media (max-width: 1024px) {
+   /* Store 페이지 레이아웃 */
+   .page-store .store__layout {
+      grid-template-columns: 1fr;
+   }
+
+   .page-store .store__sidebar {
+      position: static;
+   }
+
+   /* Event 페이지 그리드 */
+   .page-event .event__grid {
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1.5rem;
+   }
+}
+
+/* 모바일: 640px 이하 */
+@media (max-width: 640px) {
+   /* Menu 페이지 */
+   .page-menu .menu__filter__tabs {
+      top: 60px;
+   }
+
+   /* Brand 페이지 */
+   .page-brand .brand__tabbar {
+      top: 60px;
+      padding-block: 0.75rem;
+   }
+
+   /* Event 페이지 */
+   .page-event .event__grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+   }
+
+   /* Store 페이지 */
+   .page-store .store__sidebar {
+      padding: 1rem;
+   }
+}
+
+/* =========================================================
+   PRINT STYLES - 인쇄 최적화
+   ========================================================= */
+@media print {
+   /* 헤더/푸터 숨김 */
+   .site__header,
+   .site__footer,
+   .hamburger,
+   .mobile-nav,
+   .overlay {
+      display: none !important;
+   }
+
+   /* 배경 이미지 제거 */
+   .hero,
+   .featured__picks,
+   .rewards__teaser,
+   .seasonal__bridge,
+   .store__experience {
+      background: white !important;
+   }
+
+   /* 페이지 여백 */
+   body {
+      margin: 2cm;
+   }
+
+   /* 링크 URL 표시 */
+   a[href]::after {
+      content: ' (' attr(href) ')';
+      font-size: 0.8em;
+      color: #666;
+   }
+
+   /* 페이지 나누기 */
+   section {
+      page-break-inside: avoid;
+   }
+
+   h1,
+   h2,
+   h3 {
+      page-break-after: avoid;
+   }
+}
+
+/* =========================================================
+   ACCESSIBILITY - 페이지별 접근성 개선
+   ========================================================= */
+
+/* 고대비 모드 지원 */
+@media (prefers-contrast: high) {
+   .menu__card__inner,
+   .rewards__item,
+   .brand__tabbar label {
+      border-width: 2px;
+   }
+
+   .menu__badge {
+      font-weight: 900;
+   }
+}
+
+/* 다크모드 페이지별 조정 */
+@media (prefers-color-scheme: dark) {
+   .page-menu .menu__filter__tabs {
+      background: var(--bg-50);
+   }
+
+   .page-brand .brand__tabbar {
+      background: var(--bg-50);
+   }
+
+   .page-store .store__card {
+      background: var(--bg-50);
+   }
+}
