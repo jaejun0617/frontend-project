@@ -228,9 +228,9 @@
 
 /* Base */
 .site-footer {
-   color: #000;
+   color: #1e3932;
+   background: linear-gradient(to bottom, #f7f8f6 0%, #eef1ee 100%);
 }
-
 .footer-container {
    max-width: var(--container);
    margin-inline: auto;
