@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="ko">
+   <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>스타벅스 아코디언 푸터</title>
+      <style>
+         * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+         }
+
+         .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+         }
+
+         .accordion-item {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+         }
+
+         .accordion-item:last-child {
+            border-bottom: none;
+         }
+
+         /* 체크박스 숨기기 */
+         .accordion-toggle {
+            display: none;
+         }
+
+         /* 아코디언 헤더 */
+         .accordion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 28px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.3s ease;
+         }
+
+         .accordion-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+         }
+
+         .accordion-title {
+            color: #000;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+         }
+
+         /* 아이콘 */
+         .accordion-icon {
+            width: 20px;
+            height: 20px;
+            position: relative;
+            transition: transform 0.3s ease;
+         }
+
+         .accordion-icon::before,
+         .accordion-icon::after {
+            content: '';
+            position: absolute;
+            background: #00a862;
+            transition: all 0.3s ease;
+         }
+
+         .accordion-icon::before {
+            width: 20px;
+            height: 2px;
+            top: 9px;
+            left: 0;
+         }
+
+         .accordion-icon::after {
+            width: 2px;
+            height: 20px;
+            top: 0;
+            left: 9px;
+         }
+
+         /* 체크 시 수평선 제거 (마이너스로 변경) */
+         .accordion-toggle:checked + .accordion-header .accordion-icon::after {
+            transform: rotate(90deg);
+            opacity: 0;
+         }
+
+         .accordion-toggle:checked + .accordion-header .accordion-icon {
+            transform: rotate(180deg);
+         }
+
+         /* 아코디언 콘텐츠 */
+         .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(0, 0, 0, 0.2);
+         }
+
+         .accordion-toggle:checked ~ .accordion-content {
+            max-height: 600px;
+         }
+
+         .accordion-inner {
+            padding: 20px 28px 28px;
+         }
+
+         .link-list {
+            list-style: none;
+            display: grid;
+            gap: 14px;
+         }
+
+         .link-list li a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            font-size: 14px;
+            display: block;
+            padding: 6px 0;
+            transition:
+               color 0.3s ease,
+               padding-left 0.3s ease;
+            letter-spacing: -0.2px;
+         }
+
+         .link-list li a:hover {
+            color: #00a862;
+            padding-left: 8px;
+         }
+
+         /* 푸터 하단 */
+         .footer-bottom {
+            padding: 32px 28px;
+            background: rgba(0, 0, 0, 0.3);
+            text-align: center;
+         }
+
+         .footer-info {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            line-height: 1.8;
+            margin-bottom: 16px;
+         }
+
+         .footer-info p {
+            margin-bottom: 8px;
+         }
+
+         .social-links {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-bottom: 20px;
+         }
+
+         .social-link {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 18px;
+         }
+
+         .social-link:hover {
+            background: #00a862;
+            transform: translateY(-3px);
+         }
+
+         .copyright {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+         }
+
+         /* 스타벅스 로고 영역 */
+         .footer-logo {
+            padding: 40px 28px 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+         }
+
+         .logo-text {
+            color: #00a862;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 2px;
+         }
+
+         /* 모바일 최적화 */
+         @media (max-width: 768px) {
+            .footer-container {
+               border-radius: 0;
+            }
+
+            .accordion-header {
+               padding: 20px 20px;
+            }
+
+            .accordion-inner {
+               padding: 16px 20px 24px;
+            }
+
+            .logo-text {
+               font-size: 24px;
+            }
+         }
+      </style>
+   </head>
+   <body>
+      <div class="footer-container">
+         <!-- 로고 영역 -->
+         <div class="footer-logo">
+            <div class="logo-text">★ STARBUCKS</div>
+         </div>
+
+         <!-- 아코디언 섹션들 -->
+         <div class="accordion-item">
+            <input type="checkbox" id="company" class="accordion-toggle" />
+            <label for="company" class="accordion-header">
+               <span class="accordion-title">COMPANY</span>
+               <div class="accordion-icon"></div>
+            </label>
+            <div class="accordion-content">
+               <div class="accordion-inner">
+                  <ul class="link-list">
+                     <li><a href="#">한눈에 보기</a></li>
+                     <li><a href="#">스타벅스 사명</a></li>
+                     <li><a href="#">스타벅스 소개</a></li>
+                     <li><a href="#">국내 뉴스룸</a></li>
+                     <li><a href="#">글로벌 뉴스룸</a></li>
+                     <li><a href="#">영상자료</a></li>
+                  </ul>
+               </div>
+            </div>
+         </div>
+
+         <div class="accordion-item">
+            <input type="checkbox" id="corpSales" class="accordion-toggle" />
+            <label for="corpSales" class="accordion-header">
+               <span class="accordion-title">CORPORATE SALES</span>
+               <div class="accordion-icon"></div>
+            </label>
+            <div class="accordion-content">
+               <div class="accordion-inner">
+                  <ul class="link-list">
+                     <li><a href="#">단체 및 기업 구매 안내</a></li>
+                     <li><a href="#">대량 구매 문의</a></li>
+                  </ul>
+               </div>
+            </div>
+         </div>
+
+         <div class="accordion-item">
+            <input type="checkbox" id="partnership" class="accordion-toggle" />
+            <label for="partnership" class="accordion-header">
+               <span class="accordion-title">PARTNERSHIP</span>
+               <div class="accordion-icon"></div>
+            </label>
+            <div class="accordion-content">
+               <div class="accordion-inner">
+                  <ul class="link-list">
+                     <li><a href="#">신규 입점 제안</a></li>
+                     <li><a href="#">협력 업체 제안</a></li>
+                  </ul>
+               </div>
+            </div>
+         </div>
+
+         <div class="accordion-item">
+            <input type="checkbox" id="online" class="accordion-toggle" />
+            <label for="online" class="accordion-header">
+               <span class="accordion-title">ONLINE COMMUNITY</span>
+               <div class="accordion-icon"></div>
+            </label>
+            <div class="accordion-content">
+               <div class="accordion-inner">
+                  <ul class="link-list">
+                     <li><a href="#">페이스북</a></li>
+                     <li><a href="#">트위터</a></li>
+                     <li><a href="#">유튜브</a></li>
+                     <li><a href="#">인스타그램</a></li>
+                  </ul>
+               </div>
+            </div>
+         </div>
+
+         <div class="accordion-item">
+            <input type="checkbox" id="recruit" class="accordion-toggle" />
+            <label for="recruit" class="accordion-header">
+               <span class="accordion-title">RECRUIT</span>
+               <div class="accordion-icon"></div>
+            </label>
+            <div class="accordion-content">
+               <div class="accordion-inner">
+                  <ul class="link-list">
+                     <li><a href="#">채용 소개</a></li>
+                     <li><a href="#">바리스타</a></li>
+                     <li><a href="#">정규직 및 경력직</a></li>
+                  </ul>
+               </div>
+            </div>
+         </div>
+
+         <!-- 푸터 하단 정보 -->
+         <div class="footer-bottom">
+            <div class="social-links">
+               <a href="#" class="social-link">f</a>
+               <a href="#" class="social-link">𝕏</a>
+               <a href="#" class="social-link">▶</a>
+               <a href="#" class="social-link">📷</a>
+            </div>
+
+            <div class="footer-info">
+               <p>사업자등록번호 : 201-81-21515 | 주식회사 에스씨케이컴퍼니</p>
+               <p>대표이사 : 송호섭 | 서울특별시 중구 을지로 170</p>
+               <p>고객센터 : 1522-3232 (평일 09:00 - 18:00)</p>
+               <p>
+                  <a
+                     href="#"
+                     style="
+                        color: rgba(255, 255, 255, 0.5);
+                        text-decoration: underline;
+                     "
+                     >개인정보처리방침</a
+                  >
+                  |
+                  <a
+                     href="#"
+                     style="
+                        color: rgba(255, 255, 255, 0.5);
+                        text-decoration: underline;
+                     "
+                     >영상정보처리기기 운영관리방침</a
+                  >
+               </p>
+            </div>
+
+            <p class="copyright">
+               © 2025 Starbucks Coffee Company. All rights reserved.
+            </p>
+         </div>
+      </div>
+   </body>
+</html>

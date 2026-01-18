@@ -222,28 +222,167 @@
    transform: rotate(-45deg) translate(6px, -6px);
 }
 
-/* ===== Site Footer ===== */
-.site__footer {
-   width: 100%;
+/* ================================
+   Footer — Starbucks Winter Edition
+================================ */
+
+/* Base */
+.site-footer {
+   color: #000;
+}
+
+.footer-container {
+   max-width: var(--container);
+   margin-inline: auto;
+   max-width: 1200px;
+}
+
+/* ==================================================
+    MOBILE (≤ 640px) — ACCORDION (DEFAULT)
+ ================================================== */
+
+.footer-accordion {
+   border-bottom: 1px solid #ededed;
+}
+
+.footer-toggle {
+   display: none;
+}
+
+/* Header */
+.footer-header {
    display: flex;
-   flex-direction: column;
+   justify-content: space-between;
    align-items: center;
-   justify-content: center;
-   border: 1px solid var(--ice-400);
-   padding: 18px 0;
-   gap: 6px;
+   padding: 22px 20px;
+   cursor: pointer;
+   color: #000;
+   /* border: 1px solid red; */
 }
 
-.footer__copyright {
-   font-size: var(--fs-14);
-   color: var(--text-400);
+.footer-title {
+   font-size: 14px;
+   font-weight: 600;
+   letter-spacing: -0.2px;
+   color: #000;
 }
 
-.footer__disclaimer {
-   font-size: var(--fs-12);
-   color: var(--text-400);
+/* Icon */
+.footer-icon {
+   width: 18px;
+   height: 18px;
+   position: relative;
+   color: #000;
+}
+
+.footer-icon::before,
+.footer-icon::after {
+   content: '';
+   position: absolute;
+   background: #00a862;
+   transition: 0.3s ease;
+}
+
+.footer-icon::before {
+   width: 18px;
+   height: 2px;
+   top: 8px;
+}
+
+.footer-icon::after {
+   width: 2px;
+   height: 18px;
+   left: 8px;
+}
+
+.footer-toggle:checked + .footer-header .footer-icon::after {
+   opacity: 0;
+}
+
+/* Content */
+.footer-content {
+   max-height: 0;
+   overflow: hidden;
+   transition: max-height 0.4s ease;
+   color: #000;
+   /* border: 1px solid red; */
+   padding: 10px 20px;
+}
+
+.footer-toggle:checked ~ .footer-content {
+   max-height: 500px;
+}
+
+.footer-inner {
+   padding: 16px 20px 28px;
+   color: #000;
+}
+
+.footer-links {
+   list-style: none;
+   display: grid;
+   gap: 12px;
+   color: #000;
+}
+
+.footer-links a {
+   font-size: 13px;
+   color: #000;
+   text-decoration: none;
+}
+
+.footer-links a:hover {
+   color: #00a862;
+}
+
+/* ----------------
+    Portfolio Notice
+ ---------------- */
+.footer-portfolio {
+   padding: 24px 20px;
    text-align: center;
-   max-width: 60ch;
+   font-size: 11px;
+   color: #000;
+   border-top: 1px solid #ededed;
+}
+
+/* ==================================================
+    PC (≥ 641px) — FLEX COLUMN FOOTER
+ ================================================== */
+
+@media (min-width: 641px) {
+   /* Accordion 해제 */
+   .footer-content {
+      max-height: none;
+      overflow: visible;
+   }
+
+   .footer-toggle,
+   .footer-icon {
+      display: none;
+   }
+
+   .footer-header {
+      cursor: default;
+      padding-bottom: 12px;
+   }
+
+   /* 컬럼 레이아웃 */
+   .footer-container {
+      display: flex;
+      flex-wrap: wrap;
+      padding: 56px 24px;
+      gap: 48px 32px;
+   }
+
+   .footer-accordion {
+      flex: 1 1 160px;
+      border-bottom: none;
+   }
+
+   .footer-inner {
+      padding: 0;
+   }
 }
 
 /* ===== Responsive: Mobile ===== */
