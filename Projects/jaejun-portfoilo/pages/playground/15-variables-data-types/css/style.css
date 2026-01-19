@@ -1,0 +1,62 @@
+body {
+   margin: 0;
+   padding: 0;
+   background: #0b0d12;
+   color: #e8ecff;
+}
+
+header {
+   display: flex;
+   justify-content: center;
+}
+
+main {
+   width: 100%;
+   margin: 0 auto;
+   height: 100vh;
+}
+.actions {
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   gap: 10px;
+   margin: 16px 0 20px;
+}
+
+button {
+   padding: 10px 12px;
+   border-radius: 10px;
+   border: 1px solid rgba(232, 236, 255, 0.18);
+   background: rgba(255, 255, 255, 0.04);
+   color: #e8ecff;
+   cursor: pointer;
+}
+
+.card {
+   border: 1px solid rgba(232, 236, 255, 0.16);
+   border-radius: 16px;
+   padding: 16px;
+   background: rgba(255, 255, 255, 0.04);
+}
+
+.badge {
+   display: inline-block;
+   padding: 6px 10px;
+   border-radius: 999px;
+   font-size: 12px;
+   border: 1px solid rgba(232, 236, 255, 0.18);
+}
+
+.badge.on {
+   background: rgba(34, 211, 238, 0.12);
+}
+
+.badge.off {
+   background: rgba(148, 163, 184, 0.08);
+}
+
+#error {
+   margin-top: 14px;
+   color: #ffb4b4;
+   font-size: 14px;
+}

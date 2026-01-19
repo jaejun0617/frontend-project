@@ -1,0 +1,24 @@
+#app {
+   min-height: 100svh;
+   /* border: 1px solid red; */
+}
+
+.hero {
+   background-color: #ebebeb;
+}
+
+.profile {
+   background-color: #ffffff;
+}
+
+.skills {
+   background-color: #ebebeb;
+}
+
+.projects {
+   background-color: #ffffff;
+}
+
+.contact {
+   background-color: #ebebeb;
+}

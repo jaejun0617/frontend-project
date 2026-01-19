@@ -1,0 +1,34 @@
+section {
+   min-height: 100svh;
+}
+
+header {
+   height: var(--header-h);
+}
+
+header .container {
+   max-width: var(--container-content);
+   margin-inline: auto;
+   display: flex;
+   align-items: center;
+   height: 100%;
+   /* border: 1px solid red; */
+}
+
+.site__nav {
+   display: flex;
+   justify-content: space-between;
+   align-items: center;
+   width: 100%;
+}
+
+.site__menu {
+   display: flex;
+}
+
+.site__menu--list {
+   display: flex;
+   gap: var(--sp-16);
+   font-size: var(--fz-18);
+   font-weight: var(--fw-semibold);
+}

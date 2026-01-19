@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ko">
+   <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>포트폴리오 | Frontend Developer</title>
+      <link rel="stylesheet" href="./css/style.css" />
+   </head>
+   <body>
+      <!-- Header -->
+      <header class="header">
+         <div class="header__container">
+            <div class="header__logo">
+               <a href="#hero">YourName</a>
+            </div>
+            <nav class="header__nav">
+               <ul class="nav__list">
+                  <li class="nav__item">
+                     <a href="#about" class="nav__link">About</a>
+                  </li>
+                  <li class="nav__item">
+                     <a href="#skills" class="nav__link">Skills</a>
+                  </li>
+                  <li class="nav__item">
+                     <a href="#projects" class="nav__link">Projects</a>
+                  </li>
+                  <li class="nav__item">
+                     <a href="#contact" class="nav__link">Contact</a>
+                  </li>
+               </ul>
+            </nav>
+            <button class="header__dark-toggle" id="darkModeToggle">
+               <span class="toggle__icon">🌙</span>
+            </button>
+            <button class="header__hamburger" id="hamburger">
+               <span></span>
+               <span></span>
+               <span></span>
+            </button>
+         </div>
+      </header>
+
+      <!-- Hero Section -->
+      <section class="hero" id="hero">
+         <div class="hero__container">
+            <h1 class="hero__title">
+               안녕하세요,<br />프론트엔드 개발자
+               <span class="hero__name">홍길동</span>입니다
+            </h1>
+            <p class="hero__subtitle">
+               HTML, CSS, JavaScript로 웹을 만들어갑니다
+            </p>
+            <div class="hero__cta">
+               <a href="#about" class="btn btn--primary">더 알아보기</a>
+               <a href="#contact" class="btn btn--secondary">연락하기</a>
+            </div>
+         </div>
+      </section>
+
+      <!-- Main Content with Fixed Profile -->
+      <main class="main">
+         <!-- Fixed Profile Sidebar -->
+         <aside class="profile" id="profile">
+            <div class="profile__container">
+               <div class="profile__image">
+                  <img
+                     src="https://via.placeholder.com/150"
+                     alt="프로필 사진"
+                  />
+               </div>
+               <h2 class="profile__name">홍길동</h2>
+               <p class="profile__title">Frontend Developer</p>
+               <div class="profile__social">
+                  <a href="#" class="social__link" aria-label="GitHub">
+                     <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                     >
+                        <path
+                           d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                        />
+                     </svg>
+                  </a>
+                  <a href="#" class="social__link" aria-label="LinkedIn">
+                     <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                     >
+                        <path
+                           d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"
+                        />
+                     </svg>
+                  </a>
+                  <a href="#" class="social__link" aria-label="Email">
+                     <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                     >
+                        <path
+                           d="M0 3v18h24v-18h-24zm6.623 7.929l-4.623 5.712v-9.458l4.623 3.746zm-4.141-5.929h19.035l-9.517 7.713-9.518-7.713zm5.694 7.188l3.824 3.099 3.83-3.104 5.612 6.817h-18.779l5.513-6.812zm9.208-1.264l4.616-3.741v9.348l-4.616-5.607z"
+                        />
+                     </svg>
+                  </a>
+               </div>
+            </div>
+         </aside>
+
+         <!-- Content Sections -->
+         <div class="content">
+            <!-- About Section -->
+            <section class="section section--about" id="about">
+               <div class="section__container">
+                  <h2 class="section__title">About Me</h2>
+                  <div class="about__content">
+                     <p class="about__text">
+                        안녕하세요! 웹 개발에 열정을 가진 프론트엔드 개발자
+                        지망생입니다. HTML, CSS, JavaScript를 학습하며 사용자
+                        경험을 중시하는 웹 페이지를 만들고 있습니다.
+                     </p>
+                     <p class="about__text">
+                        끊임없이 배우고 성장하며, 클린 코드와 웹 표준을 준수하는
+                        개발을 지향합니다.
+                     </p>
+                     <div class="about__info">
+                        <div class="info__item">
+                           <span class="info__label">이름</span>
+                           <span class="info__value">홍길동</span>
+                        </div>
+                        <div class="info__item">
+                           <span class="info__label">위치</span>
+                           <span class="info__value">서울, 대한민국</span>
+                        </div>
+                        <div class="info__item">
+                           <span class="info__label">이메일</span>
+                           <span class="info__value"
+                              >your.email@example.com</span
+                           >
+                        </div>
+                     </div>
+                     <a href="#" class="btn btn--download">이력서 다운로드</a>
+                  </div>
+               </div>
+            </section>
+
+            <!-- Skills Section -->
+            <section class="section section--skills" id="skills">
+               <div class="section__container">
+                  <h2 class="section__title">Skills</h2>
+                  <div class="skills__content">
+                     <div class="skill-category">
+                        <h3 class="category__title">Frontend</h3>
+                        <div class="skill-list">
+                           <div class="skill">
+                              <div class="skill__header">
+                                 <span class="skill__name">HTML5</span>
+                                 <span class="skill__level">90%</span>
+                              </div>
+                              <div class="skill__bar">
+                                 <div
+                                    class="skill__progress"
+                                    style="width: 90%"
+                                 ></div>
+                              </div>
+                           </div>
+                           <div class="skill">
+                              <div class="skill__header">
+                                 <span class="skill__name">CSS3</span>
+                                 <span class="skill__level">85%</span>
+                              </div>
+                              <div class="skill__bar">
+                                 <div
+                                    class="skill__progress"
+                                    style="width: 85%"
+                                 ></div>
+                              </div>
+                           </div>
+                           <div class="skill">
+                              <div class="skill__header">
+                                 <span class="skill__name">JavaScript</span>
+                                 <span class="skill__level">80%</span>
+                              </div>
+                              <div class="skill__bar">
+                                 <div
+                                    class="skill__progress"
+                                    style="width: 80%"
+                                 ></div>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+                     <div class="skill-category">
+                        <h3 class="category__title">Tools</h3>
+                        <div class="skill-list">
+                           <div class="skill">
+                              <div class="skill__header">
+                                 <span class="skill__name">Git</span>
+                                 <span class="skill__level">75%</span>
+                              </div>
+                              <div class="skill__bar">
+                                 <div
+                                    class="skill__progress"
+                                    style="width: 75%"
+                                 ></div>
+                              </div>
+                           </div>
+                           <div class="skill">
+                              <div class="skill__header">
+                                 <span class="skill__name">VS Code</span>
+                                 <span class="skill__level">85%</span>
+                              </div>
+                              <div class="skill__bar">
+                                 <div
+                                    class="skill__progress"
+                                    style="width: 85%"
+                                 ></div>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </section>
+
+            <!-- Projects Section -->
+            <section class="section section--projects" id="projects">
+               <div class="section__container">
+                  <h2 class="section__title">Projects</h2>
+                  <div class="projects__grid">
+                     <article class="project-card">
+                        <div class="project__image">
+                           <img
+                              src="https://via.placeholder.com/400x300"
+                              alt="프로젝트 1"
+                           />
+                        </div>
+                        <div class="project__content">
+                           <h3 class="project__title">프로젝트 제목 1</h3>
+                           <p class="project__description">
+                              HTML, CSS, JavaScript를 활용한 반응형
+                              웹사이트입니다.
+                           </p>
+                           <div class="project__tags">
+                              <span class="tag">HTML</span>
+                              <span class="tag">CSS</span>
+                              <span class="tag">JavaScript</span>
+                           </div>
+                           <div class="project__links">
+                              <a href="#" class="project__link">GitHub</a>
+                              <a href="#" class="project__link">Live Demo</a>
+                           </div>
+                        </div>
+                     </article>
+
+                     <article class="project-card">
+                        <div class="project__image">
+                           <img
+                              src="https://via.placeholder.com/400x300"
+                              alt="프로젝트 2"
+                           />
+                        </div>
+                        <div class="project__content">
+                           <h3 class="project__title">프로젝트 제목 2</h3>
+                           <p class="project__description">
+                              인터랙티브한 UI/UX를 구현한 웹 애플리케이션입니다.
+                           </p>
+                           <div class="project__tags">
+                              <span class="tag">HTML</span>
+                              <span class="tag">CSS</span>
+                              <span class="tag">JavaScript</span>
+                           </div>
+                           <div class="project__links">
+                              <a href="#" class="project__link">GitHub</a>
+                              <a href="#" class="project__link">Live Demo</a>
+                           </div>
+                        </div>
+                     </article>
+
+                     <article class="project-card">
+                        <div class="project__image">
+                           <img
+                              src="https://via.placeholder.com/400x300"
+                              alt="프로젝트 3"
+                           />
+                        </div>
+                        <div class="project__content">
+                           <h3 class="project__title">프로젝트 제목 3</h3>
+                           <p class="project__description">
+                              모바일 우선 반응형 디자인을 적용한 프로젝트입니다.
+                           </p>
+                           <div class="project__tags">
+                              <span class="tag">HTML</span>
+                              <span class="tag">CSS</span>
+                              <span class="tag">JavaScript</span>
+                           </div>
+                           <div class="project__links">
+                              <a href="#" class="project__link">GitHub</a>
+                              <a href="#" class="project__link">Live Demo</a>
+                           </div>
+                        </div>
+                     </article>
+                  </div>
+               </div>
+            </section>
+
+            <!-- Contact Section -->
+            <section class="section section--contact" id="contact">
+               <div class="section__container">
+                  <h2 class="section__title">Contact</h2>
+                  <div class="contact__content">
+                     <form class="contact__form" id="contactForm">
+                        <div class="form__group">
+                           <label for="name" class="form__label">이름</label>
+                           <input
+                              type="text"
+                              id="name"
+                              name="name"
+                              class="form__input"
+                              required
+                           />
+                        </div>
+                        <div class="form__group">
+                           <label for="email" class="form__label">이메일</label>
+                           <input
+                              type="email"
+                              id="email"
+                              name="email"
+                              class="form__input"
+                              required
+                           />
+                        </div>
+                        <div class="form__group">
+                           <label for="message" class="form__label"
+                              >메시지</label
+                           >
+                           <textarea
+                              id="message"
+                              name="message"
+                              class="form__textarea"
+                              rows="5"
+                              required
+                           ></textarea>
+                        </div>
+                        <button
+                           type="submit"
+                           class="btn btn--primary btn--full"
+                        >
+                           메시지 보내기
+                        </button>
+                     </form>
+                     <div class="contact__info">
+                        <div class="info-box">
+                           <h3>이메일</h3>
+                           <p>your.email@example.com</p>
+                        </div>
+                        <div class="info-box">
+                           <h3>GitHub</h3>
+                           <p>github.com/yourusername</p>
+                        </div>
+                        <div class="info-box">
+                           <h3>LinkedIn</h3>
+                           <p>linkedin.com/in/yourname</p>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </section>
+         </div>
+      </main>
+
+      <script src="./js/main.js"></script>
+   </body>
+</html>
