@@ -1,5 +1,7 @@
 # Day 15 — Variables & Data Types: Dynamic Profile Card
 
+**Demo:** : https://jaejun0617.github.io/projects/learning/js-core/01-state/15-variables-data-types/
+
 **Date:** 2026-01-19
 **Topic:** Variables / Data Types / Template Literals / typeof / Basic DOM render  
 **Goal:** 변수·자료형을 기반으로 “프로필 카드 UI”를 동적으로 구성하고, 타입 검증과 예외 케이스까지 처리한다.
