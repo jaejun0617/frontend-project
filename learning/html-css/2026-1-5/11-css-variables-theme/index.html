@@ -1,0 +1,39 @@
+<!-- index.html -->
+<!doctype html>
+<html lang="ko">
+   <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Day 11 — CSS Variables & Architecture</title>
+      <link rel="stylesheet" href="./css/style.css" />
+   </head>
+   <body>
+      <!-- 상태를 가진 토글(체크박스) -->
+      <input type="checkbox" id="theme-toggle" class="theme-toggle__input" />
+
+      <!-- 헤더: 오늘의 주제 + 토글 -->
+      <header class="header">
+         <div class="header__inner">
+            <div class="header__meta">
+               <h1 class="header__title">
+                  Day 11 — CSS Variables & Architecture
+               </h1>
+            </div>
+
+            <!-- 토글 UI: JS 없이 label로 제어 -->
+            <label
+               for="theme-toggle"
+               class="theme-toggle"
+               aria-label="테마 전환"
+            >
+               <span class="theme-toggle__track">
+                  <span class="theme-toggle__thumb"></span>
+               </span>
+            </label>
+         </div>
+      </header>
+
+      <!-- input 뒤에 있어야 ~로 변수 재정의가 먹는다 -->
+      <main class="page"></main>
+   </body>
+</html>

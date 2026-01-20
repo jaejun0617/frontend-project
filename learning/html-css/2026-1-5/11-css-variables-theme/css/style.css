@@ -1,0 +1,168 @@
+/* css/style.css */
+
+/* 전역 토큰 (Light 기본값) */
+:root {
+   --bg: #ffffff;
+   --text: #000000;
+
+   --surface: #ffffff;
+   --border: rgba(0, 0, 0, 0.18);
+   --shadow: rgba(0, 0, 0, 0.1);
+
+   --radius: 14px;
+
+   --space-1: 8px;
+   --space-2: 12px;
+   --space-3: 16px;
+   --space-4: 24px;
+   --space-5: 32px;
+
+   --toggle-track: var(--surface);
+   --toggle-thumb: var(--text);
+   --toggle-border: var(--border);
+}
+
+/* 최소 리셋 */
+* {
+   box-sizing: border-box;
+}
+
+html,
+body {
+   height: 100%;
+}
+
+body {
+   margin: 0;
+   background: var(--bg);
+   color: var(--text);
+   transition:
+      background 0.25s ease,
+      color 0.25s ease;
+}
+
+/* 접근성 유지용 체크박스 숨김 */
+.theme-toggle__input {
+   position: absolute;
+   width: 1px;
+   height: 1px;
+   margin: -1px;
+   overflow: hidden;
+   clip: rect(0 0 0 0);
+   white-space: nowrap;
+   border: 0;
+}
+
+/* Dark 모드: 변수 재정의 */
+.theme-toggle__input:checked ~ .header,
+.theme-toggle__input:checked ~ .page {
+   --bg: #000000;
+   --text: #ffffff;
+
+   --surface: #000000;
+   --border: rgba(255, 255, 255, 0.22);
+   --shadow: rgba(0, 0, 0, 0.35);
+
+   --toggle-track: var(--surface);
+   --toggle-thumb: var(--text);
+   --toggle-border: var(--border);
+}
+
+/* 헤더 */
+.header {
+   position: sticky;
+   top: 0;
+   background: var(--bg);
+   color: var(--text);
+   border-bottom: 1px solid var(--border);
+   transition:
+      background 0.25s ease,
+      color 0.25s ease,
+      border-color 0.25s ease;
+}
+
+.header__inner {
+   width: min(1800px, 100vw);
+   margin: 0 auto;
+   padding: 18px 0;
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: var(--space-3);
+}
+
+.header__meta {
+   display: grid;
+   gap: 6px;
+}
+
+.header__title {
+   margin: 0;
+   font-size: 22px;
+   letter-spacing: -0.2px;
+}
+
+/* 페이지 */
+.page {
+   min-height: calc(100vh - 72px);
+   padding: var(--space-5) 0;
+   background: var(--bg);
+   color: var(--text);
+   transition:
+      background 0.25s ease,
+      color 0.25s ease;
+}
+
+/* 토글 */
+.theme-toggle {
+   display: flex;
+   align-items: center;
+   cursor: pointer;
+   user-select: none;
+}
+
+.theme-toggle__track {
+   position: relative;
+   width: 64px;
+   height: 34px;
+   border-radius: 999px;
+   background: var(--toggle-track);
+   border: 1px solid var(--toggle-border);
+   box-shadow: 0 10px 26px var(--shadow);
+   transition:
+      background 0.25s ease,
+      border-color 0.25s ease;
+}
+
+.theme-toggle__thumb {
+   position: absolute;
+   top: 3px;
+   left: 3px;
+   width: 28px;
+   height: 28px;
+   border-radius: 50%;
+   background: var(--toggle-thumb);
+   transition:
+      transform 0.22s ease,
+      background 0.25s ease;
+}
+
+/* 체크 시 썸 이동 */
+.theme-toggle__input:checked + .header .theme-toggle__thumb {
+   transform: translateX(30px);
+}
+
+/* 키보드 포커스 */
+.theme-toggle__input:focus-visible + .header .theme-toggle__track {
+   outline: none;
+   box-shadow: 0 0 0 3px rgba(127, 127, 127, 0.35);
+}
+
+/* 모션 최소화 */
+@media (prefers-reduced-motion: reduce) {
+   * {
+      transition-duration: 0.001ms !important;
+      animation-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+   }
+}

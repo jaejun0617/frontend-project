@@ -1,0 +1,88 @@
+/* =========================================================
+   tokens.css
+   역할: 전역 디자인 기준값(컬러/타이포/모션/레이아웃)
+   ========================================================= */
+
+:root {
+   /* ===== Color Tokens ===== */
+   /* Background */
+   --bg-0: #fbfbfc;
+   --bg-50: #f2f4f7;
+   --bg-100: #e8ecf2;
+
+   /* Text */
+   --text-900: #111318;
+   --text-700: #2a2f38;
+   --text-600: #4b5563;
+   --text-400: #8a93a3;
+
+   /* Line/Border */
+   --line-200: #d6dde7;
+   --line-300: #c3ccd8;
+
+   /* Brand - Starbucks Green */
+   --brand-700: #085a31;
+   --brand-600: #0b6b3a;
+   --brand-500: #138a4f;
+   --brand-100: #d9f3e5;
+
+   /* Accent - Red */
+   --accent-600: #b11f2a;
+   --accent-500: #d12c3b;
+   --accent-200: #ffd7dc;
+
+   /* Ice - Blue */
+   --ice-400: #8fc7ff;
+   --ice-200: #d7eeff;
+
+   /* Focus */
+   --focus: var(--ice-400);
+
+   /* ===== Spacing Tokens ===== */
+   --gutter: 24px;
+
+   /* ===== Border Radius ===== */
+   --radius-sm: 12px;
+
+   /* ===== Layout Tokens ===== */
+   --container: 1920px;
+   --header-h: 72px;
+
+   /* ===== Typography Tokens ===== */
+   --font-sans:
+      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+      'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+
+   /* Font Weight */
+   --fw-semibold: 600;
+   --fw-bold: 700;
+
+   /* Font Size */
+   --fs-12: 12px;
+   --fs-14: 14px;
+   --fs-16: 16px;
+
+   /* Line Height */
+   --lh-base: 1.55;
+
+   /* Letter Spacing */
+   --ls-tight: -0.02em;
+
+   /* ===== Motion Tokens ===== */
+   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ===== Dark Theme Tokens ===== */
+html[data-theme='dark'] {
+   --bg-0: #0b0e12;
+   --bg-50: #111722;
+   --bg-100: #182235;
+
+   --text-900: #f3f5f7;
+   --text-700: #d6dde7;
+   --text-600: #b7c0cf;
+   --text-400: #8a93a3;
+
+   --line-200: #223047;
+   --line-300: #2a3a55;
+}
