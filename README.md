@@ -29,8 +29,9 @@
 
 ## 📚 Projects
 
-- [starbucks-renewal-winter — 90% 완료](https://jaejun0617.github.io/frontend-learning/html-css/starbucks-renewal-winter/)
-- [jaejun-portfolio — 진행중](https://jaejun0617.github.io/frontend-project/jaejun-portfoilo/)
+- <a href="https://jaejun0617.github.io/frontend-learning/html-css/starbucks-renewal-winter/" target="_blank">starbucks-renewal-winter — 90% 완료</a>
+- <a href="https://jaejun0617.github.io/frontend-project/jaejun-portfoilo/" target="_blank">jaejun-portfolio — 진행중</a>
+
 
 > **기본기 → 설계 → 구현 → 확장** 과정을 하나의 사이클로 관리하며  
 > **실무 기준에 맞춘 프로젝트**를 기록하고,  
