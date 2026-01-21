@@ -16,7 +16,7 @@ const profiles = [
    {
       name: '신재준',
       image: {
-         src: './assets/images/main/about/profile.jpeg',
+         src: '/frontend-project/jaejun-portfoilo/assets/images/main/about/profile.jpeg',
          alt: '프론트엔드 개발자 신재준 프로필',
       },
       job: 'Front-end Developer',
