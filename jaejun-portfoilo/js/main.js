@@ -99,7 +99,11 @@ function ProfileCard(profile) {
                <p class="profile__name-en">${name.en}</p>
             </div>
             <div class="profile__avatar">
-               <img src="/assets/images/main/about/profile.jpeg" alt="${image.alt}" />
+          <img
+               src="https://jaejun0617.github.io/frontend-project/assets/images/main/about/profile.jpeg"
+               onerror="this.onerror=null; this.src='/assets/images/main/about/profile.jpeg';"
+               alt="${image.alt}"
+               />
             </div>
             <div class="profile__des">
                ${description
