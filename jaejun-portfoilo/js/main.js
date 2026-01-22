@@ -14,9 +14,12 @@ const html = document.documentElement;
       ================================ */
 const profiles = [
    {
-      name: '신재준',
+      name: {
+         ko: '신재준 | 사용자 경험을 설계하는 프론트엔드',
+         en: 'Jaejun Shin | Frontend Developer crafting UX',
+      },
+
       image: {
-         src: '/frontend-project/jaejun-portfoilo/assets/images/main/about/profile.jpeg',
          alt: '프론트엔드 개발자 신재준 프로필',
       },
       job: 'Front-end Developer',
@@ -24,23 +27,42 @@ const profiles = [
       skill: ['HTML', 'CSS', 'JavaScript', 'React', 'TypeScript', 'Git'],
       city: '경기도 고양시 일산서구',
       description: [
-         '열심히 하겠습니다',
-         '사용자 경험을 최우선으로 생각합니다',
-         '꾸준한 학습과 성장을 추구합니다',
-         '팀과의 협업을 중요하게 여깁니다',
-         '깔끔하고 유지보수 가능한 코드를 작성합니다',
+         '사용자가 느끼는 1초의 차이를 위해 최적화에 몰입합니다',
+         '비즈니스 문제를 기술로 해결하는 과정에서 보람을 느낍니다',
+         '코드 리뷰를 통해 배우고 성장하는 문화를 만들어갑니다',
+         '접근성과 성능, 두 마리 토끼를 모두 잡기 위해 노력합니다',
+         '새로운 기술을 학습하고 팀에 공유하는 것을 즐깁니다',
       ],
       quotes: [
-         '일찍 일어나는 새가 벌레를 잡는다',
-         '오늘 할 수 있는 일을 내일로 미루지 말자',
-         '작은 실행이 큰 계획보다 낫다',
-         '완벽함보다는 꾸준함이 중요하다',
-         '함께 가면 더 멀리 갈 수 있다',
+         {
+            en: 'First, solve the problem. Then, write the code.',
+            ko: '먼저 문제를 해결하라. 그런 다음 코드를 작성하라.',
+            author: 'John Johnson',
+         },
+         {
+            en: `Code is like humor. When you have to explain it, it's bad.`,
+            ko: '코드는 유머와 같다. 설명이 필요하면 나쁜 코드다.',
+            author: 'Cory House',
+         },
+         {
+            en: 'Make it work, make it right, make it fast.',
+            ko: '작동하게, 올바르게, 빠르게 만들어라.',
+            author: 'Kent Beck',
+         },
+         {
+            en: 'Simplicity is the soul of efficiency.',
+            ko: '단순함이 효율성의 핵심이다.',
+            author: 'Austin Freeman',
+         },
+         {
+            en: 'Talk is cheap. Show me the code.',
+            ko: '말은 쉽다. 코드로 보여줘라.',
+            author: 'Linus Torvalds',
+         },
       ],
       isOnline: true,
    },
 ];
-
 let state = profiles[0];
 
 /* ==============================
@@ -49,7 +71,13 @@ let state = profiles[0];
 function validateProfile(profile) {
    const errors = [];
 
-   if (typeof profile.name !== 'string') errors.push('name은 string');
+   if (
+      typeof profile.name !== 'object' ||
+      !profile.name.ko ||
+      !profile.name.en
+   ) {
+      errors.push('name은 ko와 en 속성은 객체');
+   }
    if (typeof profile.age !== 'string') errors.push('age는 string');
    if (typeof profile.job !== 'string') errors.push('job은 string');
    if (!Array.isArray(profile.skill)) errors.push('skill은 배열');
@@ -67,41 +95,47 @@ function ProfileCard(profile) {
 
    return `
          <div class="profile__header">
-            <h3 class="profile__name">${name}</h3>
-         </div>
-         <div class="profile__avatar">
-            <img src="${image.src}" alt="${image.alt}" />
-         </div>
-         <div class="profile__des">
-            ${description
-               .map(
-                  (text, index) =>
-                     `<p class="${index === 0 ? 'active' : ''}">${text}</p>`,
-               )
-               .join('')}
-         </div>
-         <div class="profile__body">
-            <p class="profile__job">${job}</p>
-            <p class="profile__age">${age}</p>
-            <p class="profile__city">${city}</p>
-         </div>
-         <ul class="profile__skills">
-            ${skill.map((item) => `<li>${item}</li>`).join('')}
-         </ul>
-         <div class="profile__quotes">
-            ${quotes
-               .map(
-                  (q, index) =>
-                     `<blockquote class="${index === 0 ? 'active' : ''}">${q}</blockquote>`,
-               )
-               .join('')}
-         </div>
-         <div class="profile__resume">
-            <button class="resume__btn" onclick="downloadResume()">
-               📄 이력서 다운로드
-            </button>
-         </div>
-      `;
+               <h3 class="profile__name">${name.ko}</h3>
+               <p class="profile__name-en">${name.en}</p>
+            </div>
+            <div class="profile__avatar">
+               <img src="/assets/images/main/about/profile.jpeg"  alt="${image.alt}" />
+            </div>
+            <div class="profile__des">
+               ${description
+                  .map(
+                     (text, index) =>
+                        `<p class="${index === 0 ? 'active' : ''}">${text}</p>`,
+                  )
+                  .join('')}
+            </div>
+            <div class="profile__body">
+               <p class="profile__job">${job}</p>
+               <p class="profile__age">${age}</p>
+               <p class="profile__city">${city}</p>
+            </div>
+            <ul class="profile__skills">
+               ${skill.map((item) => `<li>${item}</li>`).join('')}
+            </ul>
+            <div class="profile__quotes">
+               ${quotes
+                  .map(
+                     (q, index) => `
+                     <blockquote class="${index === 0 ? 'active' : ''}">
+                        <p class="quote__en">${q.en}</p>
+                        <p class="quote__ko">${q.ko}</p>
+                        <cite>- ${q.author}</cite>
+                     </blockquote>
+                  `,
+                  )
+                  .join('')}
+            </div>
+            <div class="profile__resume">
+               <button class="resume__btn">
+                  📄 이력서 다운로드
+               </button>
+            </div>
+         `;
 }
 
 /* ==============================
@@ -143,47 +177,6 @@ function initFadeInEffect() {
       quoteIndex = (quoteIndex + 1) % quotes.length;
       quotes[quoteIndex].classList.add('active');
    }, 5000);
-}
-
-/* ==============================
-      RESUME DOWNLOAD
-      ================================ */
-function downloadResume() {
-   const resumeContent = `
-   신재준 이력서
-   ===================
-   
-   기본 정보
-   ---------
-   이름: ${state.name}
-   직무: ${state.job}
-   생년월일: ${state.age}
-   위치: ${state.city}
-   
-   기술 스택
-   ---------
-   ${state.skill.join(', ')}
-   
-   소개
-   ----
-   ${state.description.join('\n')}
-   
-   좌우명
-   ------
-   ${state.quotes.join('\n')}
-      `;
-
-   const blob = new Blob([resumeContent], {
-      type: 'text/plain;charset=utf-8',
-   });
-   const url = URL.createObjectURL(blob);
-   const link = document.createElement('a');
-   link.href = url;
-   link.download = '신재준_이력서.txt';
-   document.body.appendChild(link);
-   link.click();
-   document.body.removeChild(link);
-   URL.revokeObjectURL(url);
 }
 
 /* ==============================
