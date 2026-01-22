@@ -100,8 +100,8 @@ function ProfileCard(profile) {
             </div>
             <div class="profile__avatar">
           <img
-               src="https://jaejun0617.github.io/frontend-project/assets/images/main/about/profile.jpeg"
-               onerror="this.onerror=null; this.src='/assets/images/main/about/profile.jpeg';"
+              src="/frontend-project/assets/images/main/about/profile.jpeg"
+               onerror="this.onerror=null; this.src='./assets/images/main/about/profile.jpeg';"
                alt="${image.alt}"
                />
             </div>
