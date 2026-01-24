@@ -1,3 +1,4 @@
+# [starbucks-renewal-winter](https://jaejun0617.github.io/frontend-learning/html-css/starbucks-renewal-winter/) (새 탭에서 열기)
 # Starbucks Korea Renewal: Winter Full-page Responsive Multi-page
 
 **Date:** 2026-01-10 ~ 2026-01-24
