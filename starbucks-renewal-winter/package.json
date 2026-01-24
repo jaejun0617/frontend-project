@@ -1,0 +1,17 @@
+{
+   "name": "starbucks-renewal-winter",
+   "version": "1.0.0",
+   "description": "**Date:** 2026-01-08   **Topic:** HTML / CSS   **Goal:** 스타벅스 코리아 웹사이트를 레퍼런스로 삼아, **겨울 시즌 무드의 완전 리뉴얼 멀티 페이지**를 설계/구현한다. (퍼블리셔 전형 기준: 구조·레이아웃·반응형·상태·모션·아키텍처)",
+   "main": "index.js",
+   "scripts": {
+      "build:snow": "sass scss/snow.scss css/snow.css --style=compressed",
+      "dev:snow": "sass scss/snow.scss css/snow.css --watch --source-map"
+   },
+   "keywords": [],
+   "author": "",
+   "license": "ISC",
+   "type": "commonjs",
+   "devDependencies": {
+      "sass": "^1.97.2"
+   }
+}

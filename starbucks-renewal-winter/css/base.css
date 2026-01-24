@@ -1,0 +1,90 @@
+/* =========================================================
+   base.css
+   역할: 리셋/기본 타이포/접근성 기본값
+   ========================================================= */
+
+/* ===== CSS Reset ===== */
+*,
+*::before,
+*::after {
+   margin: 0;
+   padding: 0;
+   box-sizing: border-box;
+}
+
+/* ===== Document Defaults ===== */
+html {
+   color: var(--text-900);
+   font-family: var(--font-sans);
+   line-height: var(--lh-base);
+}
+
+body {
+   background-color: var(--bg-0);
+   font-size: var(--fs-16);
+}
+
+/* ===== List Reset ===== */
+ul,
+li,
+ol {
+   list-style: none;
+}
+
+/* ===== Link Defaults ===== */
+a {
+   color: inherit;
+   text-decoration: none;
+}
+
+/* ===== Button Defaults ===== */
+button {
+   font-family: inherit;
+   background: none;
+   border: none;
+   cursor: pointer;
+}
+
+/* ===== Media Defaults ===== */
+img,
+picture,
+video,
+canvas,
+svg {
+   display: block;
+   max-width: 100%;
+}
+
+/* ===== Form Elements ===== */
+input,
+textarea,
+select,
+button {
+   font-family: inherit;
+}
+
+/* ===== Accessibility - Focus Ring ===== */
+:focus-visible {
+   outline: 2px solid var(--focus);
+   outline-offset: 2px;
+}
+
+/* ===== Text Selection ===== */
+::selection {
+   background: var(--ice-200);
+   color: var(--text-900);
+}
+
+/* ===== Hidden Attribute ===== */
+[hidden] {
+   display: none !important;
+}
+
+/* ===== Reduced Motion ===== */
+@media (prefers-reduced-motion: reduce) {
+   * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+   }
+}
