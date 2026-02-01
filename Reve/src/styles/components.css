@@ -113,6 +113,7 @@ body.is-sidebar-open {
    pointer-events: none;
    transition: opacity 160ms ease;
    z-index: 9998;
+   height: 100svh;
 }
 
 .mobile-sidebar {
