@@ -23,9 +23,15 @@ export const Header = () => {
 
         <ul class='nav-menu-icons' aria-label='Utility Menu'>
           <li>
-            <a href='/search' data-link aria-label='Search'>
-              <img src='/src/icons/search.svg' alt='' />
-            </a>
+            <button
+              class='search-toggle'
+              type='button'
+              aria-label='Open search'
+              aria-controls='search-drawer'
+              aria-expanded='false'
+            >
+              <img src='/src/icons/search.svg' alt='' aria-hidden='true' />
+            </button>
           </li>
           <li>
             <a href='/auth' data-link aria-label='Login'>
@@ -80,9 +86,15 @@ export const Header = () => {
           <div class='mobile-icons'>
             <ul class='mobile-icons__list'>
               <li>
-                <a href='/search' data-link aria-label='Search'>
-                  <img src='/src/icons/search.svg' alt='' />
-                </a>
+                <button
+                  class='search-toggle'
+                  type='button'
+                  aria-label='Open search'
+                  aria-controls='search-drawer'
+                  aria-expanded='false'
+                >
+                  <img src='/src/icons/search.svg' alt='' aria-hidden='true' />
+                </button>
               </li>
               <li>
                 <a href='/auth' data-link aria-label='Login'>
@@ -117,6 +129,56 @@ export const Header = () => {
             <a href='/admin' data-link>Admin</a>
           </nav>
         </aside>
+
+        <!-- Search Overlay -->
+        <div class='search-overlay' data-search-overlay aria-hidden='true'></div>
+
+        <!-- Search Drawer (Top-down) -->
+        <section
+          id='search-drawer'
+          class='search-drawer'
+          role='dialog'
+          aria-label='Search'
+          aria-hidden='true'
+        >
+          <div class='search-drawer__inner'>
+            <div class='search-drawer__header'>
+              <img src='/assets/logo/logo.svg' alt='' />
+              <button type='button' class='search-close' aria-label='Close search'>
+                ✕
+              </button>
+            </div>
+
+            <form class='search-form' data-search-form>
+              <input
+                class='search-input'
+                type='search'
+                name='q'
+                placeholder='검색어를 입력하세요'
+                autocomplete='off'
+                aria-label='Search input'
+              />
+              <button class='search-submit' type='submit'>검색</button>
+            </form>
+
+            <div class='search-panels'>
+              <div class='search-panel'>
+                <div class='search-panel__head'>
+                  <strong>최근 검색어</strong>
+                  <button type='button' class='search-clear' data-search-clear>전체 삭제</button>
+                </div>
+                <ul class='search-chips' data-search-recent></ul>
+              </div>
+
+              <div class='search-panel'>
+                <div class='search-panel__head'>
+                  <strong>추천 검색어</strong>
+                </div>
+                <ul class='search-chips' data-search-suggest></ul>
+              </div>
+            </div>
+          </div>
+        </section>
       </nav>
     </header>
   `;
