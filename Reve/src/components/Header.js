@@ -35,22 +35,31 @@ export const Header = () => {
           </li>
           <li>
             <a href='/auth' data-link aria-label='Login'>
-              <img src='/src/icons/usericon.svg' alt='' />
+              <img src='/src/icons/usericon.svg' alt='' aria-hidden='true' />
             </a>
           </li>
           <li>
-            <a href='/cart' data-link aria-label='Cart'>
-              <img src='/src/icons/cart.svg' alt='' />
+            <a href='/cart' data-link aria-label='Cart' class='nav-cart'>
+              <img src='/src/icons/cart.svg' alt='' aria-hidden='true' />
+              <span
+                class='cart-badge'
+                data-cart-count
+                aria-label='Cart item count'
+                aria-live='polite'
+                hidden
+              >
+                0
+              </span>
             </a>
           </li>
           <li class='mypage-icon'>
             <a href='/mypage' data-link aria-label='My Page'>
-              <img src='/src/icons/category.svg' alt='' />
+              <img src='/src/icons/category.svg' alt='' aria-hidden='true' />
             </a>
           </li>
           <li class='admin-icon'>
             <a href='/admin' data-link aria-label='Admin'>
-              <img src='/src/icons/lock.svg' alt='' />
+              <img src='/src/icons/lock.svg' alt='' aria-hidden='true' />
             </a>
           </li>
           <li class='menu-bar-item'>
@@ -98,22 +107,31 @@ export const Header = () => {
               </li>
               <li>
                 <a href='/auth' data-link aria-label='Login'>
-                  <img src='/src/icons/usericon.svg' alt='' />
+                  <img src='/src/icons/usericon.svg' alt='' aria-hidden='true' />
                 </a>
               </li>
               <li>
-                <a href='/cart' data-link aria-label='Cart'>
-                  <img src='/src/icons/cart.svg' alt='' />
+                <a href='/cart' data-link aria-label='Cart' class='nav-cart'>
+                  <img src='/src/icons/cart.svg' alt='' aria-hidden='true' />
+                  <span
+                    class='cart-badge'
+                    data-cart-count
+                    aria-label='Cart item count'
+                    aria-live='polite'
+                    hidden
+                  >
+                    0
+                  </span>
                 </a>
               </li>
               <li class='mypage-icon'>
                 <a href='/mypage' data-link aria-label='My Page'>
-                  <img src='/src/icons/category.svg' alt='' />
+                  <img src='/src/icons/category.svg' alt='' aria-hidden='true' />
                 </a>
               </li>
               <li class='admin-icon'>
                 <a href='/admin' data-link aria-label='Admin'>
-                  <img src='/src/icons/lock.svg' alt='' />
+                  <img src='/src/icons/lock.svg' alt='' aria-hidden='true' />
                 </a>
               </li>
             </ul>

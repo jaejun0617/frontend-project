@@ -108,8 +108,35 @@ initSidebar();
 // initSearchDrawer()는 1번만 호출하고, 매 렌더마다 refresh()로 리스트를 다시 렌더링한다.
 const searchDrawer = initSearchDrawer();
 
+function updateCartCount() {
+   const count = cartStore.getCount();
+   const badgeEls = document.querySelectorAll('[data-cart-count]');
+
+   badgeEls.forEach((el) => {
+      // 0이면 뱃지 숨김(UX)
+      if (count <= 0) {
+         el.hidden = true;
+         el.textContent = '0';
+         return;
+      }
+
+      el.hidden = false;
+      el.textContent = String(count);
+   });
+}
+
+// 최초 1회(첫 렌더 직후에도 안전하게 동작)
+updateCartCount();
+
+// 라우터가 렌더를 끝낼 때마다: SearchDrawer + CartCount 둘 다 새 DOM에 맞춰 갱신
 window.addEventListener('app:render', () => {
    searchDrawer.refresh();
+   updateCartCount();
+});
+
+// 장바구니 상태가 바뀌면 즉시 카운트 갱신
+cartStore.subscribe(() => {
+   updateCartCount();
 });
 
 /* ==============================
