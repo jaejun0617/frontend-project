@@ -12,11 +12,14 @@ import { Footer } from './src/components/Footer.js';
 import { HomePage } from './src/pages/home/index.js';
 import { SearchPage, initSearchPage } from './src/pages/search/index.js';
 import { ProductPage, initProductPage } from './src/pages/product/index.js';
+import { CartPage, initCartPage } from './src/pages/cart/index.js';
 
 // Utils
 import { initSidebar } from './src/utils/sidebar.js';
 import { initSearchDrawer } from './src/utils/searchDrawer.js';
 import { initRouter } from './src/utils/router.js';
+
+import { cartStore } from './src/store/cartStore.js';
 
 /* ==============================
    0) DOM 마운트 유틸
@@ -65,11 +68,11 @@ const routes = {
       afterRender: () => initSearchPage(),
    },
 
-   // MVP 단계: 아직 페이지 파일이 없으면 placeholder로 둬도 OK
    '/cart': {
-      render: () =>
-         "<section class='page'><h1>Cart</h1><p>장바구니 페이지 (TODO)</p></section>",
+      render: () => CartPage(),
+      afterRender: () => initCartPage(),
    },
+
    '/auth': {
       render: () =>
          "<section class='page'><h1>Auth</h1><p>로그인/회원가입 페이지 (TODO)</p></section>",
@@ -107,4 +110,30 @@ const searchDrawer = initSearchDrawer();
 
 window.addEventListener('app:render', () => {
    searchDrawer.refresh();
+});
+
+/* ==============================
+   4) 전역 이벤트: 장바구니 담기
+   ============================== */
+
+// Product/Search 카드의 "장바구니" 버튼은 data-add-cart를 갖는다.
+// 페이지가 바뀌어도 document 위임으로 한 번만 등록하면 됨.
+document.addEventListener('click', async (e) => {
+   const btn = e.target.closest('[data-add-cart]');
+   if (!btn) return;
+
+   const card = btn.closest('[data-product-id]');
+   const productId = card?.getAttribute('data-product-id');
+   if (!productId) return;
+
+   // 1) 장바구니에 담기
+   await cartStore.addById(productId, 1);
+
+   // 2) 사용자가 체감할 수 있도록 간단한 피드백(나중에 토스트로 교체 가능)
+   btn.textContent = '담김 ✓';
+   btn.disabled = true;
+   setTimeout(() => {
+      btn.textContent = '장바구니';
+      btn.disabled = false;
+   }, 700);
 });
