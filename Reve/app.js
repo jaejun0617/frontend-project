@@ -20,6 +20,7 @@ import { initSearchDrawer } from './src/utils/searchDrawer.js';
 import { initRouter } from './src/utils/router.js';
 
 import { cartStore } from './src/store/cartStore.js';
+import { initToast } from './src/components/Toast.js';
 
 /* ==============================
    0) DOM 마운트 유틸
@@ -108,6 +109,9 @@ initSidebar();
 // initSearchDrawer()는 1번만 호출하고, 매 렌더마다 refresh()로 리스트를 다시 렌더링한다.
 const searchDrawer = initSearchDrawer();
 
+// 전역 토스트(중앙) - 라우팅이 바뀌어도 body에 남아있음
+const toast = initToast();
+
 function updateCartCount() {
    const count = cartStore.getCount();
    const badgeEls = document.querySelectorAll('[data-cart-count]');
@@ -162,5 +166,7 @@ document.addEventListener('click', async (e) => {
    setTimeout(() => {
       btn.textContent = '장바구니';
       btn.disabled = false;
-   }, 700);
+   }, 1400);
+   // 2) 토스트로 피드백 (중앙 표시)
+   toast.show('장바구니에 담겼어요');
 });
