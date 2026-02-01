@@ -3,3 +3,13 @@
    padding-top: 7vh;
    /* border: 1px solid red; */
 }
+
+.page {
+   padding-top: 7vh;
+}
+
+.product-page {
+   width: 100%;
+
+   border: 1px solid red;
+}
