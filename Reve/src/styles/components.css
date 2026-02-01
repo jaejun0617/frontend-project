@@ -334,6 +334,8 @@ body.is-search-open .search-drawer {
    align-items: center;
    justify-content: space-between;
    margin-bottom: 8px;
+   height: 30px;
+   /* border: 1px solid red; */
 }
 
 .search-clear {
@@ -1101,4 +1103,240 @@ body.is-search-open .search-drawer {
 .toast.is-toast-show {
    opacity: 1;
    transform: translateY(0) scale(1);
+}
+
+/* =============================================
+ * Search Page: 최근/추천 검색어(칩) UI
+ * 위치 예시: src/styles/components/search.css (추가)
+ * ============================================= */
+
+/* Search meta wrapper */
+.search-meta {
+   display: grid;
+   gap: 16px;
+   padding: 12px 0 4px;
+}
+
+/* Block */
+.search-meta__block {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 14px;
+   padding: 14px;
+   background: rgba(255, 255, 255, 0.9);
+}
+
+/* Head */
+.search-meta__head {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   margin-bottom: 10px;
+}
+
+.search-meta__title {
+   font-size: 14px;
+   font-weight: 700;
+   margin: 0;
+}
+
+.search-meta__clear {
+   font-size: 12px;
+   padding: 8px 10px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: transparent;
+   cursor: pointer;
+}
+
+.search-meta__clear:hover {
+   background: rgba(0, 0, 0, 0.06);
+}
+
+/* Chip list */
+.chip-list {
+   list-style: none;
+   margin: 0;
+   padding: 0;
+
+   display: flex;
+   flex-wrap: wrap;
+   gap: 10px;
+}
+
+/* One chip row (button + optional x) */
+.chip-row {
+   display: inline-flex;
+   align-items: center;
+   gap: 6px;
+}
+
+/* Chip button */
+.chip-btn {
+   appearance: none;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.03);
+   color: inherit;
+
+   font-size: 13px;
+   line-height: 1;
+   padding: 10px 12px;
+   border-radius: 999px;
+   cursor: pointer;
+
+   transition:
+      background 120ms ease,
+      transform 120ms ease;
+}
+
+.chip-btn:hover {
+   background: rgba(0, 0, 0, 0.08);
+}
+
+.chip-btn:active {
+   transform: translateY(1px);
+}
+
+/* Remove (×) */
+.chip-remove {
+   width: 28px;
+   height: 28px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.02);
+   cursor: pointer;
+
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+
+   font-size: 16px;
+   line-height: 1;
+
+   transition:
+      background 120ms ease,
+      transform 120ms ease;
+}
+
+.chip-remove:hover {
+   background: rgba(0, 0, 0, 0.08);
+}
+
+.chip-remove:active {
+   transform: translateY(1px);
+}
+
+/* Empty label */
+.chip-empty {
+   font-size: 12px;
+   opacity: 0.6;
+   padding: 8px 10px;
+}
+
+/* Tablet+ layout (optional) */
+@media (min-width: 768px) {
+   .search-meta {
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+   }
+}
+
+/* ==============================
+   Search Drawer: 최근 | 추천 2열 + 중앙 디바이더 (모바일)
+   - 최근: 세로 리스트 + 끝과 끝(검색어 / X)
+   - 추천: 가로로 나열(wrap)
+   ============================== */
+
+/* 드로어는 모바일에서만 쓰니, 항상 2열로 고정 */
+.search-panels {
+   display: grid;
+   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+   gap: 0;
+}
+
+/* 오른쪽 패널(추천)에 세로 디바이더 + 여백 */
+.search-panels > *:nth-child(2) {
+   border-left: 1px solid rgba(0, 0, 0, 0.12);
+   padding-left: 14px;
+   margin-left: 14px;
+}
+
+/* 드로어 패널이 내용에 의해 줄어들지 않게 */
+.search-panels > * {
+   min-width: 0;
+}
+
+/* ==============================
+   최근 검색어: 세로 + 끝과 끝
+   (listEl: [data-search-recent])
+   ============================== */
+
+.search-chips[data-search-recent] {
+   display: flex;
+   flex-direction: column;
+   gap: 10px;
+   padding: 0;
+   margin: 0;
+   list-style: none;
+}
+
+.search-chips[data-search-recent] li {
+   width: 100%;
+}
+
+/* JS 구조가 <li><div class='chip-row'>...</div></li> 라서 chip-row에 정렬을 준다 */
+.search-chips[data-search-recent] .chip-row {
+   width: 100%;
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+}
+
+.search-chips[data-search-recent] .chip-btn {
+   flex: 1 1 auto;
+   min-width: 0;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   text-align: left;
+}
+
+.search-chips[data-search-recent] .chip-remove {
+   flex: 0 0 auto;
+   width: 36px;
+   height: 36px;
+   border-radius: 999px;
+}
+
+/* ==============================
+   추천 검색어: 가로 wrap
+   (listEl: [data-search-suggest])
+   ============================== */
+
+.search-chips[data-search-suggest] {
+   display: flex;
+   flex-direction: column;
+   flex-wrap: wrap;
+   gap: 10px;
+
+   list-style: none;
+   /* border: 1px solid red; */
+}
+
+.search-chips[data-search-suggest] li {
+   width: auto;
+}
+
+.search-chips[data-search-suggest] .chip-row {
+   display: inline-flex;
+   align-items: center;
+}
+
+.search-chips[data-search-suggest] .chip-btn {
+   width: auto;
+   max-width: 100%;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
 }
