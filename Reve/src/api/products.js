@@ -313,10 +313,10 @@ function buildTags({ brand, category, name, color }) {
    if (!badges.length) badges.push(pickOne(['신상', '베스트', 'HOT']));
 
    // 최대 1개만 노출(현재 정책 유지)
-   const pickedBadges = badges.slice(0, 1);
+   const pickedBadge = pickOne(badges);
 
    // ✅ 카드에 보여줄 태그
-   const displayTags = [brand.en, ...pickedBadges].filter(Boolean);
+   const displayTags = [brand.en, pickedBadge].filter(Boolean);
 
    /* --------------------------------
          1) 검색용 토큰
