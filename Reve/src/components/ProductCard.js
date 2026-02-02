@@ -48,8 +48,12 @@ function getDisplayTags(product) {
 }
 
 export function ProductCard(product) {
-   const id = String(product?.id ?? '').trim();
-   const name = escapeHtml(product?.name ?? '');
+   const rawId = String(product?.id ?? '').trim();
+   const safeId = escapeHtml(rawId);
+
+   const rawName = String(product?.name ?? '').trim();
+   const safeName = escapeHtml(rawName);
+
    const price = Number(product?.price ?? 0);
    const basePrice = Number(product?.basePrice ?? price);
    const discountRate = Number(product?.discountRate ?? 0);
@@ -60,30 +64,29 @@ export function ProductCard(product) {
    const displayTags = getDisplayTags(product);
 
    return `
-  <article class='product-card' data-product-id='${escapeHtml(id)}'>
-    <!-- 썸네일 영역: 상세 페이지 진입 -->
+  <article class='product-card' data-product-id='${safeId}'>
     <a
       class='product-card__thumb'
-      href='/product/${escapeHtml(id)}'
+      href='/product/${safeId}'
       data-link
-      aria-label='${name} 상세 보기'
+      aria-label='${escapeHtml(rawName)} 상세 보기'
     ></a>
 
     <div class='product-card__body'>
       <h3 class='product-card__name'>
-        <a href='/product/${escapeHtml(id)}' data-link>${name}</a>
+        <a href='/product/${safeId}' data-link>${safeName}</a>
       </h3>
 
       <div class='product-card__pricebox'>
         ${
            isDiscounted
               ? `
-                <p class='product-card__base' aria-label='정가'>₩ ${formatKRW(basePrice)}</p>
-                <p class='product-card__price' aria-label='할인가'>
-                  ₩ ${formatKRW(price)}
-                  <span class='product-card__discount' aria-label='할인율'>-${percent}%</span>
-                </p>
-              `
+              <p class='product-card__base' aria-label='정가'>₩ ${formatKRW(basePrice)}</p>
+              <p class='product-card__price' aria-label='할인가'>
+                ₩ ${formatKRW(price)}
+                <span class='product-card__discount' aria-label='할인율'>-${percent}%</span>
+              </p>
+            `
               : `<p class='product-card__price'>₩ ${formatKRW(price)}</p>`
         }
       </div>
@@ -99,12 +102,11 @@ export function ProductCard(product) {
       </ul>
 
       <div class='product-card__actions'>
-        <!-- 장바구니 버튼: app.js 문서 위임(data-add-cart)과 연결 -->
         <button type='button' class='btn-add-cart' data-add-cart>
           장바구니
         </button>
       </div>
     </div>
   </article>
-`;
+  `;
 }

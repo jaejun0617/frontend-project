@@ -2,6 +2,10 @@
  * =============================================
  * 📍 위치: src/pages/cart/index.js
  * 역할: 장바구니(Cart) 페이지
+ * - 배송비/무료배송 기준
+ * - 쿠폰 적용(실제 할인 반영)
+ * - 쿠폰 선택 상태 localStorage 유지
+ * - "적용 가능한 쿠폰만" 노출
  * =============================================
  */
 
@@ -10,6 +14,16 @@ import { formatPrice } from '../../utils/format.js';
 
 const FREE_SHIPPING_THRESHOLD = 300000;
 const SHIPPING_FEE = 3000;
+
+const COUPONS = [
+   { code: 'WELCOME', label: 'WELCOME 10%', rate: 0.1 },
+   { code: 'SEASON', label: 'SEASON 8%', rate: 0.08 },
+   { code: 'VIP', label: 'VIP 12%', rate: 0.12 },
+   { code: 'APP_ONLY', label: 'APP_ONLY 7%', rate: 0.07 },
+   { code: 'BUNDLE', label: 'BUNDLE 5%', rate: 0.05 },
+];
+
+const COUPON_STORAGE_KEY = 'eclat_cart_coupon';
 
 export const CartPage = () => {
    return `
@@ -37,12 +51,15 @@ function renderEmpty() {
   `;
 }
 
+/* ==============================
+   계산 유틸
+   ============================== */
+
 function calcSubtotal(detailedItems) {
-   return detailedItems.reduce((acc, row) => {
-      const price = Number(row?.product?.price ?? 0);
-      const qty = Number(row?.qty ?? 0);
-      return acc + price * qty;
-   }, 0);
+   return detailedItems.reduce(
+      (acc, row) => acc + row.product.price * row.qty,
+      0,
+   );
 }
 
 function calcShipping(subtotal) {
@@ -50,17 +67,108 @@ function calcShipping(subtotal) {
    return subtotal < FREE_SHIPPING_THRESHOLD ? SHIPPING_FEE : 0;
 }
 
-function countCouponEligibleItems(detailedItems) {
-   // 라인아이템 기준(옵션 다르면 다른 라인)
-   return detailedItems.filter((row) => !!row?.product?.couponEligible).length;
+/**
+ * ✅ 특정 쿠폰이 실제로 적용 가능한 라인아이템 개수
+ * 조건:
+ * - couponEligible === true
+ * - couponTags에 coupon.code 포함
+ * - couponRateCap > 0 (의미 있는 캡)
+ */
+function countEligibleForCoupon(detailedItems, coupon) {
+   if (!coupon) return 0;
+
+   return detailedItems.filter(({ product }) => {
+      if (!product?.couponEligible) return false;
+
+      const tags = Array.isArray(product?.couponTags) ? product.couponTags : [];
+      if (!tags.includes(coupon.code)) return false;
+
+      const cap = Number(product?.couponRateCap ?? 0);
+      return cap > 0;
+   }).length;
 }
 
-function renderCart(detailedItems) {
+/**
+ * ✅ 장바구니 기준으로 "선택 가능한 쿠폰"만 필터링
+ * - 최소 1개 이상 적용 가능한 상품이 있을 때만 노출
+ */
+function getApplicableCoupons(detailedItems) {
+   return COUPONS.filter((c) => countEligibleForCoupon(detailedItems, c) > 0);
+}
+
+/**
+ * ✅ 쿠폰 할인 계산(실제 적용)
+ * - couponEligible + couponTags + couponRateCap 기준
+ */
+function calcCouponDiscount(detailedItems, coupon) {
+   if (!coupon) return 0;
+
+   const total = detailedItems.reduce((acc, row) => {
+      const p = row.product;
+      const qty = row.qty;
+
+      if (!p?.couponEligible) return acc;
+
+      const tags = Array.isArray(p?.couponTags) ? p.couponTags : [];
+      if (!tags.includes(coupon.code)) return acc;
+
+      const price = Number(p.price ?? 0);
+      const cap = Number(p.couponRateCap ?? 0);
+      if (cap <= 0) return acc;
+
+      const appliedRate = Math.min(coupon.rate, cap);
+      return acc + price * qty * appliedRate;
+   }, 0);
+
+   // 보기 좋게 내림(원 단위)
+   return Math.floor(total);
+}
+
+/* ==============================
+   쿠폰 선택 저장/복구
+   ============================== */
+
+function loadSavedCouponCode() {
+   try {
+      return String(localStorage.getItem(COUPON_STORAGE_KEY) || '');
+   } catch {
+      return '';
+   }
+}
+
+function saveCouponCode(code) {
+   try {
+      if (!code) localStorage.removeItem(COUPON_STORAGE_KEY);
+      else localStorage.setItem(COUPON_STORAGE_KEY, String(code));
+   } catch {
+      // storage 불가 환경이면 그냥 무시(MVP)
+   }
+}
+
+/* ==============================
+   렌더
+   ============================== */
+
+function renderCart(detailedItems, selectedCouponCode) {
    const subtotal = calcSubtotal(detailedItems);
    const shipping = calcShipping(subtotal);
-   const total = subtotal + shipping;
 
-   const couponEligibleCount = countCouponEligibleItems(detailedItems);
+   // ✅ 적용 가능한 쿠폰만 보여주기
+   const applicableCoupons = getApplicableCoupons(detailedItems);
+
+   // ✅ 선택된 쿠폰이 현재 장바구니에서 유효한지 확인
+   const selectedCoupon =
+      applicableCoupons.find((c) => c.code === selectedCouponCode) ?? null;
+
+   const eligibleCountForSelected = selectedCoupon
+      ? countEligibleForCoupon(detailedItems, selectedCoupon)
+      : 0;
+
+   const couponDiscount = selectedCoupon
+      ? calcCouponDiscount(detailedItems, selectedCoupon)
+      : 0;
+
+   const total = Math.max(0, subtotal - couponDiscount) + shipping;
 
    const freeShippingText =
       subtotal <= 0
@@ -73,7 +181,6 @@ function renderCart(detailedItems) {
 
    return `
     <div class='cart-layout' aria-label='Cart Layout'>
-      <!-- 왼쪽: 상품 리스트 -->
       <div class='cart__list' aria-label='Cart Items'>
         ${detailedItems
            .map(({ key, product, qty, options }) => {
@@ -108,9 +215,39 @@ function renderCart(detailedItems) {
            .join('')}
       </div>
 
-      <!-- 오른쪽: 요약/결제 -->
       <aside class='cart__summary' aria-label='Cart Summary'>
         <p class='cart__hint'>${freeShippingText}</p>
+
+        <div class='cart__coupon'>
+          <p class='cart__coupon-title'>쿠폰</p>
+
+          <select class='cart__coupon-select' data-coupon-select>
+            <option value=''>선택 안 함</option>
+            ${
+               applicableCoupons.length
+                  ? applicableCoupons
+                       .map(
+                          (c) => `
+                            <option value='${c.code}' ${
+                               c.code === selectedCouponCode ? 'selected' : ''
+                            }>
+                              ${c.label}
+                            </option>
+                          `,
+                       )
+                       .join('')
+                  : `<option value='' disabled>적용 가능한 쿠폰 없음</option>`
+            }
+          </select>
+
+          <p class='cart__coupon-meta'>
+            ${
+               selectedCoupon
+                  ? `쿠폰 적용 (${eligibleCountForSelected}개 상품 가능)`
+                  : '쿠폰 적용 상품을 선택해 주세요'
+            }
+          </p>
+        </div>
 
         <div class='cart__row'>
           <span>상품 합계</span>
@@ -118,13 +255,13 @@ function renderCart(detailedItems) {
         </div>
 
         <div class='cart__row'>
-          <span>배송비</span>
-          <strong>₩ ${formatPrice(shipping)}</strong>
+          <span>쿠폰 할인</span>
+          <strong>- ₩ ${formatPrice(couponDiscount)}</strong>
         </div>
 
         <div class='cart__row'>
-          <span>쿠폰 적용</span>
-          <strong>${couponEligibleCount}개 상품 가능</strong>
+          <span>배송비</span>
+          <strong>₩ ${formatPrice(shipping)}</strong>
         </div>
 
         <div class='cart__row cart__row--total'>
@@ -136,7 +273,9 @@ function renderCart(detailedItems) {
           전체 비우기
         </button>
 
-        <button type='button' class='cart__checkout' data-checkout ${canCheckout ? '' : 'disabled'}>
+        <button type='button' class='cart__checkout' ${
+           canCheckout ? '' : 'disabled'
+        }>
           구매하기 ${canCheckout ? '' : '(조건 미충족)'}
         </button>
       </aside>
@@ -144,44 +283,59 @@ function renderCart(detailedItems) {
   `;
 }
 
+/* ==============================
+   init
+   ============================== */
+
 export async function initCartPage() {
    const cartEl = document.querySelector('[data-cart]');
    if (!cartEl) return;
 
-   // ✅ 렌더 함수 분리(중복 호출/동시성 방지)
-   let renderTick = 0;
+   // ✅ 새로고침 유지: 저장된 쿠폰 코드 불러오기
+   let selectedCouponCode = loadSavedCouponCode();
 
    async function paint() {
-      const myTick = ++renderTick;
       const detailed = await cartStore.getDetailedItems();
-      if (myTick !== renderTick) return; // 최신 렌더만 반영
 
-      cartEl.innerHTML = detailed.length ? renderCart(detailed) : renderEmpty();
-   }
-
-   // (1) 최초 렌더
-   await paint();
-
-   // (2) 상태 변경 시 재렌더
-   // subscribe는 "즉시 1회 호출"이 기본이라,
-   // 여기서는 listener 내부에서 paint만 호출하고, 최초 렌더는 위에서 끝냄.
-   cartStore.subscribe(() => {
-      paint();
-   });
-
-   // (3) 이벤트 위임
-   cartEl.addEventListener('click', (e) => {
-      // 전체 비우기
-      if (e.target.closest('[data-cart-clear]')) {
-         cartStore.clear();
+      if (!detailed.length) {
+         cartEl.innerHTML = renderEmpty();
          return;
       }
 
-      // 구매하기(MVP)
-      const checkout = e.target.closest('[data-checkout]');
-      if (checkout) {
-         if (checkout.hasAttribute('disabled')) return;
-         alert('MVP: 결제는 아직 비활성! 😼');
+      // ✅ 현재 장바구니 기준으로 선택 쿠폰 유효성 검증
+      const applicableCoupons = getApplicableCoupons(detailed);
+      const isValid = applicableCoupons.some(
+         (c) => c.code === selectedCouponCode,
+      );
+
+      // 유효하지 않으면 초기화(장바구니 구성 바뀌면 발생 가능)
+      if (selectedCouponCode && !isValid) {
+         selectedCouponCode = '';
+         saveCouponCode('');
+      }
+
+      cartEl.innerHTML = renderCart(detailed, selectedCouponCode);
+   }
+
+   await paint();
+
+   cartStore.subscribe(async () => {
+      await paint();
+   });
+
+   cartEl.addEventListener('change', async (e) => {
+      const select = e.target.closest('[data-coupon-select]');
+      if (!select) return;
+
+      selectedCouponCode = String(select.value || '');
+      saveCouponCode(selectedCouponCode); // ✅ 선택값 저장
+
+      await paint();
+   });
+
+   cartEl.addEventListener('click', (e) => {
+      if (e.target.closest('[data-cart-clear]')) {
+         cartStore.clear();
          return;
       }
 
@@ -189,13 +343,11 @@ export async function initCartPage() {
       const key = itemEl?.getAttribute('data-cart-key');
       if (!key) return;
 
-      // 삭제
       if (e.target.closest('[data-remove]')) {
          cartStore.remove(key);
          return;
       }
 
-      // 수량 변경
       const state = cartStore.getState();
       const current = state.items.find((it) => it.key === key)?.qty || 1;
 
