@@ -57,7 +57,7 @@ export function ProductCard(product) {
    const price = Number(product?.price ?? 0);
    const basePrice = Number(product?.basePrice ?? price);
    const discountRate = Number(product?.discountRate ?? 0);
-
+   const image = String(product?.image ?? '').trim();
    const isDiscounted = discountRate > 0 && basePrice > price;
    const percent = calcDiscountPercent(discountRate);
 

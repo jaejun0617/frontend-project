@@ -1,4 +1,6 @@
-/* Product Grid + Product Card */
+/* =====================================================================
+      Product Grid + Product Card
+      ===================================================================== */
 
 .product-grid {
    display: grid;
@@ -36,9 +38,15 @@
 }
 
 .product-card__thumb {
-   aspect-ratio: 1 / 1;
+   display: block; /* a 태그라서 안전하게 block */
    width: 100%;
-   background:
+   aspect-ratio: 1 / 1; /* 원하는 비율로 (지금은 정사각) */
+   border-radius: 0;
+   overflow: hidden;
+
+   /* ✅ 이미지 + 유리그라데이션 레이어 */
+   background-image:
+      url('https://placehold.co/800x800/png'),
       radial-gradient(
          120% 120% at 10% 0%,
          rgba(0, 0, 0, 0.06) 0%,
@@ -46,7 +54,10 @@
          rgba(0, 0, 0, 0) 100%
       ),
       linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0));
-   position: relative;
+
+   background-size: cover, auto, auto;
+   background-position: center, center, center;
+   background-repeat: no-repeat, no-repeat, no-repeat;
 }
 
 .product-badge {
@@ -68,6 +79,7 @@
    background: rgba(0, 0, 0, 0.7);
 }
 
+/* Price box (discount) */
 .product-card__pricebox {
    display: flex;
    align-items: baseline;
@@ -80,7 +92,6 @@
    opacity: 0.55;
    text-decoration: line-through;
 }
-
 .product-card__body {
    padding: 12px;
    display: grid;

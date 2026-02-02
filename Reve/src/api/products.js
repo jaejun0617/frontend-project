@@ -172,6 +172,11 @@ const PRICE_RANGE_BY_CATEGORY = {
 const APPAREL_SIZES = ['S', 'M', 'L', 'XL'];
 const SHOE_SIZES = Array.from({ length: 13 }, (_, i) => 220 + i * 5);
 
+function buildImageUrl({ id, category }) {
+   const text = encodeURIComponent(`${category}\n${id}`);
+   return `https://placehold.co/800x800?text=${text}`;
+}
+
 function buildBasePrice(category) {
    const [min, max] = PRICE_RANGE_BY_CATEGORY[category] ?? [300000, 2000000];
    const raw = randInt(min, max);
@@ -276,22 +281,38 @@ function buildTags({ brand, category, name, color }) {
 }
 
 function buildSizes(category) {
+   // ✅ 의류 사이즈 정렬 우선순위
+   const APPAREL_ORDER = { S: 1, M: 2, L: 3, XL: 4 };
+   const sortApparel = (arr) =>
+      [...arr].sort(
+         (a, b) => (APPAREL_ORDER[a] || 99) - (APPAREL_ORDER[b] || 99),
+      );
+
+   // ✅ 신발은 숫자 오름차순
+   const sortShoes = (arr) => [...arr].sort((a, b) => Number(a) - Number(b));
+
    if (category === 'shoes') {
       return {
          apparelSizes: [],
-         shoeSizes: pickSubset(SHOE_SIZES, 2, 6).sort((a, b) => a - b),
+         shoeSizes: sortShoes(pickSubset(SHOE_SIZES, 2, 6)),
       };
    }
+
    if (category === 'outer' || category === 'top') {
-      return { apparelSizes: pickSubset(APPAREL_SIZES, 2, 4), shoeSizes: [] };
+      return {
+         apparelSizes: sortApparel(pickSubset(APPAREL_SIZES, 2, 4)),
+         shoeSizes: [],
+      };
    }
+
    const hasApparel = rand() < 0.25;
    return {
-      apparelSizes: hasApparel ? pickSubset(APPAREL_SIZES, 1, 3) : [],
+      apparelSizes: hasApparel
+         ? sortApparel(pickSubset(APPAREL_SIZES, 1, 3))
+         : [],
       shoeSizes: [],
    };
 }
-
 function createMockProducts(count = 100) {
    const products = [];
 
@@ -311,7 +332,7 @@ function createMockProducts(count = 100) {
       const sizes = buildSizes(category);
       const colors = buildColorOptions();
       const tags = buildTags({ brand, category, name, color });
-
+      const image = buildImageUrl({ id, category });
       products.push({
          id,
          name,
@@ -324,7 +345,7 @@ function createMockProducts(count = 100) {
          couponTags: promo.couponTags,
          tags,
          category,
-         image: '',
+         image,
          colors, // ✅ 상세 옵션용
          ...sizes,
       });

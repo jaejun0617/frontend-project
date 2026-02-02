@@ -1,0 +1,48 @@
+/* =====================================================================
+   common.css
+   - 여러 페이지/컴포넌트에서 공용으로 쓰는 유틸/상태/버튼
+   ===================================================================== */
+
+.loading,
+.error,
+.empty,
+.result {
+   margin: 0;
+   padding: 10px 0;
+   color: rgba(0, 0, 0, 0.72);
+}
+
+.error {
+   color: rgba(180, 30, 30, 0.95);
+}
+
+/* 작은 pill */
+.pill {
+   display: inline-flex;
+   align-items: center;
+   border-radius: 999px;
+   padding: 4px 10px;
+   border: 1px solid rgba(0, 0, 0, 0.16);
+   background: rgba(0, 0, 0, 0.03);
+   font-size: 12px;
+   font-weight: 800;
+}
+
+/* empty */
+.empty {
+   padding: 16px;
+   border-radius: 16px;
+   border: 1px dashed rgba(0, 0, 0, 0.18);
+   background: rgba(0, 0, 0, 0.02);
+}
+
+.empty__title {
+   margin: 0;
+   font-weight: 900;
+}
+
+.empty__desc {
+   margin: 6px 0 0;
+   opacity: 0.75;
+   font-size: 13px;
+}

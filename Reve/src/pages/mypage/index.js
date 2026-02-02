@@ -16,11 +16,11 @@ import { couponStore } from '../../store/couponStore.js';
 
 /** 탭 정의: 나중에 여기만 늘리면 UI가 같이 확장됨 */
 const TABS = [
-   { key: 'coupon', label: '쿠폰/혜택', enabled: true },
    { key: 'profile', label: '내 정보', enabled: false },
    { key: 'address', label: '배송지', enabled: false },
    { key: 'orders', label: '주문/배송', enabled: false },
    { key: 'grade', label: '회원등급', enabled: false },
+   { key: 'coupon', label: '쿠폰/혜택', enabled: true },
 ];
 
 /** 쿠폰 등록 UX 메시지 */
