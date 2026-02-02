@@ -54,45 +54,49 @@ function renderCart(detailedItems) {
    const total = calcTotal(detailedItems);
 
    return `
-    <div class='cart__list' aria-label='Cart Items'>
-      ${detailedItems
-         .map(({ product, qty }) => {
-            return `
-          <article class='cart-item' data-cart-item data-product-id='${product.id}'>
-            <div class='cart-item__info'>
-              <p class='cart-item__name'>${product.name}</p>
-              <p class='cart-item__price'>₩ ${formatPrice(product.price)}</p>
-            </div>
+    <div class='cart-layout' aria-label='Cart Layout'>
+      <!-- 왼쪽: 상품 리스트 -->
+      <div class='cart__list' aria-label='Cart Items'>
+        ${detailedItems
+           .map(({ product, qty }) => {
+              return `
+              <article class='cart-item' data-cart-item data-product-id='${product.id}'>
+                <div class='cart-item__info'>
+                  <p class='cart-item__name'>${product.name}</p>
+                  <p class='cart-item__price'>₩ ${formatPrice(product.price)}</p>
+                </div>
 
-            <div class='cart-item__controls' aria-label='Quantity Controls'>
-              <button type='button' data-qty-dec aria-label='Decrease quantity'>-</button>
-              <span class='cart-item__qty' data-qty>${qty}</span>
-              <button type='button' data-qty-inc aria-label='Increase quantity'>+</button>
-            </div>
+                <div class='cart-item__controls' aria-label='Quantity Controls'>
+                  <button type='button' data-qty-dec aria-label='Decrease quantity'>-</button>
+                  <span class='cart-item__qty' data-qty>${qty}</span>
+                  <button type='button' data-qty-inc aria-label='Increase quantity'>+</button>
+                </div>
 
-            <button type='button' class='cart-item__remove' data-remove aria-label='Remove item'>
-              삭제
-            </button>
-          </article>
-        `;
-         })
-         .join('')}
-    </div>
-
-    <footer class='cart__summary' aria-label='Cart Summary'>
-      <div class='cart__row'>
-        <span>총 상품금액</span>
-        <strong>₩ ${formatPrice(total)}</strong>
+                <button type='button' class='cart-item__remove' data-remove aria-label='Remove item'>
+                  삭제
+                </button>
+              </article>
+            `;
+           })
+           .join('')}
       </div>
 
-      <button type='button' class='cart__clear' data-cart-clear>
-        전체 비우기
-      </button>
+      <!-- 오른쪽: 요약/결제 -->
+      <aside class='cart__summary' aria-label='Cart Summary'>
+        <div class='cart__row'>
+          <span>총 상품금액</span>
+          <strong>₩ ${formatPrice(total)}</strong>
+        </div>
 
-      <button type='button' class='cart__checkout' disabled>
-        구매하기 (MVP: 비활성)
-      </button>
-    </footer>
+        <button type='button' class='cart__clear' data-cart-clear>
+          전체 비우기
+        </button>
+
+        <button type='button' class='cart__checkout' disabled>
+          구매하기 (MVP: 비활성)
+        </button>
+      </aside>
+    </div>
   `;
 }
 

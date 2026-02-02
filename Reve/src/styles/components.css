@@ -806,3 +806,147 @@ body.is-search-open .search-drawer {
    overflow: hidden;
    text-overflow: ellipsis;
 }
+
+/* =====================================================================
+   Cart UI
+   - 좌: 상품 리스트
+   - 우: Summary(총액/버튼)
+   ===================================================================== */
+
+/* 레이아웃 래퍼 */
+.cart-layout {
+   display: grid;
+   gap: 16px;
+}
+
+/* 모바일: 세로 스택 (기본) */
+@media (min-width: 768px) {
+   .cart-layout {
+      grid-template-columns: minmax(0, 1fr) 320px; /* 좌 넓게 / 우 고정 */
+      align-items: start;
+   }
+}
+
+/* 오른쪽 Summary는 스크롤 따라오게 (데스크탑에서 체감 좋아짐) */
+@media (min-width: 768px) {
+   .cart__summary {
+      position: sticky;
+      top: calc(6svh + 16px); /* 헤더 높이 + 여백 */
+   }
+}
+
+/* 리스트 영역 */
+.cart__list {
+   display: grid;
+   gap: 12px;
+}
+
+/* 카드(아이템) */
+.cart-item {
+   display: grid;
+   gap: 10px;
+
+   padding: 14px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   background: rgba(255, 255, 255, 0.95);
+}
+
+/* 정보(상품명/가격) */
+.cart-item__info {
+   display: flex;
+   align-items: baseline;
+   justify-content: space-between; /* 끝과 끝 */
+   gap: 12px;
+}
+
+.cart-item__name {
+   margin: 0;
+   font-weight: 700;
+
+   /* 긴 이름 말줄임 */
+   min-width: 0;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.cart-item__price {
+   margin: 0;
+   font-weight: 700;
+   opacity: 0.9;
+   flex: 0 0 auto;
+}
+
+/* 수량 컨트롤 */
+.cart-item__controls {
+   display: inline-flex;
+   align-items: center;
+   gap: 10px;
+}
+
+.cart-item__controls button {
+   width: 36px;
+   height: 36px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.03);
+   cursor: pointer;
+}
+
+.cart-item__qty {
+   min-width: 24px;
+   text-align: center;
+   font-weight: 700;
+}
+
+/* 삭제 버튼 */
+.cart-item__remove {
+   justify-self: end; /* 오른쪽 끝 */
+   padding: 10px 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: transparent;
+   cursor: pointer;
+}
+
+/* Summary 박스 */
+.cart__summary {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   padding: 14px;
+   background: rgba(255, 255, 255, 0.95);
+
+   display: grid;
+   gap: 12px;
+}
+
+.cart__row {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+}
+
+/* Summary 버튼들 */
+.cart__clear,
+.cart__checkout {
+   width: 100%;
+   height: 44px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   cursor: pointer;
+}
+
+.cart__clear {
+   background: rgba(0, 0, 0, 0.03);
+}
+
+.cart__checkout {
+   background: rgba(0, 0, 0, 0.08);
+   font-weight: 700;
+}
+
+.cart__checkout:disabled {
+   opacity: 0.6;
+   cursor: not-allowed;
+}
