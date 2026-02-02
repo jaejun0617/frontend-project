@@ -96,6 +96,11 @@ function setOpen(isOpen) {
    3) UI 렌더(칩) + 검색 실행
    ============================== */
 
+// ✅ 최근검색 데이터가 바뀌면 "다른 화면(SearchPage)"에도 알려주기
+function emitRecentChanged() {
+   window.dispatchEvent(new CustomEvent('recent-search:changed'));
+}
+
 function renderChips(listEl, items, onClick, options = {}) {
    if (!listEl) return;
 
@@ -135,6 +140,7 @@ function renderChips(listEl, items, onClick, options = {}) {
 
          const value = removeBtn.getAttribute('data-chip');
          removeRecentSearch(value);
+         emitRecentChanged();
          syncLists();
          return;
       }
@@ -158,7 +164,7 @@ function submitSearch(keyword) {
    if (!q) return;
 
    addRecent(q);
-
+   emitRecentChanged();
    const inputEl = document.querySelector(SELECTORS.input);
    if (inputEl) inputEl.value = '';
 
@@ -223,6 +229,7 @@ export function initSearchDrawer() {
 
       if (clearBtn) {
          clearRecent();
+         emitRecentChanged();
          syncLists();
          return;
       }

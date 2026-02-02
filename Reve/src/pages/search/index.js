@@ -171,6 +171,17 @@ export async function initSearchPage() {
    // ✅ 페이지 들어올 때마다 최근/추천 갱신
    syncMetaLists();
 
+   // ✅ SearchDrawer에서 최근검색이 바뀌면(SearchDrawer 삭제/추가/전체삭제) 페이지도 즉시 갱신
+   // - 이벤트 리스너는 전역(window)에 걸어도 되지만 "중복 등록"을 막아야 함
+   if (!window.__recentSearchListenerBound) {
+      window.__recentSearchListenerBound = 'true';
+
+      window.addEventListener('recent-search:changed', () => {
+         // 라우팅으로 페이지가 없을 때도 호출될 수 있으니, 요소 있으면만 갱신
+         syncMetaLists();
+      });
+   }
+
    // ✅ 이벤트는 페이지 루트에 1회만 바인딩 (라우팅 재렌더 중복 방지)
    if (!pageRoot.dataset.bound) {
       pageRoot.dataset.bound = 'true';
@@ -181,6 +192,8 @@ export async function initSearchPage() {
          if (clearAll) {
             clearRecentSearches();
             syncMetaLists();
+
+            window.dispatchEvent(new CustomEvent('recent-search:changed')); // ✅ 추가
             return;
          }
 
@@ -192,6 +205,8 @@ export async function initSearchPage() {
             const value = removeBtn.getAttribute('data-chip');
             removeRecentSearch(value);
             syncMetaLists();
+
+            window.dispatchEvent(new CustomEvent('recent-search:changed')); // ✅ 추가
             return;
          }
 

@@ -6,10 +6,14 @@
 
 .page {
    padding-top: 7vh;
+   width: 100%;
+   max-width: 1440px;
+   height: 100svh;
+   margin: 0 auto;
+   background-color: papayawhip;
+   /* border: 1px solid red; */
 }
 
 .product-page {
-   width: 100%;
-
-   border: 1px solid red;
+   height: auto;
 }
