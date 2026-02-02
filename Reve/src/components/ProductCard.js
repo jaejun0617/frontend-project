@@ -1,91 +1,110 @@
 /**
  * =============================================
  * 📍 위치: src/components/ProductCard.js
- * 역할: 상품 카드 UI(이름/가격/태그 등) 렌더링용 컴포넌트
- * 사용처: Product/Search 페이지에서 반복 렌더링(map/loop)
+ * 역할: 상품 카드 UI
+ * - 할인/정가/할인율 표시
+ * - 카드 태그: 브랜드(영문) + 뱃지(신상/베스트/HOT)만 노출
+ * - 상세 진입: /product/:id (data-link)
  * =============================================
  */
 
 function formatKRW(value) {
-   return new Intl.NumberFormat('ko-KR').format(value);
-}
-
-function toPercent(rate) {
-   const n = Number(rate || 0);
-   return Math.round(n * 100);
+   return new Intl.NumberFormat('ko-KR').format(Number(value || 0));
 }
 
 /**
- * 상품 카드 컴포넌트
- * @param {Object} product
- * @param {string} product.id
- * @param {string} product.name
- * @param {string} product.brand
- * @param {number} product.price            // 최종가(세일 반영)
- * @param {number} product.basePrice        // 정가
- * @param {number} product.discountRate     // 세일율(0~1)
- * @param {boolean} product.couponEligible  // 쿠폰 가능 여부
- * @param {string[]} product.tags           // displayTags + searchTokens 섞여 있음
+ * HTML 문자열 깨짐/XSS 방지용 최소 escape
+ * (템플릿 문자열로 innerHTML에 꽂는 구조라 기본 방어)
  */
-export function ProductCard(product) {
-   const id = product?.id ?? '';
-   const name = product?.name ?? '';
-   const brand = product?.brand ?? '';
+function escapeHtml(value) {
+   return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+}
 
-   const price = Number(product?.price ?? 0);
-   const basePrice = Number(product?.basePrice ?? 0);
-   const discountRate = Number(product?.discountRate ?? 0);
+function calcDiscountPercent(discountRate) {
+   const r = Number(discountRate || 0);
+   if (!r) return 0;
+   return Math.round(r * 100);
+}
 
-   const couponEligible = Boolean(product?.couponEligible);
+/**
+ * 카드에 보여줄 태그만 추출
+ * - 브랜드(영문): product.brand
+ * - 뱃지: tags 안에 '신상'|'베스트'|'HOT'가 있으면 추가
+ * - 최대 3개 (브랜드 + 뱃지들)
+ */
+function getDisplayTags(product) {
+   const brand = String(product?.brand ?? '').trim();
    const tags = Array.isArray(product?.tags) ? product.tags : [];
 
-   // ✅ 세일 여부 판단
-   const hasDiscount = basePrice > 0 && price > 0 && price < basePrice;
-   const discountPercent = hasDiscount ? toPercent(discountRate) : 0;
+   const badgePool = ['신상', '베스트', 'HOT'];
+   const badges = badgePool.filter((b) => tags.includes(b));
 
-   // ✅ UI에 보여줄 태그만 추려내기
-   // - tags에는 검색 토큰이 많으니, 카드용으로만 제한
-   // - 정책: brand(영문) + (신상/베스트/HOT 중 0~1개)
-   const displayTags = [brand, '신상', '베스트', 'HOT'];
-   const visibleTags = tags.filter((t) => displayTags.includes(t)).slice(0, 2);
+   return [brand, ...badges].filter(Boolean).slice(0, 3);
+}
+
+export function ProductCard(product) {
+   const id = String(product?.id ?? '').trim();
+   const name = escapeHtml(product?.name ?? '');
+   const price = Number(product?.price ?? 0);
+   const basePrice = Number(product?.basePrice ?? price);
+   const discountRate = Number(product?.discountRate ?? 0);
+
+   const isDiscounted = discountRate > 0 && basePrice > price;
+   const percent = calcDiscountPercent(discountRate);
+
+   const displayTags = getDisplayTags(product);
 
    return `
-   <article class='product-card' data-product-id='${id}'>
-     <div class='product-card__thumb' aria-hidden='true'>
-       ${
-          hasDiscount
-             ? `<span class='product-badge product-badge--sale'>-${discountPercent}%</span>`
-             : ''
-       }
-       ${couponEligible ? `<span class='product-badge product-badge--coupon'>쿠폰</span>` : ''}
-     </div>
+  <article class='product-card' data-product-id='${escapeHtml(id)}'>
+    <!-- 썸네일 영역: 상세 페이지 진입 -->
+    <a
+      class='product-card__thumb'
+      href='/product/${escapeHtml(id)}'
+      data-link
+      aria-label='${name} 상세 보기'
+    ></a>
 
-     <div class='product-card__body'>
-       <h3 class='product-card__name'>${name}</h3>
+    <div class='product-card__body'>
+      <h3 class='product-card__name'>
+        <a href='/product/${escapeHtml(id)}' data-link>${name}</a>
+      </h3>
 
-       ${
-          hasDiscount
-             ? `
-           <div class='product-card__pricebox' aria-label='Price'>
-             <p class='product-card__price'>₩ ${formatKRW(price)}</p>
-             <p class='product-card__base'>₩ ${formatKRW(basePrice)}</p>
-           </div>
-         `
-             : `
-           <p class='product-card__price'>₩ ${formatKRW(price)}</p>
-         `
-       }
+      <div class='product-card__pricebox'>
+        ${
+           isDiscounted
+              ? `
+                <p class='product-card__base' aria-label='정가'>₩ ${formatKRW(basePrice)}</p>
+                <p class='product-card__price' aria-label='할인가'>
+                  ₩ ${formatKRW(price)}
+                  <span class='product-card__discount' aria-label='할인율'>-${percent}%</span>
+                </p>
+              `
+              : `<p class='product-card__price'>₩ ${formatKRW(price)}</p>`
+        }
+      </div>
 
-       <ul class='product-card__tags' aria-label='Product Tags'>
-         ${visibleTags.map((t) => `<li class='product-tag'>#${t}</li>`).join('')}
-       </ul>
+      <ul class='product-card__tags' aria-label='Product Tags'>
+        ${
+           displayTags.length
+              ? displayTags
+                   .map((t) => `<li class='product-tag'>#${escapeHtml(t)}</li>`)
+                   .join('')
+              : ''
+        }
+      </ul>
 
-       <div class='product-card__actions'>
-         <button type='button' class='btn-add-cart' data-add-cart>
-           장바구니
-         </button>
-       </div>
-     </div>
-   </article>
- `;
+      <div class='product-card__actions'>
+        <!-- 장바구니 버튼: app.js 문서 위임(data-add-cart)과 연결 -->
+        <button type='button' class='btn-add-cart' data-add-cart>
+          장바구니
+        </button>
+      </div>
+    </div>
+  </article>
+`;
 }

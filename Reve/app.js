@@ -12,6 +12,10 @@ import { Footer } from './src/components/Footer.js';
 import { HomePage } from './src/pages/home/index.js';
 import { SearchPage, initSearchPage } from './src/pages/search/index.js';
 import { ProductPage, initProductPage } from './src/pages/product/index.js';
+import {
+   ProductDetailPage,
+   initProductDetailPage,
+} from './src/pages/productDetail/index.js';
 import { CartPage, initCartPage } from './src/pages/cart/index.js';
 
 // Utils
@@ -62,6 +66,10 @@ const routes = {
    '/product': {
       render: () => ProductPage(),
       afterRender: () => initProductPage(),
+   },
+   '/product/:id': {
+      render: () => ProductDetailPage(),
+      afterRender: (params) => initProductDetailPage(params),
    },
 
    '/search': {

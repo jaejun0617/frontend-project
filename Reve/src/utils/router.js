@@ -1,34 +1,10 @@
 /**
  * =============================================
  * 📍 위치: src/utils/router.js
- * 역할: 커스텀 SPA 라우터 (경로(path) -> 페이지 렌더링)
- *
- * ✅ 라우터 MVP 체크
- * 1) [data-link] 클릭 -> pushState -> renderRoute()
- * 2) popstate(뒤로가기) -> renderRoute()
- * 3) 404 fallback
- * 4) /search?q= 처럼 query가 있어도 path(/search)로 페이지 선택
- *
- * 🔔 app:render 이벤트
- * - 라우팅 시 #app의 DOM을 통째로 교체하므로(Header 포함)
- * - SearchDrawer 같은 모듈이 새 DOM을 다시 잡을 수 있도록
- *   renderRoute() 끝에서 window에 CustomEvent('app:render')를 발행한다.
+ * 역할: 커스텀 SPA 라우터 (정적 + 동적 경로 지원)
  * =============================================
  */
 
-/**
- * @typedef {Object} Route
- * @property {() => string} render - 페이지 HTML 템플릿 반환
- * @property {() => (void|Promise<void>)} [afterRender] - 렌더 직후 실행(선택)
- */
-
-/**
- * 라우터 초기화
- * @param {Object} params
- * @param {(html: string) => void} params.mount - #app에 HTML을 꽂는 함수
- * @param {(pageHtml: string) => string} params.layout - Header/Footer를 감싸는 레이아웃 함수
- * @param {Record<string, Route>} params.routes - path -> Route 매핑
- */
 export function initRouter({ mount, layout, routes }) {
    if (!mount || !layout || !routes) {
       throw new Error(
@@ -40,26 +16,58 @@ export function initRouter({ mount, layout, routes }) {
       return window.location.pathname || '/';
    }
 
-   async function renderRoute() {
-      const path = getPathname();
+   function matchRoute(path) {
+      // 1) 정적 라우트 우선
+      if (routes[path]) return { route: routes[path], params: {} };
 
-      const route = routes[path] || routes['/404'];
-      const pageHtml = route?.render ? route.render() : '<h1>404</h1>';
+      // 2) 동적 라우트 탐색: /product/:id 같은 형태
+      for (const [pattern, route] of Object.entries(routes)) {
+         if (!pattern.includes(':')) continue;
 
-      // 1) 화면에 먼저 그리기(동기)
-      // ⚠️ mount()는 #app 내부를 통째로 갈아끼우므로,
-      //    Header/SearchDrawer 같은 DOM도 매번 새로 생성됨
-      mount(layout(pageHtml));
+         const keys = [];
+         const regexStr = pattern
+            .split('/')
+            .map((seg) => {
+               if (seg.startsWith(':')) {
+                  keys.push(seg.slice(1));
+                  return '([^/]+)';
+               }
+               return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            })
+            .join('/');
 
-      // 2) 렌더 이후 로직(선택)
-      if (route?.afterRender) {
-         await route.afterRender();
+         const regex = new RegExp(`^${regexStr}$`);
+         const m = path.match(regex);
+         if (!m) continue;
+
+         const params = {};
+         keys.forEach(
+            (k, idx) => (params[k] = decodeURIComponent(m[idx + 1] ?? '')),
+         );
+         return { route, params };
       }
 
-      // 3) 새 DOM이 만들어진 뒤, 다른 모듈들이 다시 DOM을 잡을 수 있게 이벤트 발행
+      return { route: routes['/404'], params: {} };
+   }
+
+   async function renderRoute() {
+      const path = getPathname();
+      const { route, params } = matchRoute(path);
+
+      const pageHtml = route?.render ? route.render(params) : '<h1>404</h1>';
+
+      // 1) 먼저 그림
+      mount(layout(pageHtml));
+
+      // 2) afterRender(params)
+      if (route?.afterRender) {
+         await route.afterRender(params);
+      }
+
+      // 3) 새 DOM 이벤트
       window.dispatchEvent(new CustomEvent('app:render'));
 
-      // 4) 네비게이션 전환 시 열린 패널이 남아있지 않게(UX)
+      // 4) 패널 닫기
       document.body.classList.remove('is-sidebar-open');
       document.body.classList.remove('is-search-open');
    }
@@ -79,13 +87,8 @@ export function initRouter({ mount, layout, routes }) {
 
       const target = anchor.getAttribute('target');
       const isExternal = /^https?:\/\//i.test(href);
-      if (
-         target === '_blank' ||
-         anchor.hasAttribute('download') ||
-         isExternal
-      ) {
+      if (target === '_blank' || anchor.hasAttribute('download') || isExternal)
          return;
-      }
 
       e.preventDefault();
       navigate(href);
@@ -93,6 +96,12 @@ export function initRouter({ mount, layout, routes }) {
 
    document.addEventListener('click', onLinkClick);
    window.addEventListener('popstate', renderRoute);
+
+   // ✅ 외부에서 라우팅 요청(상세 -> 장바구니 이동 등)
+   window.addEventListener('app:navigate', (e) => {
+      const href = e?.detail?.href;
+      if (href) navigate(href);
+   });
 
    renderRoute();
 

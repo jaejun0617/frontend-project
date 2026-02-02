@@ -2,33 +2,8 @@
  * =============================================
  * 📍 위치: src/api/products.js
  * 역할: 상품 데이터를 가져오는 "데이터 레이어"
- *
- * ✅ MVP: API/DB 없이 목업(mock) 데이터를 반환
- *
- * ✅ 데이터 스펙(자동 생성 100개)
- * - id, name(한글), brand(영문), price, tags, category, image
- * - apparelSizes: ['S','M','L','XL'] 중 랜덤
- * - shoeSizes: 220~280 / 5단위 중 랜덤
- *
- * ✅ 할인/쿠폰 확장 대비
- * - basePrice(정가), discountRate(세일), price(최종가)
- * - couponEligible, couponRateCap, couponTags
- *
- * ✅ 검색 대응
- * - tags에 브랜드/컬러를 영문+한글+별칭으로 함께 넣어
- *   "chanel" / "샤넬" 같이 어떤 입력에도 검색되게 구성
- *
- * ✅ UI(카드) 표시용 태그 정책
- * - 카드에 보여줄 태그는 "브랜드(영문) + 랜덤 뱃지(신상/베스트/HOT)"
- * - 검색용 토큰은 tags에 계속 포함(검색 정확도 유지)
  * =============================================
  */
-
-/* =========================================================
-   0) 유틸: 시드 랜덤(새로고침해도 같은 데이터 세트 유지)
-   - mulberry32: 빠르고 간단한 pseudo random
-   - rand(): 0~1 실수 반환
-   ========================================================= */
 
 function mulberry32(seed) {
    let t = seed >>> 0;
@@ -41,7 +16,6 @@ function mulberry32(seed) {
    };
 }
 
-// ✅ 시드 고정(원하면 숫자만 바꿔서 “다른 랜덤 세트” 생성 가능)
 const rand = mulberry32(617);
 
 function randInt(min, max) {
@@ -56,7 +30,6 @@ function pickSubset(arr, minCount = 1, maxCount = 3) {
    const count = randInt(minCount, Math.min(maxCount, arr.length));
    const copy = [...arr];
 
-   // Fisher-Yates 기반 간단 셔플
    for (let i = copy.length - 1; i > 0; i--) {
       const j = randInt(0, i);
       [copy[i], copy[j]] = [copy[j], copy[i]];
@@ -68,16 +41,11 @@ function formatId(n) {
    return String(n).padStart(3, '0');
 }
 
-// ✅ 검색 편의용(소문자 토큰)
 function toSearchToken(value) {
    return String(value ?? '')
       .trim()
       .toLowerCase();
 }
-
-/* =========================================================
-      1) 도메인 데이터: 카테고리 / 브랜드 / 컬러 / 네이밍 재료
-      ========================================================= */
 
 const CATEGORIES = [
    { key: 'bag', label: '가방' },
@@ -90,8 +58,6 @@ const CATEGORIES = [
    { key: 'jewelry', label: '주얼리' },
 ];
 
-// ✅ brand 필드는 "영문"을 저장
-// ✅ tags에는 ko + aliases도 함께 주입해서 검색 범위 확장
 const BRANDS = [
    { en: 'Chanel', ko: '샤넬', aliases: ['chanel', '샤넬'] },
    {
@@ -123,11 +89,7 @@ const BRANDS = [
    { en: 'Celine', ko: '셀린느', aliases: ['celine', '셀린느'] },
    { en: 'Loewe', ko: '로에베', aliases: ['loewe', '로에베'] },
    { en: 'Moncler', ko: '몽클레르', aliases: ['moncler', '몽클레르'] },
-   {
-      en: 'Off-White',
-      ko: '오프화이트',
-      aliases: ['off-white', '오프화이트', '오프화이트'],
-   },
+   { en: 'Off-White', ko: '오프화이트', aliases: ['off-white', '오프화이트'] },
    {
       en: 'Maison Margiela',
       ko: '메종 마르지엘라',
@@ -146,7 +108,6 @@ const BRANDS = [
    { en: 'Bvlgari', ko: '불가리', aliases: ['bvlgari', 'bulgari', '불가리'] },
 ];
 
-// ✅ color는 영문을 기준으로 쓰되 ko/aliases도 tags에 포함
 const COLORS = [
    { en: 'Black', ko: '블랙', aliases: ['black', '블랙'] },
    {
@@ -197,7 +158,6 @@ const ITEM_BY_CATEGORY = {
    jewelry: ['브레이슬릿', '링', '네크리스', '이어링'],
 };
 
-// ✅ 카테고리별 정가 범위(원) - 대략적인 명품 가격대
 const PRICE_RANGE_BY_CATEGORY = {
    bag: [1200000, 6500000],
    wallet: [450000, 2200000],
@@ -209,34 +169,21 @@ const PRICE_RANGE_BY_CATEGORY = {
    jewelry: [900000, 15000000],
 };
 
-/* =========================================================
-      2) 사이즈 풀
-      ========================================================= */
-
 const APPAREL_SIZES = ['S', 'M', 'L', 'XL'];
-const SHOE_SIZES = Array.from({ length: 13 }, (_, i) => 220 + i * 5); // 220~280(5단위)
-
-/* =========================================================
-      3) 가격 / 할인 / 쿠폰(확장 대비 필드)
-      ========================================================= */
+const SHOE_SIZES = Array.from({ length: 13 }, (_, i) => 220 + i * 5);
 
 function buildBasePrice(category) {
    const [min, max] = PRICE_RANGE_BY_CATEGORY[category] ?? [300000, 2000000];
    const raw = randInt(min, max);
-
-   // ✅ 1만원 단위로 정리(가격이 보기 좋게 떨어지도록)
    return Math.round(raw / 10000) * 10000;
 }
 
 function buildPromotion(category) {
-   // ✅ 일부 상품만 세일 적용
    const hasPromo = rand() < 0.35;
 
-   // ✅ 쿠폰 사용 가능 여부/최대 할인율(캡)
    const couponEligible = rand() < 0.6;
    const couponRateCap = couponEligible ? randInt(5, 15) / 100 : 0;
 
-   // ✅ 시계/주얼리는 할인 폭을 보수적으로
    const discountRatePool =
       category === 'watch' || category === 'jewelry'
          ? [0.05, 0.08, 0.1]
@@ -244,7 +191,6 @@ function buildPromotion(category) {
 
    const discountRate = hasPromo ? pickOne(discountRatePool) : 0;
 
-   // ✅ 쿠폰 분류 태그(향후 조건 필터/프로모션 로직용)
    const couponTags = couponEligible
       ? pickSubset(['WELCOME', 'SEASON', 'VIP', 'APP_ONLY', 'BUNDLE'], 1, 2)
       : [];
@@ -254,78 +200,40 @@ function buildPromotion(category) {
 
 function applyDiscount(basePrice, discountRate = 0) {
    if (!discountRate) return basePrice;
-
-   // ✅ 세일 적용 후 1만원 단위로 정리
    const discounted =
       Math.round((basePrice * (1 - discountRate)) / 10000) * 10000;
-
    return Math.max(discounted, 10000);
 }
 
-/* =========================================================
-      4) 네임 / 태그 생성
-      ========================================================= */
+function buildColorOptions() {
+   // 1~3개 컬러 옵션 제공
+   const count = randInt(1, 3);
+   const picked = pickSubset(COLORS, count, count);
+   return picked.map((c) => ({ en: c.en, ko: c.ko }));
+}
 
-/**
- * name 정책
- * - 상품명에는 브랜드를 넣지 않음(요구사항)
- * - 색상은 (영문)으로만 표시
- */
-function buildKoreanName({ category, colorEn }) {
+function buildKoreanName({ category }) {
    const item = pickOne(ITEM_BY_CATEGORY[category] ?? ['아이템']);
    const style = pickOne(STYLE_KR);
    const material = pickOne(MATERIAL_KR);
-
-   // ⚠️ colorText는 정책상 필요하지만, 현재 name 조합에는 포함하지 않음(현 코드 유지)
-   const colorText = colorEn ? ` (${colorEn})` : '';
-
    return `${style} ${material} ${item}`;
 }
 
-/**
- * tags 정책
- * - displayTags: 카드에서 보여줄 태그(브랜드(영문) + 랜덤 뱃지)
- * - searchTokens: 검색을 위한 토큰(브랜드/컬러 ko+en+aliases, 카테고리, name 키워드)
- */
 function buildTags({ brand, category, name, color }) {
    const categoryLabel = (
       CATEGORIES.find((c) => c.key === category)?.label ?? ''
    ).trim();
 
-   /* --------------------------------
-         0) 카드 표시용 뱃지(랜덤)
-         - 브랜드는 항상 노출
-         - 신상/베스트/HOT는 확률로 노출
-         - 최소 1개는 보이게(카드가 심심하지 않게)
-         -------------------------------- */
+   // 카드 표시용: 브랜드(영문) + 랜덤 뱃지 1개
    const badges = [];
-
-   // 신상: 45%
    if (rand() < 0.45) badges.push('신상');
-
-   // 베스트: 30%
    if (rand() < 0.3) badges.push('베스트');
-
-   // HOT: 18%
    if (rand() < 0.18) badges.push('HOT');
-
-   // 최소 1개 보장
    if (!badges.length) badges.push(pickOne(['신상', '베스트', 'HOT']));
+   const displayTags = [brand.en, pickOne(badges)].filter(Boolean);
 
-   // 최대 1개만 노출(현재 정책 유지)
-   const pickedBadge = pickOne(badges);
-
-   // ✅ 카드에 보여줄 태그
-   const displayTags = [brand.en, pickedBadge].filter(Boolean);
-
-   /* --------------------------------
-         1) 검색용 토큰
-         - 브랜드: en/ko/별칭 + 소문자
-         - 컬러: en/ko/별칭 + 소문자
-         - 카테고리: key + label
-         - 상품명 키워드
-         -------------------------------- */
-   const brandSearchTokens = [
+   // 검색용 토큰(영문/한글/별칭/소문자)
+   const brandTokens = [
       brand.en,
       toSearchToken(brand.en),
       brand.ko,
@@ -334,7 +242,7 @@ function buildTags({ brand, category, name, color }) {
       ...(brand.aliases ?? []).map(toSearchToken),
    ].filter(Boolean);
 
-   const colorSearchTokens = [
+   const colorTokens = [
       color?.en,
       toSearchToken(color?.en),
       color?.ko,
@@ -352,47 +260,31 @@ function buildTags({ brand, category, name, color }) {
    const searchTokens = [
       category,
       categoryLabel,
-      ...brandSearchTokens,
-      ...colorSearchTokens,
+      ...brandTokens,
+      ...colorTokens,
       ...nameTokens,
    ].filter(Boolean);
 
-   // ✅ "원본 + 소문자"를 함께 보관(검색 정확도 ↑)
-   const normalizedSearchTokens = searchTokens.flatMap((t) => {
+   const normalized = searchTokens.flatMap((t) => {
       const raw = String(t ?? '').trim();
       if (!raw) return [];
       const lower = raw.toLowerCase();
       return raw === lower ? [raw] : [raw, lower];
    });
 
-   // ✅ 최종 tags = 표시용 + 검색용(중복 제거)
-   return Array.from(
-      new Set([...displayTags, ...normalizedSearchTokens]),
-   ).slice(0, 40);
+   return Array.from(new Set([...displayTags, ...normalized])).slice(0, 40);
 }
 
-/* =========================================================
-      5) 목업 생성(100개)
-      ========================================================= */
-
 function buildSizes(category) {
-   // 신발 카테고리: shoeSizes만 부여
    if (category === 'shoes') {
       return {
          apparelSizes: [],
          shoeSizes: pickSubset(SHOE_SIZES, 2, 6).sort((a, b) => a - b),
       };
    }
-
-   // 의류 카테고리: apparelSizes를 더 자주 부여
    if (category === 'outer' || category === 'top') {
-      return {
-         apparelSizes: pickSubset(APPAREL_SIZES, 2, 4),
-         shoeSizes: [],
-      };
+      return { apparelSizes: pickSubset(APPAREL_SIZES, 2, 4), shoeSizes: [] };
    }
-
-   // 그 외: 사이즈 없음도 가능
    const hasApparel = rand() < 0.25;
    return {
       apparelSizes: hasApparel ? pickSubset(APPAREL_SIZES, 1, 3) : [],
@@ -407,24 +299,18 @@ function createMockProducts(count = 100) {
       const id = `p-${formatId(i)}`;
 
       const { key: category } = pickOne(CATEGORIES);
-      const brand = pickOne(BRANDS); // {en, ko, aliases}
-      const color = pickOne(COLORS); // {en, ko, aliases}
+      const brand = pickOne(BRANDS);
+      const color = pickOne(COLORS);
 
-      const name = buildKoreanName({
-         brandEn: brand.en,
-         category,
-         colorEn: color.en,
-      });
+      const name = buildKoreanName({ category });
 
       const basePrice = buildBasePrice(category);
       const promo = buildPromotion(category);
       const price = applyDiscount(basePrice, promo.discountRate);
 
       const sizes = buildSizes(category);
+      const colors = buildColorOptions();
       const tags = buildTags({ brand, category, name, color });
-
-      // ✅ 이미지 리소스는 추후 연결(현재는 빈 문자열 유지)
-      const image = '';
 
       products.push({
          id,
@@ -438,7 +324,8 @@ function createMockProducts(count = 100) {
          couponTags: promo.couponTags,
          tags,
          category,
-         image,
+         image: '',
+         colors, // ✅ 상세 옵션용
          ...sizes,
       });
    }
@@ -446,19 +333,17 @@ function createMockProducts(count = 100) {
    return products;
 }
 
-// ✅ 앱 구동 시 한 번만 생성(시드 고정이라 결과도 고정)
 const MOCK_PRODUCTS = createMockProducts(100);
 
-/* =========================================================
-      6) API 함수
-      ========================================================= */
-
-/**
- * 상품 목록 조회
- * - 실제 API 연결 시 fetch 로직만 여기로 교체하면 됨
- */
 export async function getProducts() {
-   // 로딩 상태 연습용 딜레이
    await new Promise((r) => setTimeout(r, 250));
    return MOCK_PRODUCTS;
+}
+
+export async function getProductById(productId) {
+   const id = String(productId || '').trim();
+   if (!id) return null;
+
+   await new Promise((r) => setTimeout(r, 120));
+   return MOCK_PRODUCTS.find((p) => p.id === id) ?? null;
 }
