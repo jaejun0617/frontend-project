@@ -124,11 +124,6 @@ function syncMetaLists() {
 export const SearchPage = () => {
    return `
     <section class='page search-page' aria-label='Search Page'>
-      <header class='page__header'>
-        <h1 class='page__title'>검색</h1>
-        <p class='page__desc'>검색어에 맞는 상품을 찾아 보여줍니다.</p>
-      </header>
-
       <!-- ✅ 최근/추천 검색어 영역 (페이지에서도 보이게) -->
       <section class='search-meta' aria-label='Search Meta'>
         <div class='search-meta__block'>
