@@ -32,6 +32,9 @@ import { initToast } from './src/components/Toast.js';
 import { initAuthUi } from './src/utils/authUi.js';
 import { requireAuth, requireAdmin } from './src/utils/guards.js';
 import { authStore } from './src/store/authStore.js';
+
+// Components
+import { confirmModal } from './src/components/ConfirmModal.js';
 /* ==============================
    0) DOM 마운트 유틸
    ============================== */
@@ -159,7 +162,7 @@ function updateCartCount() {
       el.textContent = String(count);
    });
 }
-
+let didRunSignupModal = false;
 /* ==============================
    5) 렌더 후 훅
    ============================== */
@@ -168,6 +171,48 @@ window.addEventListener('app:render', () => {
    searchDrawer.refresh();
    updateCartCount();
    authUi.refresh();
+
+   // ✅ 회원가입 후 "메인에서" 모달 띄우기
+   if (didRunSignupModal) return;
+
+   const raw = sessionStorage.getItem('reve_after_signup_modal');
+   if (!raw) return;
+
+   // 한 번만 실행되게 먼저 제거(중복 방지)
+   sessionStorage.removeItem('reve_after_signup_modal');
+   didRunSignupModal = true;
+
+   let data = null;
+   try {
+      data = JSON.parse(raw);
+   } catch {
+      return;
+   }
+
+   const name = data?.name || '고객';
+   const coupon = data?.coupon;
+   const delayMs = Number(data?.delayMs ?? 0);
+   const confirmHref = String(data?.confirmHref || '/mypage');
+
+   // ✅ 2초 뒤 모달
+   setTimeout(async () => {
+      const message = coupon
+         ? `${name}님, 가입을 환영합니다 ✨\n\n🎫 ${coupon.title}이 지급되었어요.\n• 코드: ${coupon.code}\n• 혜택: ${coupon.rateText}\n\n지금 마이페이지 쿠폰함에서 확인할까요?`
+         : `${name}님, 가입을 환영합니다 ✨\n\n마이페이지에서 혜택을 확인할 수 있어요.\n지금 이동할까요?`;
+
+      const ok = await confirmModal({
+         title: '가입 완료 🎉',
+         message,
+         confirmText: '쿠폰함 보기',
+         cancelText: '나중에',
+      });
+
+      if (ok) {
+         window.dispatchEvent(
+            new CustomEvent('app:navigate', { detail: { href: confirmHref } }),
+         );
+      }
+   }, delayMs);
 });
 
 // 최초 1회도 안전하게 실행

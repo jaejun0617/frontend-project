@@ -13,14 +13,20 @@
  * - 회원가입 성공 시:
  *   - 자동 로그인
  *   - 가입 축하 쿠폰(HELLOWORLD) 1회 지급(couponStore.register)
+ *   - 웰컴 쿠폰 모달: 확인→/mypage, 취소→redirectTo 이동
  * - redirectTo 쿼리 지원: /auth?redirectTo=/cart
  * =============================================
  */
 
 import { authStore } from '../../store/authStore.js';
 import { couponStore } from '../../store/couponStore.js';
+import { confirmModal } from '../../components/ConfirmModal.js';
+import { initToast } from '../../components/Toast.js';
 
 const USERS_KEY = 'reve_users_v1';
+
+// ✅ Auth 페이지에서도 토스트 사용(전역처럼 body에 붙는 구조라 1번만 생성돼도 OK)
+const toast = initToast();
 
 function safeParse(json) {
    try {
@@ -192,7 +198,7 @@ export function AuthPage() {
               <button class="auth__submit" type="submit">회원가입</button>
 
               <p class="auth__hint">
-                회원가입 시 <strong>HELLOWORLD 쿠폰(10%)</strong>이 1회 지급됩니다 🎫
+                회원가입 시 <strong>웰컴 쿠폰(HELLOWORLD · 10%)</strong>이 1회 지급됩니다 🎫
               </p>
             </form>
           </section>
@@ -201,7 +207,9 @@ export function AuthPage() {
     </section>
   `;
 }
-
+function delay(ms) {
+   return new Promise((r) => setTimeout(r, ms));
+}
 export function initAuthPage() {
    const root = document.querySelector('[data-auth]');
    if (!root) return;
@@ -236,7 +244,7 @@ export function initAuthPage() {
       const pw = normalizePw(fd.get('pw'));
 
       if (!id || !pw) {
-         setMsg(root, '아이디/비밀번호를 입력해 주세요.', 'error');
+         setMsg(root, '아이디와 비밀번호를 입력해 주세요.', 'error');
          return;
       }
 
@@ -269,7 +277,8 @@ export function initAuthPage() {
          totalSpent: found.totalSpent ?? 0,
       });
 
-      setMsg(root, `${found.name}님 로그인 완료`, 'success');
+      setMsg(root, `${found.name}님, 로그인 완료 ✨`, 'success');
+
       const redirectTo = getRedirectTo();
       window.dispatchEvent(
          new CustomEvent('app:navigate', { detail: { href: redirectTo } }),
@@ -294,15 +303,38 @@ export function initAuthPage() {
          return;
       }
 
-      // 자동 로그인
+      // ✅ 자동 로그인
       authStore.login({ id, name, role: 'MEMBER', totalSpent: 0 });
 
-      // 가입 축하 쿠폰 1회 지급(이미 있으면 store가 막아줌)
-      couponStore.register('HELLOWORLD');
+      // ✅ 가입 축하 쿠폰 1회 지급
+      const couponResult = couponStore.register('HELLOWORLD');
 
       setMsg(root, created.message, 'success');
 
+      // ✅ 이동할 곳(보통 / or /cart 등)
       const redirectTo = getRedirectTo();
+
+      // ✅ "메인 이동 후 모달 띄우기" 예약 (중요!)
+      const payload = {
+         name,
+         ok: Boolean(couponResult?.ok),
+         coupon: {
+            code: 'HELLOWORLD',
+            title: '웰컴 쿠폰',
+            rateText: '10% 할인',
+         },
+         // 모달에서 "확인" 눌렀을 때 갈 곳
+         confirmHref: '/mypage',
+         // 모달 띄우기 딜레이(ms)
+         delayMs: 2000,
+      };
+
+      sessionStorage.setItem(
+         'reve_after_signup_modal',
+         JSON.stringify(payload),
+      );
+
+      // ✅ 여기서 바로 이동시켜야 "메인으로 이동된 다음 모달"이 가능
       window.dispatchEvent(
          new CustomEvent('app:navigate', { detail: { href: redirectTo } }),
       );
