@@ -1,5 +1,14 @@
-/* Header / Navigation (모바일 우선) */
+/* =============================================
+ * 📍 위치: src/styles/header.css
+ * 역할: Header / Nav 전용 스타일
+ * ============================================= */
 
+/* ✅ hidden 속성은 강제로 display none */
+[hidden] {
+   display: none !important;
+}
+
+/* Header */
 .site-header {
    width: 100%;
    height: 6svh;
@@ -22,37 +31,19 @@
    justify-content: space-between;
 }
 
-.site-logo img {
-   width: 100%;
+.site-logo a {
+   display: inline-flex;
+   align-items: center;
    height: 100%;
-   object-fit: cover;
+}
+
+.site-logo img {
+   height: 44px;
+   width: auto;
    display: block;
 }
 
-/* 아이콘 링크 공통(데스크/모바일 공용) */
-.nav-menu-icons a,
-.mobile-icons a {
-   display: inline-flex;
-   align-items: center;
-   justify-content: center;
-   cursor: pointer;
-   padding: 8px;
-   border-radius: 10px;
-   transition: background-color 150ms ease;
-}
-
-.nav-menu-icons a:hover,
-.mobile-icons a:hover {
-   background-color: rgba(0, 0, 0, 0.06);
-}
-
-.nav-menu-icons a:focus-visible,
-.mobile-icons a:focus-visible {
-   outline: 2px solid rgba(0, 0, 0, 0.35);
-   outline-offset: 2px;
-   background-color: rgba(0, 0, 0, 0.06);
-}
-
+/* 메뉴(데스크 확장용 자리) */
 .nav-menu-list {
    display: none;
 }
@@ -60,38 +51,91 @@
 .nav-menu-icons {
    display: flex;
    gap: 12px;
+   align-items: center;
+   padding: 0;
+   margin: 0;
+   list-style: none;
 }
 
-.site-menu-bar {
+/* 공통 아이콘 버튼/링크 */
+.icon-link,
+.icon-btn,
+.nav-menu-icons a,
+.nav-menu-icons button {
+   width: 40px;
+   height: 40px;
    display: inline-flex;
    align-items: center;
    justify-content: center;
-
+   cursor: pointer;
    padding: 8px;
    border-radius: 10px;
-   background: transparent;
-   border: 0;
-
-   cursor: pointer;
    transition: background-color 150ms ease;
 }
 
-.site-menu-bar:hover {
+.icon-btn {
+   border: 0;
+   background: transparent;
+}
+
+.icon-link:hover,
+.icon-btn:hover,
+.nav-menu-icons a:hover,
+.nav-menu-icons button:hover {
    background-color: rgba(0, 0, 0, 0.06);
 }
 
-.site-menu-bar:focus-visible {
+.icon-link:focus-visible,
+.icon-btn:focus-visible,
+.nav-menu-icons a:focus-visible,
+.nav-menu-icons button:focus-visible {
    outline: 2px solid rgba(0, 0, 0, 0.35);
    outline-offset: 2px;
    background-color: rgba(0, 0, 0, 0.06);
 }
 
-/* 로그인/권한에 따라 노출할 아이콘(초기 숨김) */
-.admin-icon,
-.mypage-icon {
+/* ✅ 아이콘 크기 보장 */
+.nav-menu-icons img,
+.site-menu-bar img,
+.search-toggle img,
+.icon-link img,
+.icon-btn img {
+   width: 22px;
+   height: 22px;
+   display: block;
+}
+
+/* Cart badge */
+.nav-cart {
+   position: relative;
+}
+
+.cart-badge {
+   position: absolute;
+   top: 2px;
+   right: 2px;
+
+   min-width: 18px;
+   height: 18px;
+   padding: 0 5px;
+
+   border-radius: 999px;
+   background: rgba(0, 0, 0, 0.9);
+   color: #fff;
+
+   font-size: 11px;
+   font-weight: 700;
+   line-height: 18px;
+   text-align: center;
+
+   transform: translate(40%, -40%);
+}
+
+.cart-badge[hidden] {
    display: none;
 }
 
+/* 푸터(참고) */
 .site-footer {
    height: 6svh;
    border-top: 1px solid #c8c8c8;

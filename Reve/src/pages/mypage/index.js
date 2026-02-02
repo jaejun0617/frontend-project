@@ -1,25 +1,31 @@
 /**
  * =============================================
  * 📍 위치: src/pages/mypage/index.js
- * 역할: 마이페이지(MVP) - 쿠폰 등록/보유/적용
+ * 역할: 마이페이지(MVP) - 쿠폰/내정보/회원등급
  * 경로: /mypage
  *
  * ✅ 설계 포인트
- * - 탭 구조 확장 가능(프로필/주소지/주문/등급 등)
+ * - 탭 구조 확장 가능
  * - 이벤트는 페이지 root 내부에서만 처리(문서 전역 오염 방지)
  * - 중복 init 방지(data-bound)
- * - couponStore shape 변화에도 최대한 안전하게 대응
  * =============================================
  */
 
 import { couponStore } from '../../store/couponStore.js';
+import { authStore } from '../../store/authStore.js';
+import {
+   formatKRW,
+   formatPercent,
+   getPointRateByTotalSpent,
+   getNextGradeInfo,
+} from '../../utils/grade.js';
 
-/** 탭 정의: 나중에 여기만 늘리면 UI가 같이 확장됨 */
+/** 탭 정의 */
 const TABS = [
-   { key: 'profile', label: '내 정보', enabled: false },
+   { key: 'profile', label: '내 정보', enabled: true },
    { key: 'address', label: '배송지', enabled: false },
    { key: 'orders', label: '주문/배송', enabled: false },
-   { key: 'grade', label: '회원등급', enabled: false },
+   { key: 'grade', label: '회원등급', enabled: true },
    { key: 'coupon', label: '쿠폰/혜택', enabled: true },
 ];
 
@@ -27,16 +33,12 @@ const TABS = [
 const DEFAULT_REGISTER_MSG =
    '쿠폰을 등록하면 “보유 쿠폰”에 쌓이고, 장바구니에서 적용돼요.';
 
-/**
- * Page template (sync)
- * - 실제 데이터/이벤트 바인딩은 initMyPage에서
- */
 export const MyPage = () => {
    return `
     <section class="page mypage" aria-label="My Page" data-mypage>
       <header class="page__header">
         <h1 class="page__title">마이페이지</h1>
-        <p class="page__desc">쿠폰 등록/보유/적용을 관리합니다.</p>
+        <p class="page__desc">내 정보/등급/쿠폰을 관리합니다.</p>
       </header>
 
       <div class="page__content">
@@ -49,10 +51,10 @@ export const MyPage = () => {
           <!-- 우측 패널 -->
           <div class="mypage__main">
             ${renderPanelCoupon()}
-            ${renderPanelPlaceholder('profile', '내 정보', '로그인/회원가입 이후 연결할 영역')}
+            ${renderPanelProfile()}
+            ${renderPanelGrade()}
             ${renderPanelPlaceholder('address', '배송지 관리', '기본 배송지/목록 CRUD (localStorage → 서버 연동)')}
             ${renderPanelPlaceholder('orders', '주문/배송', '주문 내역/상태(결제 붙을 때 확장)')}
-            ${renderPanelPlaceholder('grade', '회원등급', '등급/혜택/다음 등급까지 금액 등')}
           </div>
         </div>
       </div>
@@ -100,6 +102,10 @@ function renderTabs(activeKey = 'coupon') {
   `;
 }
 
+/* ------------------------------
+   Panels
+--------------------------------*/
+
 function renderPanelCoupon() {
    return `
     <section class="mypage__panel is-active" id="panel-coupon" role="tabpanel" data-panel="coupon">
@@ -135,6 +141,36 @@ function renderPanelCoupon() {
   `;
 }
 
+function renderPanelProfile() {
+   return `
+    <section class="mypage__panel" id="panel-profile" role="tabpanel" data-panel="profile" aria-hidden="true">
+      <div class="mypage__section">
+        <h2 class="mypage__sectionTitle">내 정보</h2>
+        <p class="mypage__sectionDesc">로그인한 계정 정보를 확인합니다.</p>
+
+        <div class="profile-card" data-profile-wrap>
+          <p class="loading">불러오는 중...</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderPanelGrade() {
+   return `
+    <section class="mypage__panel" id="panel-grade" role="tabpanel" data-panel="grade" aria-hidden="true">
+      <div class="mypage__section">
+        <h2 class="mypage__sectionTitle">회원등급</h2>
+        <p class="mypage__sectionDesc">누적 구매액에 따라 등급/적립률이 달라집니다.</p>
+
+        <div class="grade-card" data-grade-wrap>
+          <p class="loading">불러오는 중...</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderPanelPlaceholder(key, title, desc) {
    return `
     <section class="mypage__panel" id="panel-${key}" role="tabpanel" data-panel="${key}" aria-hidden="true">
@@ -149,9 +185,12 @@ function renderPanelPlaceholder(key, title, desc) {
   `;
 }
 
+/* ------------------------------
+   Coupon helpers
+--------------------------------*/
+
 function getCouponStateSafe() {
    const s = couponStore.getState?.() ?? {};
-   // store 버전이 달라도 최대한 안전하게 읽기
    const owned = Array.isArray(s.owned) ? s.owned : [];
    const appliedCode =
       String(s.appliedCode ?? s.coupon?.code ?? '').trim() || '';
@@ -231,6 +270,92 @@ function renderOwned(owned, appliedCode) {
   `;
 }
 
+/* ------------------------------
+   Profile / Grade render
+--------------------------------*/
+
+function getUserSafe() {
+   const user = authStore.getUser?.() ?? null;
+   if (!user || typeof user !== 'object') return null;
+   return user;
+}
+
+function renderProfile(user) {
+   const name = escapeHtml(user?.name || '회원');
+   const role = escapeHtml(String(user?.role || 'MEMBER'));
+   const totalSpent = Number(user?.totalSpent || 0);
+
+   return `
+    <div class="kv">
+      <div class="kv__row">
+        <span class="kv__key">이름</span>
+        <span class="kv__val"><strong>${name}</strong></span>
+      </div>
+      <div class="kv__row">
+        <span class="kv__key">권한</span>
+        <span class="kv__val"><span class="pill">${role}</span></span>
+      </div>
+      <div class="kv__row">
+        <span class="kv__key">누적 구매</span>
+        <span class="kv__val"><strong>₩ ${formatKRW(totalSpent)}</strong></span>
+      </div>
+    </div>
+
+    <p class="hint">결제 완료 시 누적 구매액이 반영되면 등급이 자동 갱신됩니다.</p>
+  `;
+}
+
+function renderGrade(user) {
+   const totalSpent = Number(user?.totalSpent || 0);
+   const next = getNextGradeInfo(totalSpent);
+   const pointRate = getPointRateByTotalSpent(totalSpent);
+
+   const pct = Math.round(next.progress * 100);
+
+   return `
+    <div class="grade-top">
+      <div class="grade-current">
+        <p class="label">현재 등급</p>
+        <p class="value"><strong class="grade-pill">${escapeHtml(next.currentGrade)}</strong></p>
+      </div>
+
+      <div class="grade-current">
+        <p class="label">적립률</p>
+        <p class="value"><strong>${formatPercent(pointRate)}</strong></p>
+      </div>
+
+      <div class="grade-current">
+        <p class="label">누적 구매액</p>
+        <p class="value"><strong>₩ ${formatKRW(totalSpent)}</strong></p>
+      </div>
+    </div>
+
+    <div class="grade-progress">
+      ${
+         next.nextGrade
+            ? `
+          <div class="grade-progress__head">
+            <p class="title">다음 등급: <strong>${escapeHtml(next.nextGrade)}</strong></p>
+            <p class="meta">₩ ${formatKRW(next.leftToNext)} 남음</p>
+          </div>
+        `
+            : `
+          <div class="grade-progress__head">
+            <p class="title">최고 등급 달성 🎖️</p>
+            <p class="meta">현재 등급 유지 중</p>
+          </div>
+        `
+      }
+
+      <div class="bar" aria-label="Grade progress bar">
+        <div class="fill" style="width:${next.nextGrade ? pct : 100}%"></div>
+      </div>
+
+      <p class="hint">${next.nextGrade ? `${pct}% 달성` : `100%`}</p>
+    </div>
+  `;
+}
+
 /* ==============================
    Init
    ============================== */
@@ -239,7 +364,7 @@ export function initMyPage() {
    const root = document.querySelector('[data-mypage]');
    if (!root) return;
 
-   // ✅ 중복 바인딩 방지: 라우팅으로 재진입해도 이벤트 1회만
+   // ✅ 중복 바인딩 방지
    if (root.dataset.bound === '1') return;
    root.dataset.bound = '1';
 
@@ -247,21 +372,38 @@ export function initMyPage() {
    const msgEl = root.querySelector('[data-coupon-register-msg]');
    const inputEl = root.querySelector('[data-coupon-register-input]');
 
+   const profileWrap = root.querySelector('[data-profile-wrap]');
+   const gradeWrap = root.querySelector('[data-grade-wrap]');
+
    const paintOwned = () => {
       if (!ownedWrap) return;
       const { owned, appliedCode } = getCouponStateSafe();
       ownedWrap.innerHTML = renderOwned(owned, appliedCode);
    };
 
+   const paintProfile = () => {
+      if (!profileWrap) return;
+      const user = getUserSafe();
+      profileWrap.innerHTML = user
+         ? renderProfile(user)
+         : `<p class="empty__desc">유저 정보를 찾지 못했어요.</p>`;
+   };
+
+   const paintGrade = () => {
+      if (!gradeWrap) return;
+      const user = getUserSafe();
+      gradeWrap.innerHTML = user
+         ? renderGrade(user)
+         : `<p class="empty__desc">유저 정보를 찾지 못했어요.</p>`;
+   };
+
    const setActiveTab = (tabKey) => {
-      // 탭 버튼
       root.querySelectorAll('[data-tab]').forEach((btn) => {
          const key = btn.getAttribute('data-tab');
          btn.classList.toggle('is-active', key === tabKey);
          btn.setAttribute('aria-selected', key === tabKey ? 'true' : 'false');
       });
 
-      // 패널
       root.querySelectorAll('[data-panel]').forEach((panel) => {
          const key = panel.getAttribute('data-panel');
          const isOn = key === tabKey;
@@ -270,16 +412,21 @@ export function initMyPage() {
       });
    };
 
-   // 최초 렌더
+   // ✅ 최초 렌더: coupon 탭
    setActiveTab('coupon');
    paintOwned();
+   paintProfile();
+   paintGrade();
 
    // store 변화 반영
-   couponStore.subscribe?.(() => {
-      paintOwned();
+   couponStore.subscribe?.(() => paintOwned());
+   authStore.subscribe?.(() => {
+      // 로그인/결제 등으로 user.totalSpent가 바뀌면 바로 갱신
+      paintProfile();
+      paintGrade();
    });
 
-   // ✅ root 내부 이벤트 위임 (문서 전체에 영향 최소)
+   // ✅ root 내부 이벤트 위임
    root.addEventListener('click', (e) => {
       const tabBtn = e.target.closest('[data-tab]');
       if (tabBtn) {
@@ -298,7 +445,6 @@ export function initMyPage() {
          }
 
          const result = couponStore.register?.(raw);
-
          if (!result) {
             if (msgEl) msgEl.textContent = 'couponStore.register가 필요해요.';
             return;
@@ -323,7 +469,6 @@ export function initMyPage() {
 
       // 쿠폰 해제
       if (e.target.closest('[data-coupon-clear]')) {
-         // store 버전 차이 대응
          if (couponStore.clearApplied) couponStore.clearApplied();
          else if (couponStore.clear) couponStore.clear();
          return;
@@ -337,7 +482,7 @@ export function initMyPage() {
       }
    });
 
-   // 엔터로 등록 UX
+   // 엔터로 등록
    inputEl?.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
       root.querySelector('[data-coupon-register]')?.click();

@@ -9,11 +9,16 @@
  * - 보유 쿠폰 선택 적용/해제 (새로고침 유지: couponStore)
  * - 기본 세일(product.price) + 쿠폰 할인(pricing.js) 누적 반영
  * - checkout 버튼 활성화: (아이템 >= 1) && (최종금액 > 0)
+ *
+ * ✅ 확장 포인트 (API-ready)
+ * - buildCheckoutPayload()로 결제 요청 데이터 구성
+ * - checkout()에서 실제 API 연결 가능
  * =============================================
  */
 
 import { cartStore } from '../../store/cartStore.js';
 import { couponStore } from '../../store/couponStore.js';
+import { authStore } from '../../store/authStore.js';
 import { formatPrice } from '../../utils/format.js';
 import { calcLinePrice } from '../../utils/pricing.js';
 
@@ -64,7 +69,6 @@ function calcShipping(subtotalAfterCoupon) {
 }
 
 function countCouponEligibleLines(detailedItems) {
-   // ✅ 라인아이템 기준(옵션이 다르면 라인도 다름)
    return detailedItems.filter((row) => Boolean(row.product?.couponEligible))
       .length;
 }
@@ -74,9 +78,9 @@ function countCouponEligibleLines(detailedItems) {
  * - pricing.js(calcLinePrice)가 "기본 세일 + 쿠폰" 반영을 담당
  */
 function calcCartPricing(detailedItems, coupon) {
-   let subtotalAfterSale = 0; // product.price(세일 반영가) 기준 합
-   let couponDiscountTotal = 0; // 쿠폰 할인 총액(라인 단가 기준 * qty)
-   let totalAfterCoupon = 0; // 쿠폰까지 반영된 상품 합계
+   let subtotalAfterSale = 0;
+   let couponDiscountTotal = 0;
+   let totalAfterCoupon = 0;
 
    const computedRows = detailedItems.map((row) => {
       const qty = clamp(Number(row.qty || 1), 1, 99);
@@ -84,15 +88,14 @@ function calcCartPricing(detailedItems, coupon) {
       const computed = calcLinePrice({
          product: row.product,
          qty,
-         coupon, // {code,title,rate} | null
+         coupon,
       });
 
-      // priceAfterSale / couponDiscount 는 "단가 기준"으로 반환된다는 전제(pricing.js)
       subtotalAfterSale += computed.priceAfterSale * qty;
       couponDiscountTotal += computed.couponDiscount * qty;
       totalAfterCoupon += computed.lineTotal;
 
-      return { ...row, computed };
+      return { ...row, qty, computed };
    });
 
    return {
@@ -105,8 +108,6 @@ function calcCartPricing(detailedItems, coupon) {
 
 function renderCouponSection({ owned, appliedCoupon, eligibleCount }) {
    const usableCoupons = owned.filter((c) => !c.used);
-
-   // ✅ 쿠폰 적용 가능한 상품이 없으면: 선택 UI는 보여도 비활성/안내
    const canApplyAny = eligibleCount > 0;
 
    if (!usableCoupons.length) {
@@ -183,8 +184,7 @@ function renderCouponSection({ owned, appliedCoupon, eligibleCount }) {
 }
 
 function renderCart(detailedItems) {
-   // ✅ couponStore 기준: 적용된 쿠폰 객체
-   const appliedCoupon = couponStore.getAppliedCoupon(); // {code,title,rate} | null
+   const appliedCoupon = couponStore.getAppliedCoupon();
    const { owned } = couponStore.getState();
 
    const {
@@ -194,7 +194,6 @@ function renderCart(detailedItems) {
       totalAfterCoupon,
    } = calcCartPricing(detailedItems, appliedCoupon);
 
-   // ✅ 배송비 기준은 "쿠폰까지 반영된 상품 합계"로 계산
    const shipping = calcShipping(totalAfterCoupon);
    const total = totalAfterCoupon + shipping;
 
@@ -211,7 +210,6 @@ function renderCart(detailedItems) {
 
    return `
     <div class='cart-layout' aria-label='Cart Layout'>
-      <!-- 왼쪽: 상품 리스트 -->
       <div class='cart__list' aria-label='Cart Items'>
         ${computedRows
            .map(({ key, product, qty, options, computed }) => {
@@ -233,18 +231,9 @@ function renderCart(detailedItems) {
                   <p class='cart-item__name'>${product.name}</p>
 
                   <div class='cart-item__pricebox'>
-                    ${
-                       hasBaseSale
-                          ? `<span class='cart-item__base'>₩ ${formatPrice(product.basePrice)}</span>`
-                          : ''
-                    }
+                    ${hasBaseSale ? `<span class='cart-item__base'>₩ ${formatPrice(product.basePrice)}</span>` : ''}
                     <p class='cart-item__price'>₩ ${formatPrice(product.price)}</p>
-
-                    ${
-                       hasCouponDiscount
-                          ? `<p class='cart-item__coupon'>쿠폰 -₩ ${formatPrice(computed.couponDiscount)}</p>`
-                          : ''
-                    }
+                    ${hasCouponDiscount ? `<p class='cart-item__coupon'>쿠폰 -₩ ${formatPrice(computed.couponDiscount)}</p>` : ''}
                   </div>
                 </div>
 
@@ -265,15 +254,10 @@ function renderCart(detailedItems) {
            .join('')}
       </div>
 
-      <!-- 오른쪽: 요약/결제 -->
       <aside class='cart__summary' aria-label='Cart Summary'>
         <p class='cart__hint'>${freeShippingText}</p>
 
-        ${renderCouponSection({
-           owned,
-           appliedCoupon,
-           eligibleCount,
-        })}
+        ${renderCouponSection({ owned, appliedCoupon, eligibleCount })}
 
         <div class='cart__row'>
           <span>상품 합계(세일 반영)</span>
@@ -313,7 +297,106 @@ function renderCart(detailedItems) {
 }
 
 /* ==============================
-   3) Page init
+   3) API-ready Checkout Flow
+   ============================== */
+
+function buildCheckoutPayload({ detailedItems, pricing, appliedCoupon }) {
+   const user = authStore.getUser?.();
+
+   return {
+      orderId: `order_${Date.now()}`,
+      userId: user?.id ?? null,
+      items: detailedItems.map((row) => ({
+         cartKey: row.key,
+         productId: row.product?.id,
+         name: row.product?.name,
+         qty: row.qty,
+         options: row.options ?? {},
+         unitPrice: row.product?.price ?? 0, // 세일 반영가
+         couponDiscountUnit: row.computed?.couponDiscount ?? 0,
+         lineTotal: row.computed?.lineTotal ?? 0,
+         couponEligible: Boolean(row.product?.couponEligible),
+      })),
+      coupon: appliedCoupon
+         ? {
+              code: appliedCoupon.code,
+              rate: appliedCoupon.rate,
+              title: appliedCoupon.title,
+           }
+         : null,
+      pricing: {
+         subtotalAfterSale: pricing.subtotalAfterSale,
+         couponDiscountTotal: pricing.couponDiscountTotal,
+         totalAfterCoupon: pricing.totalAfterCoupon,
+         shipping: pricing.shipping,
+         total: pricing.total,
+         currency: 'KRW',
+      },
+      createdAt: new Date().toISOString(),
+   };
+}
+
+/**
+ * ✅ 지금은 더미 결제 (나중에 여기만 API로 교체하면 끝)
+ * - return: { ok, data?, message? }
+ */
+async function checkout(payload) {
+   // 나중에 여기서:
+   // const res = await postCheckout(payload)
+   // return res
+   await new Promise((r) => setTimeout(r, 350));
+   return { ok: true, data: { paidAt: Date.now(), orderId: payload.orderId } };
+}
+
+async function handleCheckout({ detailedItems }) {
+   const appliedCoupon = couponStore.getAppliedCoupon();
+
+   // pricing 다시 계산(렌더의 숫자와 동일해야 하므로)
+   const pricingCore = calcCartPricing(detailedItems, appliedCoupon);
+   const shipping = calcShipping(pricingCore.totalAfterCoupon);
+   const total = pricingCore.totalAfterCoupon + shipping;
+
+   const payload = buildCheckoutPayload({
+      detailedItems: pricingCore.computedRows,
+      pricing: {
+         subtotalAfterSale: pricingCore.subtotalAfterSale,
+         couponDiscountTotal: pricingCore.couponDiscountTotal,
+         totalAfterCoupon: pricingCore.totalAfterCoupon,
+         shipping,
+         total,
+      },
+      appliedCoupon,
+   });
+
+   const result = await checkout(payload);
+   if (!result?.ok) {
+      // 실패 UX는 토스트/모달 연결 가능
+      console.warn('[checkout] failed:', result);
+      return { ok: false };
+   }
+
+   // ✅ 성공 처리 1) 쿠폰 사용 처리(있으면)
+   if (appliedCoupon?.code) {
+      couponStore.markUsed?.(appliedCoupon.code);
+      couponStore.clearApplied?.();
+   }
+
+   // ✅ 성공 처리 2) 누적 구매액 반영 (마이페이지 등급 자동 갱신)
+   const prev = authStore.getUser?.()?.totalSpent ?? 0;
+   authStore.updateUser?.({
+      totalSpent: Number(prev) + Number(payload.pricing.total || 0),
+   });
+
+   // ✅ 성공 처리 3) 장바구니 비우기
+   cartStore.clear?.();
+
+   // ✅ 성공 처리 4) 완료 페이지/토스트로 확장 가능
+   // window.dispatchEvent(new CustomEvent('app:navigate', { detail: { href: '/mypage' } }))
+   return { ok: true, payload, receipt: result.data };
+}
+
+/* ==============================
+   4) Page init
    ============================== */
 
 export async function initCartPage() {
@@ -324,30 +407,23 @@ export async function initCartPage() {
 
    async function paint() {
       const seq = ++paintSeq;
-
       const detailed = await cartStore.getDetailedItems();
-      // ✅ 느린 응답이 먼저 와서 덮어쓰는 문제 방지
       if (seq !== paintSeq) return;
 
       cartEl.innerHTML = detailed.length ? renderCart(detailed) : renderEmpty();
    }
 
-   // 1) 최초 렌더
    await paint();
 
-   // 2) 상태 변화 시 자동 갱신
    cartStore.subscribe(() => paint());
    couponStore.subscribe(() => paint());
 
-   // 3) 이벤트 위임
-   cartEl.addEventListener('click', (e) => {
-      // 전체 비우기
+   cartEl.addEventListener('click', async (e) => {
       if (e.target.closest('[data-cart-clear]')) {
          cartStore.clear();
          return;
       }
 
-      // 쿠폰 적용
       if (e.target.closest('[data-coupon-apply]')) {
          const radio = cartEl.querySelector('input[data-coupon-radio]:checked');
          const msgEl = cartEl.querySelector('[data-coupon-msg]');
@@ -361,34 +437,28 @@ export async function initCartPage() {
          return;
       }
 
-      // 쿠폰 해제
       if (e.target.closest('[data-coupon-clear]')) {
          couponStore.clearApplied();
          return;
       }
 
-      // (MVP) 구매하기: 실제 결제는 없으니, 적용 쿠폰이 있으면 "사용 처리" 흉내
       if (e.target.closest('[data-checkout]')) {
-         const applied = couponStore.getAppliedCoupon();
-         if (applied?.code) {
-            couponStore.markUsed(applied.code);
-         }
-         // 여기서 결제 완료 페이지/토스트로 확장 가능
+         const detailed = await cartStore.getDetailedItems();
+         if (!detailed.length) return;
+
+         await handleCheckout({ detailedItems: detailed });
          return;
       }
 
-      // 라인 아이템 조작(key 기준)
       const itemEl = e.target.closest('[data-cart-item]');
       const key = itemEl?.getAttribute('data-cart-key');
       if (!key) return;
 
-      // 삭제
       if (e.target.closest('[data-remove]')) {
          cartStore.remove(key);
          return;
       }
 
-      // 수량 증가/감소
       const state = cartStore.getState();
       const current = state.items.find((it) => it.key === key)?.qty || 1;
 

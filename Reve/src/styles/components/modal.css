@@ -1,0 +1,95 @@
+/* =============================================
+ * 📍 위치: src/styles/modal.css
+ * 역할: Confirm 모달 스타일
+ * ============================================= */
+
+body.is-modal-open {
+   overflow: hidden;
+}
+
+.confirm-modal {
+   position: fixed;
+   inset: 0;
+   z-index: 30000;
+}
+
+.confirm-modal[hidden] {
+   display: none !important;
+}
+
+.confirm-modal__overlay {
+   position: absolute;
+   inset: 0;
+   background: rgba(0, 0, 0, 0.38);
+}
+
+.confirm-modal__panel {
+   position: absolute;
+   left: 50%;
+   top: 50%;
+   width: min(92vw, 420px);
+   transform: translate(-50%, -50%);
+   background: rgba(255, 255, 255, 0.96);
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 18px;
+   padding: 14px;
+   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+}
+
+.confirm-modal__header {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   margin-bottom: 10px;
+}
+
+.confirm-modal__title {
+   margin: 0;
+   font-size: 16px;
+   font-weight: 900;
+}
+
+.confirm-modal__x {
+   appearance: none;
+   border: 0;
+   background: transparent;
+   cursor: pointer;
+   padding: 8px;
+   border-radius: 10px;
+}
+
+.confirm-modal__x:hover {
+   background: rgba(0, 0, 0, 0.06);
+}
+
+.confirm-modal__desc {
+   margin: 0;
+   font-size: 14px;
+   line-height: 1.45;
+   opacity: 0.9;
+   padding: 6px 0 12px;
+}
+
+.confirm-modal__actions {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 10px;
+}
+
+.confirm-modal__btn {
+   height: 44px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.14);
+   background: rgba(0, 0, 0, 0.03);
+   cursor: pointer;
+   font-weight: 800;
+}
+
+.confirm-modal__btn:hover {
+   background: rgba(0, 0, 0, 0.06);
+}
+
+.confirm-modal__btn.primary {
+   background: rgba(0, 0, 0, 0.1);
+}

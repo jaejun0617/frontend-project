@@ -1,35 +1,37 @@
 /**
  * =============================================
  * 📍 위치: src/store/cartStore.js
- * 역할: 장바구니 전역 상태 + localStorage 영속화
+ * 역할: 장바구니 전역 저장소 (유저별 localStorage 분리)
  *
- * ✅ 옵션 확장
- * - productId + 옵션(size/color)을 함께 저장
- * - 같은 productId라도 옵션이 다르면 "다른 라인아이템"으로 취급
+ * ✅ 제공 API (기존 페이지들이 기대하는 것)
+ * - subscribe(listener)
+ * - getState()
+ * - setOwner(userId)              // 로그인/로그아웃 시 owner 스위칭
+ * - getCount()
+ * - clear()
+ * - addById(productId, qty, options?)
+ * - updateQty(key, nextQty)
+ * - remove(key)
+ * - getDetailedItems()            // CartPage에서 사용 (product 결합)
  * =============================================
  */
 
-import { getProducts } from '../api/products.js';
+import { getProductById } from '../api/products.js';
 
-const STORAGE_KEY = 'eclat_cart';
-
-/**
- * @typedef {Object} CartOptions
- * @property {string} [size]  - 'S' | 'M' | 'L' | 'XL' | '220'...
- * @property {string} [color] - 'Black' 같은 영문 컬러
- */
-
-/**
- * @typedef {Object} CartItem
- * @property {string} key
- * @property {string} productId
- * @property {number} qty
- * @property {CartOptions} options
- */
+const STORAGE_BASE = 'reve_cart_v1';
 
 /* ==============================
-   0) localStorage 유틸
+   0) Storage / Normalizer
    ============================== */
+
+function makeOwnerKey(userId) {
+   const id = String(userId || '').trim();
+   return id ? id : 'guest';
+}
+
+function storageKey(ownerKey) {
+   return `${STORAGE_BASE}:${ownerKey}`;
+}
 
 function safeParse(json) {
    try {
@@ -39,70 +41,112 @@ function safeParse(json) {
    }
 }
 
-function makeKey(productId, options = {}) {
-   const id = String(productId || '').trim();
-   const size = String(options.size || '').trim();
-   const color = String(options.color || '').trim();
-   return `${id}::${size}::${color}`;
+function normalizeOptions(options) {
+   const o = options && typeof options === 'object' ? options : {};
+   const color = String(o.color || '').trim();
+   const size = String(o.size || '').trim();
+
+   // ✅ 앞으로 옵션이 늘어나도 여기만 확장하면 됨
+   return {
+      ...(color ? { color } : {}),
+      ...(size ? { size } : {}),
+   };
 }
 
-function normalizeLoadedItems(rawItems) {
-   // ✅ 이전 버전({productId, qty})도 마이그레이션해서 살려줌
-   if (!Array.isArray(rawItems)) return [];
+function buildLineKey(productId, options) {
+   const id = String(productId || '').trim();
+   const o = normalizeOptions(options);
 
-   return rawItems
+   // key 안정성: 옵션 순서/형태가 달라도 동일하게
+   const color = String(o.color || '');
+   const size = String(o.size || '');
+
+   return `${id}::color=${color}::size=${size}`;
+}
+
+function normalizeItems(items) {
+   if (!Array.isArray(items)) return [];
+
+   return items
       .map((it) => {
-         const productId = String(it?.productId ?? '').trim();
-         const qty = Number(it?.qty ?? 1);
-         if (!productId) return null;
+         const id = String(it?.id ?? it?.productId ?? '').trim();
+         if (!id) return null;
 
-         const options =
-            it?.options && typeof it.options === 'object'
-               ? {
-                    size: it.options.size ? String(it.options.size) : '',
-                    color: it.options.color ? String(it.options.color) : '',
-                 }
-               : {};
+         const options = normalizeOptions(it?.options);
+         const key = String(it?.key || '').trim() || buildLineKey(id, options);
 
-         const key =
-            String(it?.key ?? '').trim() || makeKey(productId, options);
+         const qtyRaw = Number(it?.qty ?? 1);
+         const qty = Number.isFinite(qtyRaw) ? Math.max(1, qtyRaw) : 1;
 
          return {
             key,
-            productId,
-            qty: Math.max(1, Math.min(99, qty)),
+            id,
+            qty,
             options,
          };
       })
       .filter(Boolean);
 }
 
-function readCart() {
-   const raw = localStorage.getItem(STORAGE_KEY);
+function readStateByOwner(ownerKey) {
+   const raw = localStorage.getItem(storageKey(ownerKey));
    const parsed = raw ? safeParse(raw) : null;
-   return normalizeLoadedItems(parsed);
+
+   // ✅ 레거시 마이그레이션(예전 단일 키 STORAGE_BASE -> guest로 1회 이동)
+   if (!raw) {
+      const legacyRaw = localStorage.getItem(STORAGE_BASE);
+      const legacyParsed = legacyRaw ? safeParse(legacyRaw) : null;
+      const legacyItems = normalizeItems(
+         legacyParsed?.items ?? legacyParsed ?? [],
+      );
+
+      if (ownerKey === 'guest' && legacyItems.length) {
+         const migrated = { items: legacyItems, updatedAt: Date.now() };
+         localStorage.setItem(storageKey('guest'), JSON.stringify(migrated));
+         return migrated;
+      }
+   }
+
+   return {
+      items: normalizeItems(parsed?.items ?? parsed ?? []),
+      updatedAt: Number(parsed?.updatedAt ?? Date.now()),
+   };
 }
 
-function writeCart(items) {
-   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+function writeStateByOwner(ownerKey, next) {
+   localStorage.setItem(storageKey(ownerKey), JSON.stringify(next));
 }
 
 /* ==============================
-   1) Store 상태 + 구독
+   1) Store core
    ============================== */
 
-let state = {
-   /** @type {CartItem[]} */
-   items: readCart(),
-};
+let ownerKey = makeOwnerKey(null); // 기본 guest
+let state = readStateByOwner(ownerKey);
 
-/** @type {Set<(state: typeof state) => void>} */
+/** @type {Set<(state:any)=>void>} */
 const listeners = new Set();
 
 function notify() {
-   writeCart(state.items);
+   state = { ...state, updatedAt: Date.now() };
+   writeStateByOwner(ownerKey, state);
    listeners.forEach((fn) => fn(state));
 }
+
+function findIndexByKey(key) {
+   const k = String(key || '').trim();
+   if (!k) return -1;
+   return state.items.findIndex((it) => it.key === k);
+}
+
+function findIndexBySameLine(productId, options) {
+   const key = buildLineKey(productId, options);
+   return state.items.findIndex((it) => it.key === key);
+}
+
+/* ==============================
+   2) Public API
+   ============================== */
 
 export const cartStore = {
    subscribe(listener) {
@@ -115,8 +159,28 @@ export const cartStore = {
       return state;
    },
 
+   // ✅ 로그인/로그아웃 때 owner 스위칭 (app.js에서 호출)
+   setOwner(userId) {
+      const nextOwnerKey = makeOwnerKey(userId);
+      if (nextOwnerKey === ownerKey) return;
+
+      // 1) 현재 owner 상태 저장
+      writeStateByOwner(ownerKey, state);
+
+      // 2) owner 스위치
+      ownerKey = nextOwnerKey;
+
+      // 3) 새 owner state 로드
+      state = readStateByOwner(ownerKey);
+
+      // 4) 구독자 알림 (UI 즉시 반영)
+      listeners.forEach((fn) => fn(state));
+   },
+
    getCount() {
-      return state.items.reduce((acc, it) => acc + it.qty, 0);
+      return Array.isArray(state.items)
+         ? state.items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0)
+         : 0;
    },
 
    clear() {
@@ -124,93 +188,103 @@ export const cartStore = {
       notify();
    },
 
-   remove(keyOrProductId) {
-      const key = String(keyOrProductId || '').trim();
-      if (!key) return;
+   /**
+    * ✅ 상품 담기
+    * - 같은 상품 + 같은 옵션이면 qty 누적
+    * - options: { color?, size? }
+    */
+   async addById(productId, qty = 1, options = {}) {
+      const id = String(productId || '').trim();
+      if (!id) return { ok: false, message: '상품 id가 없습니다.' };
 
-      state = {
-         ...state,
-         items: state.items.filter(
-            (it) => it.key !== key && it.productId !== key,
-         ),
+      // (선택) 존재 검증: 상세/장바구니에서 product 접근하니까 안전하게 확인
+      const product = await getProductById(id);
+      if (!product) return { ok: false, message: '상품을 찾을 수 없습니다.' };
+
+      const addQtyRaw = Number(qty);
+      const addQty = Number.isFinite(addQtyRaw) ? Math.max(1, addQtyRaw) : 1;
+
+      const normalizedOptions = normalizeOptions(options);
+      const key = buildLineKey(id, normalizedOptions);
+
+      const idx = findIndexBySameLine(id, normalizedOptions);
+
+      if (idx >= 0) {
+         const current = state.items[idx];
+         const nextItem = { ...current, qty: current.qty + addQty };
+
+         const nextItems = [...state.items];
+         nextItems[idx] = nextItem;
+
+         state = { ...state, items: nextItems };
+         notify();
+         return { ok: true, message: '수량이 추가되었습니다.' };
+      }
+
+      const next = {
+         key,
+         id,
+         qty: addQty,
+         options: normalizedOptions,
       };
+
+      state = { ...state, items: [next, ...state.items] };
+      notify();
+      return { ok: true, message: '장바구니에 담겼습니다.' };
+   },
+
+   /**
+    * ✅ 수량 변경
+    * - 0 이하로 내려가면 remove 처리
+    */
+   updateQty(key, nextQty) {
+      const idx = findIndexByKey(key);
+      if (idx < 0) return;
+
+      const qRaw = Number(nextQty);
+      const q = Number.isFinite(qRaw) ? qRaw : 1;
+
+      if (q <= 0) {
+         this.remove(key);
+         return;
+      }
+
+      const nextItems = [...state.items];
+      nextItems[idx] = { ...nextItems[idx], qty: Math.max(1, q) };
+
+      state = { ...state, items: nextItems };
       notify();
    },
 
-   updateQty(keyOrProductId, nextQty) {
-      const target = String(keyOrProductId || '').trim();
-      if (!target) return;
+   remove(key) {
+      const idx = findIndexByKey(key);
+      if (idx < 0) return;
 
-      const qty = Math.max(1, Math.min(99, Number(nextQty || 1)));
-
-      state = {
-         ...state,
-         items: state.items.map((it) => {
-            const hit = it.key === target || it.productId === target;
-            return hit ? { ...it, qty } : it;
-         }),
-      };
+      state = { ...state, items: state.items.filter((it) => it.key !== key) };
       notify();
    },
 
    /**
-    * 장바구니 담기
-    * @param {string} productId
-    * @param {number} qty
-    * @param {CartOptions} options
+    * ✅ CartPage에서 쓰는 "상세 결합"
+    * return: [{ key, product, qty, options }]
     */
-   async addById(productId, qty = 1, options = {}) {
-      const id = String(productId || '').trim();
-      if (!id) return;
-
-      const addQty = Math.max(1, Math.min(99, Number(qty || 1)));
-
-      // (안전) 실제 상품인지 확인
-      const products = await getProducts();
-      const exists = products.some((p) => p.id === id);
-      if (!exists) {
-         console.warn('[cartStore] unknown productId:', id);
-         return;
-      }
-
-      const normalizedOptions = {
-         size: options?.size ? String(options.size).trim() : '',
-         color: options?.color ? String(options.color).trim() : '',
-      };
-
-      const key = makeKey(id, normalizedOptions);
-
-      const found = state.items.find((it) => it.key === key);
-      if (found) {
-         this.updateQty(key, found.qty + addQty);
-         return;
-      }
-
-      state = {
-         ...state,
-         items: [
-            ...state.items,
-            { key, productId: id, qty: addQty, options: normalizedOptions },
-         ],
-      };
-      notify();
-   },
-
    async getDetailedItems() {
-      const products = await getProducts();
+      const items = Array.isArray(state.items) ? state.items : [];
 
-      return state.items
-         .map((it) => {
-            const product = products.find((p) => p.id === it.productId);
-            if (!product) return null;
+      const products = await Promise.all(
+         items.map((it) => getProductById(it.id)),
+      );
 
-            return {
-               key: it.key,
-               product,
-               qty: it.qty,
-               options: it.options || {},
-            };
-         })
-         .filter(Boolean);
+      const detailed = items
+         .map((it, i) => ({
+            key: it.key,
+            product: products[i] ?? null,
+            qty: it.qty,
+            options: it.options ?? {},
+         }))
+         .filter((row) => Boolean(row.product));
+
+      // (선택) 누락 상품이 많으면 정리해도 되지만, 여기서는 데이터 건드리지 않음
+      return detailed;
    },
 };

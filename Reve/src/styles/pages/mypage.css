@@ -1,4 +1,7 @@
-/* MyPage layout + tabs/panels */
+/* =============================================
+ * 📍 위치: src/styles/mypage.css
+ * 역할: 마이페이지(탭/패널 + profile/grade) 스타일
+ * ============================================= */
 
 .mypage__layout {
    display: grid;
@@ -7,127 +10,222 @@
 
 @media (min-width: 900px) {
    .mypage__layout {
-      grid-template-columns: 260px minmax(0, 1fr);
+      grid-template-columns: 260px 1fr;
       align-items: start;
    }
 }
 
+/* 좌측 탭 */
 .mypage__nav {
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   border-radius: 16px;
-   background: rgba(255, 255, 255, 0.95);
-   padding: 10px;
+   position: sticky;
+   top: 72px; /* 헤더 높이에 맞춰 조절 */
 }
 
 .mypage__tabs {
    list-style: none;
-   margin: 0;
    padding: 0;
+   margin: 0;
    display: grid;
-   gap: 8px;
+   gap: 10px;
 }
 
 .mypage__tab {
    width: 100%;
-   text-align: left;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.1);
-   background: rgba(0, 0, 0, 0.02);
-   padding: 12px 12px;
+   height: 44px;
+   border-radius: 14px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(255, 255, 255, 0.9);
    cursor: pointer;
-   font-weight: 700;
    display: flex;
    align-items: center;
    justify-content: space-between;
-   gap: 8px;
-}
-
-.mypage__tab:hover {
-   background: rgba(0, 0, 0, 0.04);
+   padding: 0 12px;
+   font-weight: 900;
 }
 
 .mypage__tab.is-active {
    background: rgba(0, 0, 0, 0.06);
-   border-color: rgba(0, 0, 0, 0.18);
+   border-color: rgba(0, 0, 0, 0.2);
 }
 
 .mypage__tab:disabled {
-   opacity: 0.55;
    cursor: not-allowed;
+   opacity: 0.6;
 }
 
 .mypage__soon {
-   font-size: 12px;
-   font-weight: 800;
-   opacity: 0.8;
-   border: 1px solid rgba(0, 0, 0, 0.18);
-   border-radius: 999px;
+   font-size: 11px;
    padding: 4px 8px;
-   background: rgba(255, 255, 255, 0.9);
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.03);
 }
 
-.mypage__main {
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   border-radius: 16px;
-   background: rgba(255, 255, 255, 0.95);
-   padding: 14px;
-}
-
+/* 패널 */
 .mypage__panel {
    display: none;
 }
-
 .mypage__panel.is-active {
    display: block;
 }
 
 .mypage__section {
    display: grid;
-   gap: 10px;
-   padding: 10px 0;
-}
-
-.mypage__section + .mypage__section {
-   border-top: 1px solid rgba(0, 0, 0, 0.08);
-   margin-top: 10px;
+   gap: 12px;
 }
 
 .mypage__sectionTitle {
    margin: 0;
-   font-size: 16px;
-   font-weight: 800;
+   font-size: 18px;
+   font-weight: 900;
 }
 
 .mypage__sectionDesc {
    margin: 0;
-   opacity: 0.78;
+   opacity: 0.7;
    font-size: 13px;
 }
 
-/* empty / todo */
-.empty {
-   padding: 16px;
-   border-radius: 16px;
-   border: 1px dashed rgba(0, 0, 0, 0.18);
-   background: rgba(0, 0, 0, 0.02);
+/* 공통 pill */
+.pill {
+   display: inline-flex;
+   align-items: center;
+   padding: 6px 10px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.03);
+   font-size: 12px;
+   font-weight: 900;
 }
 
+/* Profile */
+.profile-card,
+.grade-card {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   padding: 14px;
+   background: rgba(255, 255, 255, 0.95);
+}
+
+.kv {
+   display: grid;
+   gap: 10px;
+}
+
+.kv__row {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   padding: 10px 12px;
+   border-radius: 14px;
+   background: rgba(0, 0, 0, 0.02);
+   border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.kv__key {
+   font-size: 12px;
+   opacity: 0.72;
+   font-weight: 800;
+}
+
+.kv__val {
+   font-size: 13px;
+}
+
+.hint {
+   margin: 10px 0 0;
+   font-size: 12px;
+   opacity: 0.7;
+   line-height: 1.4;
+}
+
+/* Grade */
+.grade-top {
+   display: grid;
+   gap: 10px;
+}
+
+@media (min-width: 768px) {
+   .grade-top {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+   }
+}
+
+.grade-current {
+   padding: 12px;
+   border-radius: 14px;
+   background: rgba(0, 0, 0, 0.02);
+   border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.grade-current .label {
+   margin: 0 0 6px;
+   font-size: 12px;
+   opacity: 0.7;
+   font-weight: 800;
+}
+
+.grade-current .value {
+   margin: 0;
+   font-size: 15px;
+}
+
+.grade-pill {
+   display: inline-flex;
+   align-items: center;
+   padding: 6px 10px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.14);
+   background: rgba(255, 255, 255, 0.9);
+   font-size: 13px;
+   font-weight: 900;
+}
+
+.grade-progress {
+   margin-top: 12px;
+   display: grid;
+   gap: 10px;
+}
+
+.grade-progress__head {
+   display: flex;
+   align-items: baseline;
+   justify-content: space-between;
+   gap: 10px;
+   flex-wrap: wrap;
+}
+
+.grade-progress__head .title,
+.grade-progress__head .meta {
+   margin: 0;
+}
+
+.grade-progress__head .meta {
+   font-size: 13px;
+   opacity: 0.8;
+}
+
+.bar {
+   height: 12px;
+   border-radius: 999px;
+   background: rgba(0, 0, 0, 0.08);
+   overflow: hidden;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.fill {
+   height: 100%;
+   width: 0%;
+   background: rgba(0, 0, 0, 0.6);
+}
+
+/* empty */
 .empty__title {
    margin: 0;
    font-weight: 900;
 }
-
 .empty__desc {
    margin: 6px 0 0;
-   opacity: 0.75;
-   font-size: 13px;
-}
-
-.mypage__todo {
-   border-radius: 16px;
-   border: 1px dashed rgba(0, 0, 0, 0.18);
-   background: rgba(0, 0, 0, 0.02);
-   padding: 14px;
-   font-size: 13px;
-   opacity: 0.85;
+   opacity: 0.7;
 }

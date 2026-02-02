@@ -339,6 +339,14 @@ export const couponStore = {
     */
    clearAll() {
       state = { owned: [], appliedCode: '' };
+
+      // ✅ v2/v1 저장 데이터까지 제거(완전 초기화)
+      if (hasStorage()) {
+         window.localStorage.removeItem(STORAGE_KEY_V2);
+         window.localStorage.removeItem(STORAGE_KEY_V1);
+      }
+
       notify();
    },
 };
+// couponStore.clearAll();

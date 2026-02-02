@@ -1,0 +1,108 @@
+/* =============================================
+ * 📍 위치: src/styles/auth.css
+ * 역할: Auth(로그인/회원가입) 페이지 전용
+ * ============================================= */
+
+.auth {
+   max-width: 420px;
+   margin: 0 auto;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   background: rgba(255, 255, 255, 0.95);
+   padding: 14px;
+   display: grid;
+   gap: 12px;
+}
+
+.auth__tabs {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 10px;
+}
+
+.auth__tab {
+   height: 44px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.03);
+   cursor: pointer;
+   font-weight: 900;
+}
+
+.auth__tab.is-active {
+   background: rgba(0, 0, 0, 0.08);
+   border-color: rgba(0, 0, 0, 0.18);
+}
+
+.auth__msg {
+   margin: 0;
+   min-height: 18px;
+   font-size: 13px;
+   opacity: 0.85;
+}
+
+.auth__msg[data-type='error'] {
+   opacity: 1;
+   color: rgba(180, 30, 30, 0.95);
+}
+
+.auth__msg[data-type='success'] {
+   opacity: 1;
+}
+
+.auth__panel {
+   display: none;
+}
+
+.auth__panel.is-active {
+   display: block;
+}
+
+.auth__form {
+   display: grid;
+   gap: 12px;
+}
+
+.auth__field {
+   display: grid;
+   gap: 6px;
+}
+
+.auth__label {
+   font-size: 12px;
+   font-weight: 900;
+   opacity: 0.8;
+}
+
+.auth__input {
+   height: 44px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(255, 255, 255, 0.9);
+   padding: 0 12px;
+   outline: none;
+}
+
+.auth__input:focus {
+   border-color: rgba(0, 0, 0, 0.26);
+}
+
+.auth__submit {
+   height: 44px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.08);
+   cursor: pointer;
+   font-weight: 950;
+}
+
+.auth__submit:hover {
+   background: rgba(0, 0, 0, 0.1);
+}
+
+.auth__hint {
+   margin: 0;
+   font-size: 12px;
+   opacity: 0.75;
+   line-height: 1.4;
+}
