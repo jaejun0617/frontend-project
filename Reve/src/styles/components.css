@@ -464,8 +464,41 @@ body.is-search-open .search-drawer {
          rgba(0, 0, 0, 0) 100%
       ),
       linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0));
+
+   position: relative;
+}
+.product-badge {
+   position: absolute;
+   top: 10px;
+   left: 10px;
+   padding: 6px 8px;
+   border-radius: 999px;
+   font-size: 11px;
+   font-weight: 800;
+   line-height: 1;
+   background: rgba(0, 0, 0, 0.88);
+   color: #fff;
 }
 
+.product-badge--coupon {
+   left: auto;
+   right: 10px;
+   background: rgba(0, 0, 0, 0.7);
+}
+
+/* Price box (discount) */
+.product-card__pricebox {
+   display: flex;
+   align-items: baseline;
+   gap: 8px;
+}
+
+.product-card__base {
+   margin: 0;
+   font-size: 12px;
+   opacity: 0.55;
+   text-decoration: line-through;
+}
 .product-card__body {
    padding: 12px;
    display: grid;
@@ -949,4 +982,32 @@ body.is-search-open .search-drawer {
 .cart__checkout:disabled {
    opacity: 0.6;
    cursor: not-allowed;
+}
+
+.cart__divider {
+   border: 0;
+   border-top: 1px solid rgba(0, 0, 0, 0.08);
+   margin: 4px 0;
+}
+
+.cart__coupon-toggle {
+   display: flex;
+   align-items: center;
+   gap: 10px;
+   font-size: 14px;
+}
+
+.cart__coupon-toggle input {
+   width: 18px;
+   height: 18px;
+}
+
+.cart__final strong {
+   font-size: 16px;
+}
+
+.cart__shipping-hint {
+   margin: 0;
+   font-size: 12px;
+   opacity: 0.72;
 }
