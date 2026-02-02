@@ -17,7 +17,7 @@ import {
    initProductDetailPage,
 } from './src/pages/productDetail/index.js';
 import { CartPage, initCartPage } from './src/pages/cart/index.js';
-
+import { MyPage, initMyPage } from './src/pages/mypage/index.js';
 // Utils
 import { initSidebar } from './src/utils/sidebar.js';
 import { initSearchDrawer } from './src/utils/searchDrawer.js';
@@ -87,8 +87,8 @@ const routes = {
          "<section class='page'><h1>Auth</h1><p>로그인/회원가입 페이지 (TODO)</p></section>",
    },
    '/mypage': {
-      render: () =>
-         "<section class='page'><h1>MyPage</h1><p>마이페이지 (TODO)</p></section>",
+      render: () => MyPage(),
+      afterRender: () => initMyPage(),
    },
    '/admin': {
       render: () =>

@@ -1,0 +1,244 @@
+/* Search Drawer (Top-down) */
+
+body.is-search-open {
+   overflow: hidden;
+}
+
+/* Search toggle button (아이콘 링크랑 같은 느낌) */
+.nav-menu-icons .search-toggle,
+.mobile-icons .search-toggle {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   cursor: pointer;
+   padding: 8px;
+   border-radius: 10px;
+   border: 0;
+   background: transparent;
+   transition: background-color 150ms ease;
+}
+
+.nav-menu-icons .search-toggle:hover,
+.mobile-icons .search-toggle:hover {
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+.nav-menu-icons .search-toggle:focus-visible,
+.mobile-icons .search-toggle:focus-visible {
+   outline: 2px solid rgba(0, 0, 0, 0.35);
+   outline-offset: 2px;
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+.search-overlay {
+   position: fixed;
+   inset: 0;
+   background: rgba(0, 0, 0, 0.35);
+   opacity: 0;
+   pointer-events: none;
+   transition: opacity 160ms ease;
+   z-index: 10000;
+}
+
+.search-drawer {
+   position: fixed;
+   top: 0;
+   left: 0;
+   right: 0;
+
+   background: rgba(255, 255, 255, 1);
+   -webkit-backdrop-filter: blur(12px);
+   backdrop-filter: blur(12px);
+
+   transform: translateY(-110%);
+   transition: transform 200ms ease;
+   z-index: 10001;
+   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.is-search-open .search-overlay {
+   opacity: 1;
+   pointer-events: auto;
+}
+
+body.is-search-open .search-drawer {
+   transform: translateY(0);
+}
+
+.search-drawer__inner {
+   padding: 16px;
+}
+
+.search-drawer__header {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   margin-bottom: 12px;
+}
+
+.search-drawer__title {
+   font-size: 16px;
+   margin: 0;
+}
+
+.search-close {
+   appearance: none;
+   border: 0;
+   background: transparent;
+   padding: 8px;
+   border-radius: 10px;
+   cursor: pointer;
+}
+
+.search-close:hover {
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+.search-form {
+   display: flex;
+   gap: 8px;
+   margin-bottom: 16px;
+}
+
+.search-input {
+   flex: 1;
+   height: 44px;
+   padding: 0 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(255, 255, 255, 0.8);
+}
+
+.search-submit {
+   height: 44px;
+   padding: 0 14px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(255, 255, 255, 0.9);
+   cursor: pointer;
+}
+
+.search-panels {
+   display: grid;
+   gap: 12px;
+}
+
+.search-panel__head {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   margin-bottom: 8px;
+   height: 30px;
+}
+
+.search-clear {
+   border: 0;
+   background: transparent;
+   padding: 6px 8px;
+   border-radius: 10px;
+   cursor: pointer;
+}
+
+.search-clear:hover {
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+.search-chips {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 8px;
+   padding: 0;
+   margin: 0;
+   list-style: none;
+}
+
+.search-chips li button {
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(255, 255, 255, 0.85);
+   padding: 8px 10px;
+   border-radius: 999px;
+   cursor: pointer;
+}
+
+.search-chips li button:hover {
+   background: rgba(255, 255, 255, 1);
+}
+
+/* Drawer: 최근 | 추천 2열 + 디바이더 */
+.search-panels {
+   display: grid;
+   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+   gap: 0;
+}
+
+.search-panels > *:nth-child(2) {
+   border-left: 1px solid rgba(0, 0, 0, 0.12);
+   padding-left: 14px;
+   margin-left: 14px;
+}
+
+.search-panels > * {
+   min-width: 0;
+}
+
+.search-chips[data-search-recent] {
+   display: flex;
+   flex-direction: column;
+   gap: 10px;
+   padding: 0;
+   margin: 0;
+   list-style: none;
+}
+
+.search-chips[data-search-recent] li {
+   width: 100%;
+}
+
+.search-chips[data-search-recent] .chip-row {
+   width: 100%;
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+}
+
+.search-chips[data-search-recent] .chip-btn {
+   flex: 1 1 auto;
+   min-width: 0;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   text-align: left;
+}
+
+.search-chips[data-search-recent] .chip-remove {
+   flex: 0 0 auto;
+   width: 36px;
+   height: 36px;
+   border-radius: 999px;
+}
+
+.search-chips[data-search-suggest] {
+   display: flex;
+   flex-direction: column;
+   flex-wrap: wrap;
+   gap: 10px;
+   list-style: none;
+}
+
+.search-chips[data-search-suggest] li {
+   width: auto;
+}
+
+.search-chips[data-search-suggest] .chip-row {
+   display: inline-flex;
+   align-items: center;
+}
+
+.search-chips[data-search-suggest] .chip-btn {
+   width: auto;
+   max-width: 100%;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}

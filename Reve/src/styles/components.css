@@ -1011,3 +1011,436 @@ body.is-search-open .search-drawer {
    font-size: 12px;
    opacity: 0.72;
 }
+
+/* =========================================
+   Cart Coupon UI
+   - .cart__coupon / list / actions / status
+   ========================================= */
+
+/* 쿠폰 섹션 래퍼 */
+.cart__coupon {
+   display: grid;
+   gap: 10px;
+   padding: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 14px;
+   background: rgba(0, 0, 0, 0.02);
+}
+
+/* 안내 문구 */
+.cart__couponmsg {
+   margin: 0;
+   font-size: 13px;
+   opacity: 0.85;
+   line-height: 1.4;
+}
+
+/* 쿠폰 리스트(라디오 그룹) */
+.cart__couponlist {
+   display: grid;
+   gap: 8px;
+}
+
+/* 쿠폰 아이템 라벨 */
+.cart__couponitem {
+   display: flex;
+   align-items: center;
+   gap: 10px;
+
+   padding: 10px 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: rgba(255, 255, 255, 0.9);
+   cursor: pointer;
+   user-select: none;
+
+   transition:
+      transform 120ms ease,
+      background 120ms ease,
+      border-color 120ms ease;
+}
+
+.cart__couponitem:hover {
+   transform: translateY(-1px);
+   border-color: rgba(0, 0, 0, 0.14);
+   background: rgba(255, 255, 255, 1);
+}
+
+/* 라디오 기본 */
+.cart__couponitem input[type='radio'] {
+   width: 16px;
+   height: 16px;
+   accent-color: rgba(0, 0, 0, 0.85);
+   cursor: pointer;
+}
+
+/* 선택된 쿠폰 하이라이트 */
+.cart__couponitem:has(input[type='radio']:checked) {
+   border-color: rgba(0, 0, 0, 0.22);
+   background: rgba(0, 0, 0, 0.04);
+}
+
+/* disabled 쿠폰(쿠폰 적용 가능한 상품 0개일 때) */
+.cart__couponitem:has(input[type='radio']:disabled) {
+   opacity: 0.55;
+   cursor: not-allowed;
+}
+
+.cart__couponitem:has(input[type='radio']:disabled):hover {
+   transform: none;
+   border-color: rgba(0, 0, 0, 0.08);
+   background: rgba(255, 255, 255, 0.9);
+}
+
+/* 쿠폰 메타 텍스트 */
+.cart__couponmeta {
+   display: inline-flex;
+   align-items: center;
+   gap: 8px;
+   min-width: 0;
+   font-size: 13px;
+}
+
+.cart__couponmeta strong {
+   font-size: 13px;
+   font-weight: 800;
+   letter-spacing: 0.2px;
+}
+
+/* 버튼 영역 */
+.cart__couponactions {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 8px;
+}
+
+/* 쿠폰 버튼 */
+.cart__couponbtn {
+   height: 40px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(255, 255, 255, 0.9);
+   cursor: pointer;
+   font-weight: 700;
+
+   transition:
+      transform 120ms ease,
+      background 120ms ease,
+      opacity 120ms ease;
+}
+
+.cart__couponbtn:hover {
+   transform: translateY(-1px);
+   background: rgba(255, 255, 255, 1);
+}
+
+.cart__couponbtn:disabled {
+   opacity: 0.55;
+   cursor: not-allowed;
+   transform: none;
+}
+
+/* 적용 상태 텍스트 */
+.cart__couponstatus {
+   margin: 0;
+   font-size: 12.5px;
+   opacity: 0.85;
+   padding-top: 4px;
+   border-top: 1px dashed rgba(0, 0, 0, 0.12);
+}
+
+/* 모바일에서 쿠폰 버튼 2개가 너무 꽉 차면 세로로 */
+@media (max-width: 420px) {
+   .cart__couponactions {
+      grid-template-columns: 1fr;
+   }
+}
+
+/* =============================================
+ * MyPage
+ * - 좌측 탭 + 우측 패널 레이아웃
+ * - 쿠폰 등록/보유 리스트 UI
+ * ============================================= */
+
+.mypage__layout {
+   display: grid;
+   gap: 16px;
+}
+
+/* 데스크탑: 좌 탭 / 우 본문 */
+@media (min-width: 900px) {
+   .mypage__layout {
+      grid-template-columns: 260px minmax(0, 1fr);
+      align-items: start;
+   }
+}
+
+/* 좌측 네비 */
+.mypage__nav {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   background: rgba(255, 255, 255, 0.95);
+   padding: 10px;
+}
+
+.mypage__tabs {
+   list-style: none;
+   margin: 0;
+   padding: 0;
+   display: grid;
+   gap: 8px;
+}
+
+.mypage__tab {
+   width: 100%;
+   text-align: left;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.1);
+   background: rgba(0, 0, 0, 0.02);
+   padding: 12px 12px;
+   cursor: pointer;
+   font-weight: 700;
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 8px;
+}
+
+.mypage__tab:hover {
+   background: rgba(0, 0, 0, 0.04);
+}
+
+.mypage__tab.is-active {
+   background: rgba(0, 0, 0, 0.06);
+   border-color: rgba(0, 0, 0, 0.18);
+}
+
+.mypage__tab:disabled {
+   opacity: 0.55;
+   cursor: not-allowed;
+}
+
+.mypage__soon {
+   font-size: 12px;
+   font-weight: 800;
+   opacity: 0.8;
+   border: 1px solid rgba(0, 0, 0, 0.18);
+   border-radius: 999px;
+   padding: 4px 8px;
+   background: rgba(255, 255, 255, 0.9);
+}
+
+/* 우측 패널 */
+.mypage__main {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   background: rgba(255, 255, 255, 0.95);
+   padding: 14px;
+}
+
+.mypage__panel {
+   display: none;
+}
+
+.mypage__panel.is-active {
+   display: block;
+}
+
+.mypage__section {
+   display: grid;
+   gap: 10px;
+   padding: 10px 0;
+}
+
+.mypage__section + .mypage__section {
+   border-top: 1px solid rgba(0, 0, 0, 0.08);
+   margin-top: 10px;
+}
+
+.mypage__sectionTitle {
+   margin: 0;
+   font-size: 16px;
+   font-weight: 800;
+}
+
+.mypage__sectionDesc {
+   margin: 0;
+   opacity: 0.78;
+   font-size: 13px;
+}
+
+/* 작은 pill */
+.pill {
+   display: inline-flex;
+   align-items: center;
+   border-radius: 999px;
+   padding: 4px 10px;
+   border: 1px solid rgba(0, 0, 0, 0.16);
+   background: rgba(0, 0, 0, 0.03);
+   font-size: 12px;
+   font-weight: 800;
+}
+
+/* 공용 버튼 (프로젝트에 버튼 시스템이 있으면 이건 빼도 됨) */
+.btn {
+   height: 40px;
+   padding: 0 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.14);
+   background: transparent;
+   cursor: pointer;
+   font-weight: 800;
+}
+
+.btn.primary {
+   background: rgba(0, 0, 0, 0.1);
+}
+
+.btn.subtle {
+   background: rgba(0, 0, 0, 0.04);
+}
+
+/* 쿠폰 등록 박스 */
+.coupon-box {
+   border: 1px solid rgba(0, 0, 0, 0.1);
+   border-radius: 16px;
+   padding: 12px;
+   background: rgba(0, 0, 0, 0.02);
+   display: grid;
+   gap: 10px;
+}
+
+.coupon-box__row {
+   display: grid;
+   grid-template-columns: minmax(0, 1fr) 92px;
+   gap: 10px;
+   align-items: center;
+}
+
+.coupon-box__input {
+   height: 44px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   padding: 0 12px;
+   background: rgba(255, 255, 255, 0.9);
+   outline: none;
+}
+
+.coupon-box__input:focus {
+   border-color: rgba(0, 0, 0, 0.26);
+}
+
+.coupon-box__btn {
+   height: 44px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.06);
+   cursor: pointer;
+   font-weight: 900;
+}
+
+.coupon-box__msg {
+   margin: 0;
+   font-size: 13px;
+   opacity: 0.78;
+}
+
+/* 보유 쿠폰 */
+.coupon-owned {
+   display: grid;
+   gap: 12px;
+}
+
+.coupon-owned__header {
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: 12px;
+}
+
+.coupon-owned__list {
+   list-style: none;
+   padding: 0;
+   margin: 0;
+   display: grid;
+   gap: 10px;
+}
+
+.coupon-item {
+   border: 1px solid rgba(0, 0, 0, 0.1);
+   border-radius: 16px;
+   padding: 12px;
+   background: rgba(255, 255, 255, 0.95);
+   display: grid;
+   gap: 10px;
+}
+
+.coupon-item.is-used {
+   opacity: 0.6;
+}
+
+.coupon-item__title {
+   margin: 0;
+   font-weight: 900;
+}
+
+.coupon-item__meta {
+   margin: 4px 0 0;
+   font-size: 13px;
+   opacity: 0.8;
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   flex-wrap: wrap;
+}
+
+.coupon-item__status {
+   font-weight: 900;
+}
+
+.coupon-item__status.is-applied {
+   opacity: 1;
+}
+
+.coupon-item__status.is-used {
+   opacity: 0.9;
+}
+
+.dot {
+   opacity: 0.55;
+}
+
+.coupon-item__actions {
+   display: flex;
+   gap: 8px;
+   justify-content: flex-end;
+}
+
+/* empty */
+.empty {
+   padding: 16px;
+   border-radius: 16px;
+   border: 1px dashed rgba(0, 0, 0, 0.18);
+   background: rgba(0, 0, 0, 0.02);
+}
+
+.empty__title {
+   margin: 0;
+   font-weight: 900;
+}
+
+.empty__desc {
+   margin: 6px 0 0;
+   opacity: 0.75;
+   font-size: 13px;
+}
+
+/* placeholder */
+.mypage__todo {
+   border-radius: 16px;
+   border: 1px dashed rgba(0, 0, 0, 0.18);
+   background: rgba(0, 0, 0, 0.02);
+   padding: 14px;
+   font-size: 13px;
+   opacity: 0.85;
+}

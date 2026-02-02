@@ -2,28 +2,27 @@
  * =============================================
  * 📍 위치: src/pages/cart/index.js
  * 역할: 장바구니(Cart) 페이지
- * - 배송비/무료배송 기준
- * - 쿠폰 적용(실제 할인 반영)
- * - 쿠폰 선택 상태 localStorage 유지
- * - "적용 가능한 쿠폰만" 노출
+ *
+ * ✅ 포함 기능
+ * - 무료배송 기준선 + 배송비(30만원 미만 3,000원)
+ * - 쿠폰 적용 가능 상품(라인) 개수 표시
+ * - 보유 쿠폰 선택 적용/해제 (새로고침 유지: couponStore)
+ * - 기본 세일(product.price) + 쿠폰 할인(pricing.js) 누적 반영
+ * - checkout 버튼 활성화: (아이템 >= 1) && (최종금액 > 0)
  * =============================================
  */
 
 import { cartStore } from '../../store/cartStore.js';
+import { couponStore } from '../../store/couponStore.js';
 import { formatPrice } from '../../utils/format.js';
+import { calcLinePrice } from '../../utils/pricing.js';
 
 const FREE_SHIPPING_THRESHOLD = 300000;
 const SHIPPING_FEE = 3000;
 
-const COUPONS = [
-   { code: 'WELCOME', label: 'WELCOME 10%', rate: 0.1 },
-   { code: 'SEASON', label: 'SEASON 8%', rate: 0.08 },
-   { code: 'VIP', label: 'VIP 12%', rate: 0.12 },
-   { code: 'APP_ONLY', label: 'APP_ONLY 7%', rate: 0.07 },
-   { code: 'BUNDLE', label: 'BUNDLE 5%', rate: 0.05 },
-];
-
-const COUPON_STORAGE_KEY = 'eclat_cart_coupon';
+/* ==============================
+   1) Page Template
+   ============================== */
 
 export const CartPage = () => {
    return `
@@ -42,6 +41,10 @@ export const CartPage = () => {
   `;
 };
 
+/* ==============================
+   2) Render Utils
+   ============================== */
+
 function renderEmpty() {
    return `
     <div class='cart-empty'>
@@ -51,139 +54,167 @@ function renderEmpty() {
   `;
 }
 
-/* ==============================
-   계산 유틸
-   ============================== */
-
-function calcSubtotal(detailedItems) {
-   return detailedItems.reduce(
-      (acc, row) => acc + row.product.price * row.qty,
-      0,
-   );
+function clamp(n, min, max) {
+   return Math.max(min, Math.min(max, n));
 }
 
-function calcShipping(subtotal) {
-   if (subtotal <= 0) return 0;
-   return subtotal < FREE_SHIPPING_THRESHOLD ? SHIPPING_FEE : 0;
+function calcShipping(subtotalAfterCoupon) {
+   if (subtotalAfterCoupon <= 0) return 0;
+   return subtotalAfterCoupon < FREE_SHIPPING_THRESHOLD ? SHIPPING_FEE : 0;
 }
 
-/**
- * ✅ 특정 쿠폰이 실제로 적용 가능한 라인아이템 개수
- * 조건:
- * - couponEligible === true
- * - couponTags에 coupon.code 포함
- * - couponRateCap > 0 (의미 있는 캡)
- */
-function countEligibleForCoupon(detailedItems, coupon) {
-   if (!coupon) return 0;
-
-   return detailedItems.filter(({ product }) => {
-      if (!product?.couponEligible) return false;
-
-      const tags = Array.isArray(product?.couponTags) ? product.couponTags : [];
-      if (!tags.includes(coupon.code)) return false;
-
-      const cap = Number(product?.couponRateCap ?? 0);
-      return cap > 0;
-   }).length;
+function countCouponEligibleLines(detailedItems) {
+   // ✅ 라인아이템 기준(옵션이 다르면 라인도 다름)
+   return detailedItems.filter((row) => Boolean(row.product?.couponEligible))
+      .length;
 }
 
 /**
- * ✅ 장바구니 기준으로 "선택 가능한 쿠폰"만 필터링
- * - 최소 1개 이상 적용 가능한 상품이 있을 때만 노출
+ * Cart 요약 계산
+ * - pricing.js(calcLinePrice)가 "기본 세일 + 쿠폰" 반영을 담당
  */
-function getApplicableCoupons(detailedItems) {
-   return COUPONS.filter((c) => countEligibleForCoupon(detailedItems, c) > 0);
+function calcCartPricing(detailedItems, coupon) {
+   let subtotalAfterSale = 0; // product.price(세일 반영가) 기준 합
+   let couponDiscountTotal = 0; // 쿠폰 할인 총액(라인 단가 기준 * qty)
+   let totalAfterCoupon = 0; // 쿠폰까지 반영된 상품 합계
+
+   const computedRows = detailedItems.map((row) => {
+      const qty = clamp(Number(row.qty || 1), 1, 99);
+
+      const computed = calcLinePrice({
+         product: row.product,
+         qty,
+         coupon, // {code,title,rate} | null
+      });
+
+      // priceAfterSale / couponDiscount 는 "단가 기준"으로 반환된다는 전제(pricing.js)
+      subtotalAfterSale += computed.priceAfterSale * qty;
+      couponDiscountTotal += computed.couponDiscount * qty;
+      totalAfterCoupon += computed.lineTotal;
+
+      return { ...row, computed };
+   });
+
+   return {
+      computedRows,
+      subtotalAfterSale,
+      couponDiscountTotal,
+      totalAfterCoupon,
+   };
 }
 
-/**
- * ✅ 쿠폰 할인 계산(실제 적용)
- * - couponEligible + couponTags + couponRateCap 기준
- */
-function calcCouponDiscount(detailedItems, coupon) {
-   if (!coupon) return 0;
+function renderCouponSection({ owned, appliedCoupon, eligibleCount }) {
+   const usableCoupons = owned.filter((c) => !c.used);
 
-   const total = detailedItems.reduce((acc, row) => {
-      const p = row.product;
-      const qty = row.qty;
+   // ✅ 쿠폰 적용 가능한 상품이 없으면: 선택 UI는 보여도 비활성/안내
+   const canApplyAny = eligibleCount > 0;
 
-      if (!p?.couponEligible) return acc;
-
-      const tags = Array.isArray(p?.couponTags) ? p.couponTags : [];
-      if (!tags.includes(coupon.code)) return acc;
-
-      const price = Number(p.price ?? 0);
-      const cap = Number(p.couponRateCap ?? 0);
-      if (cap <= 0) return acc;
-
-      const appliedRate = Math.min(coupon.rate, cap);
-      return acc + price * qty * appliedRate;
-   }, 0);
-
-   // 보기 좋게 내림(원 단위)
-   return Math.floor(total);
-}
-
-/* ==============================
-   쿠폰 선택 저장/복구
-   ============================== */
-
-function loadSavedCouponCode() {
-   try {
-      return String(localStorage.getItem(COUPON_STORAGE_KEY) || '');
-   } catch {
-      return '';
+   if (!usableCoupons.length) {
+      return `
+      <div class='cart__coupon'>
+        <div class='cart__row'>
+          <span>쿠폰 적용 가능</span>
+          <strong>${eligibleCount}개</strong>
+        </div>
+        <p class='cart__couponmsg'>
+          보유 쿠폰이 없어요. <a href='/mypage' data-link>마이페이지</a>에서 등록해 주세요.
+        </p>
+      </div>
+    `;
    }
+
+   return `
+    <div class='cart__coupon'>
+      <div class='cart__row'>
+        <span>쿠폰 적용 가능</span>
+        <strong>${eligibleCount}개</strong>
+      </div>
+
+      ${
+         !canApplyAny
+            ? `<p class='cart__couponmsg'>쿠폰 적용 가능한 상품이 없어요.</p>`
+            : `<p class='cart__couponmsg'>보유 쿠폰 중 1개를 선택해 적용할 수 있어요.</p>`
+      }
+
+      <div class='cart__couponlist' role='group' aria-label='쿠폰 선택'>
+        ${usableCoupons
+           .map((c) => {
+              const pct = Math.round(Number(c.rate || 0) * 100);
+              const checked = appliedCoupon?.code === c.code ? 'checked' : '';
+              const disabled = canApplyAny ? '' : 'disabled';
+
+              return `
+              <label class='cart__couponitem'>
+                <input
+                  type='radio'
+                  name='cart-coupon'
+                  value='${c.code}'
+                  data-coupon-radio
+                  ${checked}
+                  ${disabled}
+                />
+                <span class='cart__couponmeta'>
+                  <strong>${c.code}</strong> · ${pct}% · ${c.title}
+                </span>
+              </label>
+            `;
+           })
+           .join('')}
+      </div>
+
+      <div class='cart__couponactions'>
+        <button type='button' class='cart__couponbtn' data-coupon-apply ${canApplyAny ? '' : 'disabled'}>
+          적용
+        </button>
+        <button type='button' class='cart__couponbtn' data-coupon-clear ${appliedCoupon ? '' : 'disabled'}>
+          해제
+        </button>
+      </div>
+
+      <p class='cart__couponstatus' data-coupon-msg>
+        ${
+           appliedCoupon
+              ? `적용 중: ${appliedCoupon.code} (${Math.round((appliedCoupon.rate || 0) * 100)}%)`
+              : '현재 적용된 쿠폰 없음'
+        }
+      </p>
+    </div>
+  `;
 }
 
-function saveCouponCode(code) {
-   try {
-      if (!code) localStorage.removeItem(COUPON_STORAGE_KEY);
-      else localStorage.setItem(COUPON_STORAGE_KEY, String(code));
-   } catch {
-      // storage 불가 환경이면 그냥 무시(MVP)
-   }
-}
+function renderCart(detailedItems) {
+   // ✅ couponStore 기준: 적용된 쿠폰 객체
+   const appliedCoupon = couponStore.getAppliedCoupon(); // {code,title,rate} | null
+   const { owned } = couponStore.getState();
 
-/* ==============================
-   렌더
-   ============================== */
+   const {
+      computedRows,
+      subtotalAfterSale,
+      couponDiscountTotal,
+      totalAfterCoupon,
+   } = calcCartPricing(detailedItems, appliedCoupon);
 
-function renderCart(detailedItems, selectedCouponCode) {
-   const subtotal = calcSubtotal(detailedItems);
-   const shipping = calcShipping(subtotal);
+   // ✅ 배송비 기준은 "쿠폰까지 반영된 상품 합계"로 계산
+   const shipping = calcShipping(totalAfterCoupon);
+   const total = totalAfterCoupon + shipping;
 
-   // ✅ 적용 가능한 쿠폰만 보여주기
-   const applicableCoupons = getApplicableCoupons(detailedItems);
-
-   // ✅ 선택된 쿠폰이 현재 장바구니에서 유효한지 확인
-   const selectedCoupon =
-      applicableCoupons.find((c) => c.code === selectedCouponCode) ?? null;
-
-   const eligibleCountForSelected = selectedCoupon
-      ? countEligibleForCoupon(detailedItems, selectedCoupon)
-      : 0;
-
-   const couponDiscount = selectedCoupon
-      ? calcCouponDiscount(detailedItems, selectedCoupon)
-      : 0;
-
-   const total = Math.max(0, subtotal - couponDiscount) + shipping;
+   const eligibleCount = countCouponEligibleLines(detailedItems);
 
    const freeShippingText =
-      subtotal <= 0
+      totalAfterCoupon <= 0
          ? '담긴 상품이 없어요.'
-         : subtotal < FREE_SHIPPING_THRESHOLD
-           ? `무료배송까지 ₩ ${formatPrice(FREE_SHIPPING_THRESHOLD - subtotal)} 남음`
+         : totalAfterCoupon < FREE_SHIPPING_THRESHOLD
+           ? `무료배송까지 ₩ ${formatPrice(FREE_SHIPPING_THRESHOLD - totalAfterCoupon)} 남음`
            : '무료배송 적용 ✅';
 
    const canCheckout = detailedItems.length > 0 && total > 0;
 
    return `
     <div class='cart-layout' aria-label='Cart Layout'>
+      <!-- 왼쪽: 상품 리스트 -->
       <div class='cart__list' aria-label='Cart Items'>
-        ${detailedItems
-           .map(({ key, product, qty, options }) => {
+        ${computedRows
+           .map(({ key, product, qty, options, computed }) => {
               const optionText = [
                  options?.color ? `컬러: ${options.color}` : '',
                  options?.size ? `사이즈: ${options.size}` : '',
@@ -191,72 +222,67 @@ function renderCart(detailedItems, selectedCouponCode) {
                  .filter(Boolean)
                  .join(' · ');
 
+              const hasBaseSale =
+                 Number(product.basePrice ?? 0) > Number(product.price ?? 0);
+
+              const hasCouponDiscount = computed.couponDiscount > 0;
+
               return `
-                <article class='cart-item' data-cart-item data-cart-key='${key}'>
-                  <div class='cart-item__info'>
-                    <p class='cart-item__name'>${product.name}</p>
+              <article class='cart-item' data-cart-item data-cart-key='${key}'>
+                <div class='cart-item__info'>
+                  <p class='cart-item__name'>${product.name}</p>
+
+                  <div class='cart-item__pricebox'>
+                    ${
+                       hasBaseSale
+                          ? `<span class='cart-item__base'>₩ ${formatPrice(product.basePrice)}</span>`
+                          : ''
+                    }
                     <p class='cart-item__price'>₩ ${formatPrice(product.price)}</p>
+
+                    ${
+                       hasCouponDiscount
+                          ? `<p class='cart-item__coupon'>쿠폰 -₩ ${formatPrice(computed.couponDiscount)}</p>`
+                          : ''
+                    }
                   </div>
+                </div>
 
-                  ${optionText ? `<p class='cart-item__meta'>${optionText}</p>` : ''}
+                ${optionText ? `<p class='cart-item__meta'>${optionText}</p>` : ''}
 
-                  <div class='cart-item__controls' aria-label='Quantity Controls'>
-                    <button type='button' data-qty-dec aria-label='Decrease quantity'>-</button>
-                    <span class='cart-item__qty' data-qty>${qty}</span>
-                    <button type='button' data-qty-inc aria-label='Increase quantity'>+</button>
-                  </div>
+                <div class='cart-item__controls' aria-label='Quantity Controls'>
+                  <button type='button' data-qty-dec aria-label='Decrease quantity'>-</button>
+                  <span class='cart-item__qty' data-qty>${qty}</span>
+                  <button type='button' data-qty-inc aria-label='Increase quantity'>+</button>
+                </div>
 
-                  <button type='button' class='cart-item__remove' data-remove aria-label='Remove item'>
-                    삭제
-                  </button>
-                </article>
-              `;
+                <button type='button' class='cart-item__remove' data-remove aria-label='Remove item'>
+                  삭제
+                </button>
+              </article>
+            `;
            })
            .join('')}
       </div>
 
+      <!-- 오른쪽: 요약/결제 -->
       <aside class='cart__summary' aria-label='Cart Summary'>
         <p class='cart__hint'>${freeShippingText}</p>
 
-        <div class='cart__coupon'>
-          <p class='cart__coupon-title'>쿠폰</p>
-
-          <select class='cart__coupon-select' data-coupon-select>
-            <option value=''>선택 안 함</option>
-            ${
-               applicableCoupons.length
-                  ? applicableCoupons
-                       .map(
-                          (c) => `
-                            <option value='${c.code}' ${
-                               c.code === selectedCouponCode ? 'selected' : ''
-                            }>
-                              ${c.label}
-                            </option>
-                          `,
-                       )
-                       .join('')
-                  : `<option value='' disabled>적용 가능한 쿠폰 없음</option>`
-            }
-          </select>
-
-          <p class='cart__coupon-meta'>
-            ${
-               selectedCoupon
-                  ? `쿠폰 적용 (${eligibleCountForSelected}개 상품 가능)`
-                  : '쿠폰 적용 상품을 선택해 주세요'
-            }
-          </p>
-        </div>
+        ${renderCouponSection({
+           owned,
+           appliedCoupon,
+           eligibleCount,
+        })}
 
         <div class='cart__row'>
-          <span>상품 합계</span>
-          <strong>₩ ${formatPrice(subtotal)}</strong>
+          <span>상품 합계(세일 반영)</span>
+          <strong>₩ ${formatPrice(subtotalAfterSale)}</strong>
         </div>
 
         <div class='cart__row'>
           <span>쿠폰 할인</span>
-          <strong>- ₩ ${formatPrice(couponDiscount)}</strong>
+          <strong>-₩ ${formatPrice(couponDiscountTotal)}</strong>
         </div>
 
         <div class='cart__row'>
@@ -273,9 +299,12 @@ function renderCart(detailedItems, selectedCouponCode) {
           전체 비우기
         </button>
 
-        <button type='button' class='cart__checkout' ${
-           canCheckout ? '' : 'disabled'
-        }>
+        <button
+          type='button'
+          class='cart__checkout'
+          ${canCheckout ? '' : 'disabled'}
+          data-checkout
+        >
           구매하기 ${canCheckout ? '' : '(조건 미충족)'}
         </button>
       </aside>
@@ -284,70 +313,82 @@ function renderCart(detailedItems, selectedCouponCode) {
 }
 
 /* ==============================
-   init
+   3) Page init
    ============================== */
 
 export async function initCartPage() {
    const cartEl = document.querySelector('[data-cart]');
    if (!cartEl) return;
 
-   // ✅ 새로고침 유지: 저장된 쿠폰 코드 불러오기
-   let selectedCouponCode = loadSavedCouponCode();
+   let paintSeq = 0;
 
    async function paint() {
+      const seq = ++paintSeq;
+
       const detailed = await cartStore.getDetailedItems();
+      // ✅ 느린 응답이 먼저 와서 덮어쓰는 문제 방지
+      if (seq !== paintSeq) return;
 
-      if (!detailed.length) {
-         cartEl.innerHTML = renderEmpty();
-         return;
-      }
-
-      // ✅ 현재 장바구니 기준으로 선택 쿠폰 유효성 검증
-      const applicableCoupons = getApplicableCoupons(detailed);
-      const isValid = applicableCoupons.some(
-         (c) => c.code === selectedCouponCode,
-      );
-
-      // 유효하지 않으면 초기화(장바구니 구성 바뀌면 발생 가능)
-      if (selectedCouponCode && !isValid) {
-         selectedCouponCode = '';
-         saveCouponCode('');
-      }
-
-      cartEl.innerHTML = renderCart(detailed, selectedCouponCode);
+      cartEl.innerHTML = detailed.length ? renderCart(detailed) : renderEmpty();
    }
 
+   // 1) 최초 렌더
    await paint();
 
-   cartStore.subscribe(async () => {
-      await paint();
-   });
+   // 2) 상태 변화 시 자동 갱신
+   cartStore.subscribe(() => paint());
+   couponStore.subscribe(() => paint());
 
-   cartEl.addEventListener('change', async (e) => {
-      const select = e.target.closest('[data-coupon-select]');
-      if (!select) return;
-
-      selectedCouponCode = String(select.value || '');
-      saveCouponCode(selectedCouponCode); // ✅ 선택값 저장
-
-      await paint();
-   });
-
+   // 3) 이벤트 위임
    cartEl.addEventListener('click', (e) => {
+      // 전체 비우기
       if (e.target.closest('[data-cart-clear]')) {
          cartStore.clear();
          return;
       }
 
+      // 쿠폰 적용
+      if (e.target.closest('[data-coupon-apply]')) {
+         const radio = cartEl.querySelector('input[data-coupon-radio]:checked');
+         const msgEl = cartEl.querySelector('[data-coupon-msg]');
+
+         const code = String(radio?.value || '')
+            .trim()
+            .toUpperCase();
+         const result = couponStore.apply(code);
+
+         if (msgEl) msgEl.textContent = result.message;
+         return;
+      }
+
+      // 쿠폰 해제
+      if (e.target.closest('[data-coupon-clear]')) {
+         couponStore.clearApplied();
+         return;
+      }
+
+      // (MVP) 구매하기: 실제 결제는 없으니, 적용 쿠폰이 있으면 "사용 처리" 흉내
+      if (e.target.closest('[data-checkout]')) {
+         const applied = couponStore.getAppliedCoupon();
+         if (applied?.code) {
+            couponStore.markUsed(applied.code);
+         }
+         // 여기서 결제 완료 페이지/토스트로 확장 가능
+         return;
+      }
+
+      // 라인 아이템 조작(key 기준)
       const itemEl = e.target.closest('[data-cart-item]');
       const key = itemEl?.getAttribute('data-cart-key');
       if (!key) return;
 
+      // 삭제
       if (e.target.closest('[data-remove]')) {
          cartStore.remove(key);
          return;
       }
 
+      // 수량 증가/감소
       const state = cartStore.getState();
       const current = state.items.find((it) => it.key === key)?.qty || 1;
 

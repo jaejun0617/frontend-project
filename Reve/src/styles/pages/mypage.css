@@ -1,0 +1,133 @@
+/* MyPage layout + tabs/panels */
+
+.mypage__layout {
+   display: grid;
+   gap: 16px;
+}
+
+@media (min-width: 900px) {
+   .mypage__layout {
+      grid-template-columns: 260px minmax(0, 1fr);
+      align-items: start;
+   }
+}
+
+.mypage__nav {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   background: rgba(255, 255, 255, 0.95);
+   padding: 10px;
+}
+
+.mypage__tabs {
+   list-style: none;
+   margin: 0;
+   padding: 0;
+   display: grid;
+   gap: 8px;
+}
+
+.mypage__tab {
+   width: 100%;
+   text-align: left;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.1);
+   background: rgba(0, 0, 0, 0.02);
+   padding: 12px 12px;
+   cursor: pointer;
+   font-weight: 700;
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 8px;
+}
+
+.mypage__tab:hover {
+   background: rgba(0, 0, 0, 0.04);
+}
+
+.mypage__tab.is-active {
+   background: rgba(0, 0, 0, 0.06);
+   border-color: rgba(0, 0, 0, 0.18);
+}
+
+.mypage__tab:disabled {
+   opacity: 0.55;
+   cursor: not-allowed;
+}
+
+.mypage__soon {
+   font-size: 12px;
+   font-weight: 800;
+   opacity: 0.8;
+   border: 1px solid rgba(0, 0, 0, 0.18);
+   border-radius: 999px;
+   padding: 4px 8px;
+   background: rgba(255, 255, 255, 0.9);
+}
+
+.mypage__main {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   background: rgba(255, 255, 255, 0.95);
+   padding: 14px;
+}
+
+.mypage__panel {
+   display: none;
+}
+
+.mypage__panel.is-active {
+   display: block;
+}
+
+.mypage__section {
+   display: grid;
+   gap: 10px;
+   padding: 10px 0;
+}
+
+.mypage__section + .mypage__section {
+   border-top: 1px solid rgba(0, 0, 0, 0.08);
+   margin-top: 10px;
+}
+
+.mypage__sectionTitle {
+   margin: 0;
+   font-size: 16px;
+   font-weight: 800;
+}
+
+.mypage__sectionDesc {
+   margin: 0;
+   opacity: 0.78;
+   font-size: 13px;
+}
+
+/* empty / todo */
+.empty {
+   padding: 16px;
+   border-radius: 16px;
+   border: 1px dashed rgba(0, 0, 0, 0.18);
+   background: rgba(0, 0, 0, 0.02);
+}
+
+.empty__title {
+   margin: 0;
+   font-weight: 900;
+}
+
+.empty__desc {
+   margin: 6px 0 0;
+   opacity: 0.75;
+   font-size: 13px;
+}
+
+.mypage__todo {
+   border-radius: 16px;
+   border: 1px dashed rgba(0, 0, 0, 0.18);
+   background: rgba(0, 0, 0, 0.02);
+   padding: 14px;
+   font-size: 13px;
+   opacity: 0.85;
+}

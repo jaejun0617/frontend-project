@@ -1,0 +1,98 @@
+/* Header / Navigation (모바일 우선) */
+
+.site-header {
+   width: 100%;
+   height: 6svh;
+   position: fixed;
+   top: 0;
+   left: 0;
+   right: 0;
+   padding: 0rem 1rem;
+   z-index: 9999;
+   background-color: rgba(255, 255, 255, 0.72);
+   backdrop-filter: blur(12px);
+   -webkit-backdrop-filter: blur(12px);
+}
+
+.site-nav {
+   width: 100%;
+   height: 100%;
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+}
+
+.site-logo img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover;
+   display: block;
+}
+
+/* 아이콘 링크 공통(데스크/모바일 공용) */
+.nav-menu-icons a,
+.mobile-icons a {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   cursor: pointer;
+   padding: 8px;
+   border-radius: 10px;
+   transition: background-color 150ms ease;
+}
+
+.nav-menu-icons a:hover,
+.mobile-icons a:hover {
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+.nav-menu-icons a:focus-visible,
+.mobile-icons a:focus-visible {
+   outline: 2px solid rgba(0, 0, 0, 0.35);
+   outline-offset: 2px;
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+.nav-menu-list {
+   display: none;
+}
+
+.nav-menu-icons {
+   display: flex;
+   gap: 12px;
+}
+
+.site-menu-bar {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+
+   padding: 8px;
+   border-radius: 10px;
+   background: transparent;
+   border: 0;
+
+   cursor: pointer;
+   transition: background-color 150ms ease;
+}
+
+.site-menu-bar:hover {
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+.site-menu-bar:focus-visible {
+   outline: 2px solid rgba(0, 0, 0, 0.35);
+   outline-offset: 2px;
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* 로그인/권한에 따라 노출할 아이콘(초기 숨김) */
+.admin-icon,
+.mypage-icon {
+   display: none;
+}
+
+.site-footer {
+   height: 6svh;
+   border-top: 1px solid #c8c8c8;
+}
