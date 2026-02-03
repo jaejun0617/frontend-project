@@ -553,12 +553,51 @@ export async function initCartPage() {
          return;
       }
 
-      // ✅ 구매하기
+      // ✅ 구매하기 - 모달 확인 → Mock 결제 → 완료 모달
       if (e.target.closest('[data-checkout]')) {
          const detailed = await cartStore.getDetailedItems();
          if (!detailed.length) return;
 
-         await handleCheckout({ detailedItems: detailed });
+         // 1) 결제 전 확인 모달
+         const okPay = await confirmModal({
+            title: '결제 확인',
+            message: '결제를 진행할까요?',
+            confirmText: '결제하기',
+            cancelText: '취소',
+         });
+
+         if (!okPay) return;
+
+         // 2) 결제 진행 (Mock)
+         const result = await handleCheckout({ detailedItems: detailed });
+
+         if (!result?.ok) {
+            toast.show('결제에 실패했어요. 잠시 후 다시 시도해 주세요.', {
+               duration: 1600,
+            });
+            return;
+         }
+
+         // 3) 결제 완료 모달(요약)
+         const pricing = result?.payload?.pricing;
+         const coupon = result?.payload?.coupon;
+
+         const summaryLines = [
+            coupon?.code
+               ? `🎫 사용 쿠폰: ${coupon.code}`
+               : '🎫 사용 쿠폰: 없음',
+            `🚚 배송비: ₩ ${formatPrice(pricing?.shipping ?? 0)}`,
+            `💳 최종 결제: ₩ ${formatPrice(pricing?.total ?? 0)}`,
+         ].join('\n');
+
+         await confirmModal({
+            title: '결제 완료 ✅',
+            message: `결제가 완료되었습니다.\n\n${summaryLines}`,
+            confirmText: '확인',
+            cancelText: '닫기',
+         });
+
+         // handleCheckout 내부에서 cartStore.clear()까지 끝났으므로 여기서 추가 처리 필요 없음
          return;
       }
       // ✅ 사이즈 변경 (pill 클릭) - 모달 확인 후 변경
