@@ -1,9 +1,9 @@
 /**
  * =============================================
  * 📍 위치: src/components/ProductCard.js
- * 역할: 상품 카드 UI + 리스트에서 "사이즈 칩" 선택 지원
- * - 컬러 옵션 제거
- * - 사이즈 선택은 버튼 칩(원형) UI
+ * 역할: 상품 카드 UI + 리스트에서 옵션 선택 지원
+ * - 장바구니 버튼을 아이콘(favorite.svg)으로 변경
+ * - 하단 고정(absolute)용 래퍼 제공
  * =============================================
  */
 
@@ -40,12 +40,7 @@ function getSizeOptions(product) {
       : [];
    const shoe = Array.isArray(product?.shoeSizes) ? product.shoeSizes : [];
    const shoeText = shoe.map((s) => String(s));
-
-   const all = [...apparel, ...shoeText]
-      .map((v) => String(v).trim())
-      .filter(Boolean);
-
-   return Array.from(new Set(all));
+   return [...apparel, ...shoeText];
 }
 
 export function ProductCard(product) {
@@ -63,91 +58,89 @@ export function ProductCard(product) {
 
    const displayTags = getDisplayTags(product);
 
+   // ✅ 컬러 제거: 사이즈만 지원
    const sizes = getSizeOptions(product);
-   const hasSizes = sizes.length > 0;
+   const defaultSize = sizes[0] ? String(sizes[0]) : '';
+   const hasSize = Boolean(defaultSize);
 
    return `
- <article
-   class="product-card"
-   data-product-id="${safeId}"
-   data-has-size="${hasSizes ? '1' : '0'}"
-   data-selected-size=""
- >
-   <a
-     class="product-card__thumb"
-     href="/product/${safeId}"
-     data-link
-     aria-label="${escapeHtml(rawName)} 상세 보기"
-   ></a>
+  <article class="product-card" data-product-id="${safeId}" data-selected-size="${escapeHtml(defaultSize)}">
+    <a
+      class="product-card__thumb"
+      href="/product/${safeId}"
+      data-link
+      aria-label="${escapeHtml(rawName)} 상세 보기"
+    ></a>
 
-   <div class="product-card__body">
-     <h3 class="product-card__name">
-       <a href="/product/${safeId}" data-link>${safeName}</a>
-     </h3>
+    <div class="product-card__body">
+      <h3 class="product-card__name">
+        <a href="/product/${safeId}" data-link>${safeName}</a>
+      </h3>
 
-     <div class="product-card__pricebox">
-       ${
-          isDiscounted
-             ? `
-             <p class="product-card__base" aria-label="정가">₩ ${formatKRW(basePrice)}</p>
-             <p class="product-card__price" aria-label="할인가">
-               ₩ ${formatKRW(price)}
-               <span class="product-card__discount" aria-label="할인율">-${percent}%</span>
-             </p>
-           `
-             : `<p class="product-card__price">₩ ${formatKRW(price)}</p>`
-       }
-     </div>
+      <div class="product-card__pricebox">
+        ${
+           isDiscounted
+              ? `
+              <p class="product-card__base" aria-label="정가">₩ ${formatKRW(basePrice)}</p>
+              <p class="product-card__price" aria-label="할인가">
+                ₩ ${formatKRW(price)}
+                <span class="product-card__discount" aria-label="할인율">-${percent}%</span>
+              </p>
+            `
+              : `<p class="product-card__price">₩ ${formatKRW(price)}</p>`
+        }
+      </div>
 
-     <ul class="product-card__tags" aria-label="Product Tags">
-       ${
-          displayTags.length
-             ? displayTags
-                  .map((t) => `<li class="product-tag">#${escapeHtml(t)}</li>`)
-                  .join('')
-             : ''
-       }
-     </ul>
+      <ul class="product-card__tags" aria-label="Product Tags">
+        ${
+           displayTags.length
+              ? displayTags
+                   .map((t) => `<li class="product-tag">#${escapeHtml(t)}</li>`)
+                   .join('')
+              : ''
+        }
+      </ul>
 
-     ${
-        hasSizes
-           ? `
-           <div class="product-card__options" aria-label="사이즈 선택">
-             <div class="pc-opt__head">
-               <span class="pc-opt__label">사이즈</span>
-               <span class="pc-opt__hint" data-size-hint hidden>사이즈를 선택해 주세요</span>
-             </div>
-
-             <div class="pc-sizes" role="radiogroup" aria-label="사이즈 옵션">
-               ${sizes
-                  .map((s) => {
-                     const v = String(s).trim();
-                     return `
-                       <button
-                         type="button"
-                         class="pc-size"
-                         data-size-pill
-                         data-size-value="${escapeHtml(v)}"
-                         role="radio"
-                         aria-checked="false"
-                       >
-                         ${escapeHtml(v)}
-                       </button>
-                     `;
-                  })
-                  .join('')}
-             </div>
-           </div>
-         `
-           : ''
-     }
-
-     <div class="product-card__actions">
-       <button type="button" class="btn-add-cart" data-add-cart>
-         장바구니
-       </button>
-     </div>
-   </div>
- </article>
- `;
+      ${
+         hasSize
+            ? `
+          <div class="product-card__sizes" aria-label="사이즈 선택" data-size-pills>
+            ${sizes
+               .map((s, idx) => {
+                  const v = String(s).trim();
+                  if (!v) return '';
+                  const isSelected = idx === 0; // 기본값 첫번째
+                  return `
+                  <button
+                    type="button"
+                    class="size-pill ${isSelected ? 'is-active' : ''}"
+                    data-size-pill
+                    data-size-value="${escapeHtml(v)}"
+                    aria-pressed="${isSelected ? 'true' : 'false'}"
+                  >
+                    ${escapeHtml(v)}
+                  </button>
+                `;
+               })
+               .join('')}
+          </div> 
+        `
+            : ''
+      }
+               <div class='br'></div>
+      <!-- ✅ 하단 고정 액션 영역 -->
+      <div class="product-card__floating">
+        <button
+          type="button"
+          class="cart-fav-btn"
+          data-add-cart
+          aria-label="장바구니 담기"
+          title="장바구니 담기"
+        >
+          <img src="/src/icons/favorite.svg" alt="" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  </article>
+  `;
 }

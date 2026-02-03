@@ -25,6 +25,7 @@
    border: 1px solid rgba(0, 0, 0, 0.08);
    border-radius: 16px;
    overflow: hidden;
+   position: relative;
    background: #fff;
    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
    transition:
@@ -166,66 +167,82 @@
    outline-offset: 2px;
 }
 
-/* ===== ProductCard Size Chips ===== */
-.product-card__options {
-   margin-top: 10px;
-}
-
-.pc-opt__head {
-   display: flex;
-   align-items: center;
-   justify-content: space-between;
-   margin-bottom: 8px;
-}
-
-.pc-opt__label {
-   font-size: 12px;
-   font-weight: 600;
-   opacity: 0.75;
-}
-
-.pc-opt__hint {
-   font-size: 12px;
-   font-weight: 600;
-   opacity: 0.9;
-}
-
-.pc-sizes {
+/* 사이즈 pills (원하는 스타일 느낌) */
+.product-card__sizes {
    display: flex;
    gap: 10px;
-   flex-wrap: wrap;
+   padding-top: 10px;
+   /* border: 1px solid red; */
 }
 
-.pc-size {
-   width: 32px;
-   height: 32px;
+/* 둥근 테두리 pill */
+.size-pill {
+   width: 44px;
+   height: 44px;
    border-radius: 999px;
-   border: 2px solid rgba(0, 0, 0, 0.12);
+   border: 1px solid rgba(0, 0, 0, 0.14);
    background: #fff;
    cursor: pointer;
-   font-weight: 700;
-   font-size: 14px;
-   line-height: 1;
+   font-weight: 600;
+   transition:
+      transform 120ms ease,
+      background-color 120ms ease,
+      border-color 120ms ease;
+}
+
+.size-pill:hover {
+   transform: translateY(-1px);
+}
+
+.size-pill.is-active {
+   border-color: rgba(0, 0, 0, 0.45);
+}
+
+/* ✅ 하단 고정 액션 영역 */
+.product-card__floating {
+   position: absolute;
+   right: 12px;
+   bottom: 12px;
+   z-index: 2;
+}
+
+/* ✅ 아이콘 버튼 */
+.cart-fav-btn {
+   width: 44px;
+   height: 44px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(255, 255, 255, 0.92);
    display: inline-flex;
    align-items: center;
    justify-content: center;
+   cursor: pointer;
    transition:
-      transform 120ms ease,
-      border-color 120ms ease,
-      background-color 120ms ease;
+      background-color 150ms ease,
+      border-color 150ms ease,
+      transform 120ms ease;
 }
 
-.pc-size:hover {
+.cart-fav-btn:hover {
    transform: translateY(-1px);
-   border-color: rgba(0, 0, 0, 0.25);
 }
 
-.pc-size.is-selected {
-   border-color: rgba(0, 0, 0, 0.55);
-   background: rgba(0, 0, 0, 0.03);
+.cart-fav-btn img {
+   width: 20px;
+   height: 20px;
+   display: block;
 }
 
-.pc-size:focus-visible {
-   outline: 2px solid rgba(0, 0, 0, 0.35);
-   outline-offset: 2px;
+/* ✅ 담김 상태: 빨간 배경 */
+.cart-fav-btn.is-added {
+   background: #ff3b30;
+   border-color: #ff3b30;
+}
+
+.cart-fav-btn.is-added img {
+   filter: brightness(0) invert(1);
+}
+
+.br {
+   padding-top: 35px;
 }

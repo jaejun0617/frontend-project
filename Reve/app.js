@@ -295,18 +295,18 @@ document.addEventListener('click', (e) => {
    const card = pill.closest('[data-product-id]');
    if (!card) return;
 
-   const value = String(pill.getAttribute('data-size-value') || '').trim();
-   card.setAttribute('data-selected-size', value);
-
-   // ✅ 같은 카드 내부의 모든 pill 상태 초기화 후, 클릭한 것만 선택
+   // 같은 카드 안 pill들 active 정리
    card.querySelectorAll('[data-size-pill]').forEach((btn) => {
-      const isOn = btn === pill;
-      btn.classList.toggle('is-selected', isOn);
-      btn.setAttribute('aria-checked', isOn ? 'true' : 'false');
+      btn.classList.remove('is-active');
+      btn.setAttribute('aria-pressed', 'false');
    });
 
-   // (선택) "사이즈 선택해주세요" 같은 힌트가 있으면 숨김
-   card.querySelector('[data-size-hint]')?.setAttribute('hidden', '');
+   pill.classList.add('is-active');
+   pill.setAttribute('aria-pressed', 'true');
+
+   // 선택값 저장(장바구니 담기에서 읽음)
+   const size = String(pill.getAttribute('data-size-value') || '').trim();
+   card.setAttribute('data-selected-size', size);
 });
 
 /**
@@ -329,38 +329,28 @@ document.addEventListener('click', async (e) => {
    const productId = card?.getAttribute('data-product-id');
    if (!productId) return;
 
-   // ✅ 카드에서 선택된 사이즈 읽기
-   // - 구버전(select)과 신버전(data-selected-size) 둘 다 대응
-   const size =
-      card?.querySelector('[data-opt-size]')?.value ??
-      card?.getAttribute('data-selected-size') ??
+   // ✅ 사이즈 선택 필요 상품: 선택 안 했으면 토스트 후 중단
+   const selectedSize =
+      card?.getAttribute('data-selected-size') ||
+      card
+         ?.querySelector('.size-pill.is-active')
+         ?.getAttribute('data-size-value') ||
       '';
 
-   // ✅ 사이즈가 있는 상품이면, 선택 안 했을 때 차단
-   const hasSize = card?.getAttribute('data-has-size') === '1';
-   const selectedSize = String(size || '').trim();
-
-   if (hasSize && !selectedSize) {
-      // (선택) 카드 내 힌트 표시
-      card?.querySelector('[data-size-hint]')?.removeAttribute('hidden');
-
-      toast.show('사이즈를 선택해야 장바구니에 담을 수 있어요 👟', {
-         duration: 1600,
-      });
+   const hasSizes = Boolean(card?.querySelector('[data-size-pills]'));
+   if (hasSizes && !selectedSize) {
+      toast.show('사이즈를 선택해야 장바구니에 담을 수 있어요.');
       return;
    }
 
-   // ✅ 담기 (options에 size 포함)
    await cartStore.addById(productId, 1, { size: selectedSize });
 
-   // UX 피드백 + 토스트
-   btn.textContent = '담김 ✓';
-   btn.disabled = true;
+   // ✅ 담김 UI: 아이콘 빨간 배경 + 토스트
+   btn.classList.add('is-added');
+   toast.show('장바구니에 담겼어요');
 
-   toast.show('장바구니에 담겼어요', { duration: 1400 });
-
+   // 원하면 1.4초 뒤 원복(원복 싫으면 이 부분 삭제)
    setTimeout(() => {
-      btn.textContent = '장바구니';
-      btn.disabled = false;
+      btn.classList.remove('is-added');
    }, 1400);
 });
