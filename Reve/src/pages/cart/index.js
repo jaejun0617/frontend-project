@@ -32,6 +32,50 @@ const FREE_SHIPPING_THRESHOLD = 300000;
 const SHIPPING_FEE = 3000;
 
 /* ==============================
+   Membership (Grade) Utils
+   ============================== */
+
+// ✅ 등급 기준(원화)
+// - 실버: 300만원 미만
+// - 골드: 300~600만원 미만
+// - 로얄: 600~1200만원 미만
+// - VIP: 1200만원 이상
+// (추후 VVIP/VVVIP까지 확장 가능: 여기에만 추가하면 됨)
+const MEMBERSHIP_TIERS = [
+   { name: '실버', min: 0 },
+   { name: '골드', min: 3_000_000 },
+   { name: '로얄', min: 6_000_000 },
+   { name: 'VIP', min: 12_000_000 },
+];
+
+function clampMoney(n) {
+   const v = Number(n || 0);
+   return Number.isFinite(v) ? Math.max(0, v) : 0;
+}
+
+function getTierInfo(totalSpent) {
+   const spent = clampMoney(totalSpent);
+
+   // min 기준 오름차순 정렬 전제
+   let current = MEMBERSHIP_TIERS[0];
+   for (const t of MEMBERSHIP_TIERS) {
+      if (spent >= t.min) current = t;
+   }
+
+   const idx = MEMBERSHIP_TIERS.findIndex((t) => t.name === current.name);
+   const next = idx >= 0 ? MEMBERSHIP_TIERS[idx + 1] : null;
+
+   const remainToNext = next ? Math.max(0, next.min - spent) : 0;
+
+   return {
+      current,
+      next: next || null,
+      remainToNext,
+      spent,
+   };
+}
+
+/* ==============================
    1) Page Template
    ============================== */
 
@@ -578,9 +622,20 @@ export async function initCartPage() {
             return;
          }
 
-         // 3) 결제 완료 모달(요약)
+         // 3) 결제 완료 모달(요약 + 등급)
          const pricing = result?.payload?.pricing;
          const coupon = result?.payload?.coupon;
+
+         // ✅ 결제 후 최신 유저 totalSpent 기준으로 등급 계산
+         const user = authStore.getUser?.();
+         const tier = getTierInfo(user?.totalSpent ?? 0);
+
+         const tierLines = [
+            `🏷️ 현재 등급: ${tier.current.name}`,
+            tier.next
+               ? `⬆️ 다음 등급(${tier.next.name})까지 ₩ ${formatPrice(tier.remainToNext)} 남았어요`
+               : '👑 최고 등급이에요. 유지하면 혜택이 계속 적용돼요!',
+         ].join('\n');
 
          const summaryLines = [
             coupon?.code
@@ -592,7 +647,7 @@ export async function initCartPage() {
 
          await confirmModal({
             title: '결제 완료 ✅',
-            message: `결제가 완료되었습니다.\n\n${summaryLines}`,
+            message: `결제가 완료되었습니다.\n\n${summaryLines}\n\n${tierLines}`,
             confirmText: '확인',
             cancelText: '닫기',
          });
