@@ -1,31 +1,29 @@
 /**
  * =============================================
  * 📍 위치: src/store/couponStore.js
- * 역할: 쿠폰 전역 상태 + localStorage 영속화
+ * 역할: 쿠폰 전역 상태 + localStorage 영속화 (유저별 분리)
  *
- * ✅ 기능
- * - 쿠폰 등록(register): 코드 입력 → 보유 쿠폰 추가
- * - 쿠폰 적용(apply): 보유 쿠폰 중 1개를 cart에 적용
- * - 쿠폰 해제(clearApplied)
- * - 쿠폰 사용 처리(markUsed): 결제 시점에 "사용됨"으로 변경
- * - 새로고침 유지(owned/appliedCode)
+ * ✅ 핵심
+ * - storage key: reve_coupons_v1:<ownerKey>
+ * - ownerKey: userId 또는 'guest'
+ * - auth 변경 시 couponStore.setOwner(userId) 호출하면 자동 스위칭
  *
- * ✅ 설계 포인트
- * - Catalog(서버 대체)만 바꾸면 운영/DB 연동 가능
- * - state shape 고정: { owned: Coupon[], appliedCode: string }
- * - appliedCode는 항상 "유효한 보유/미사용 쿠폰"만 유지되도록 정리
+ * ✅ 마이그레이션
+ * - 레거시 글로벌 키(eclat_coupons_v2/v1)가 있으면
+ *   현재 ownerKey로 1회 옮기고 레거시 키 삭제
  * =============================================
  */
 
-const STORAGE_KEY_V2 = 'eclat_coupons_v2';
-const STORAGE_KEY_V1 = 'eclat_coupons_v1';
+const STORAGE_PREFIX = 'reve_coupons_v1:'; // ✅ 유저별 키 prefix
+const LEGACY_KEY_V2 = 'eclat_coupons_v2'; // ✅ 기존 글로벌 키(레거시)
+const LEGACY_KEY_V1 = 'eclat_coupons_v1';
+
+let ownerKey = 'guest';
 
 /**
  * ✅ 쿠폰 카탈로그(서버 대체)
- * - 나중에 DB/서버로 바꿔도 store API는 그대로 두면 됨
+ * - 운영 정책은 여기만 바꾸면 됨
  */
-// couponStore.js 내부 COUPON_CATALOG에 추가
-
 const COUPON_CATALOG = {
    HELLOWORLD: {
       code: 'HELLOWORLD',
@@ -34,7 +32,7 @@ const COUPON_CATALOG = {
       description: '기본 세일 + 추가 10% 쿠폰 할인',
    },
 
-   // ✅ 승급 축하 쿠폰(정책은 여기서만 관리)
+   // ✅ 승급 축하 쿠폰
    UPGRADE_GOLD: {
       code: 'UPGRADE_GOLD',
       title: '골드 승급 축하 7%',
@@ -54,8 +52,9 @@ const COUPON_CATALOG = {
       description: 'VIP 승급 기념 추가 12% 할인',
    },
 };
+
 /* ==============================
-   0) localStorage 유틸
+   0) localStorage Utils
    ============================== */
 
 function hasStorage() {
@@ -82,6 +81,20 @@ function readRaw(key) {
 function writeRaw(key, value) {
    if (!hasStorage()) return;
    window.localStorage.setItem(key, value);
+}
+
+function removeRaw(key) {
+   if (!hasStorage()) return;
+   window.localStorage.removeItem(key);
+}
+
+function normalizeOwnerKey(v) {
+   const k = String(v ?? '').trim();
+   return k ? k : 'guest';
+}
+
+function getStorageKey(okey = ownerKey) {
+   return `${STORAGE_PREFIX}${normalizeOwnerKey(okey)}`;
 }
 
 function normalizeCode(code) {
@@ -113,7 +126,7 @@ function clampRate(n) {
  */
 
 /* ==============================
-   1) 정규화/마이그레이션
+   1) Normalize
    ============================== */
 
 function normalizeOwnedList(list) {
@@ -135,7 +148,7 @@ function normalizeOwnedList(list) {
       })
       .filter(Boolean);
 
-   // code 기준 중복 제거(최신 createdAt 우선)
+   // code 중복 제거(최신 createdAt 우선)
    const map = new Map();
    normalized.forEach((c) => {
       const prev = map.get(c.code);
@@ -150,7 +163,7 @@ function normalizeState(raw) {
    const owned = normalizeOwnedList(raw?.owned);
    const appliedCode = normalizeCode(raw?.appliedCode);
 
-   // appliedCode가 유효한지 최종 정리(보유/미사용만 유지)
+   // appliedCode는 "보유 + 미사용"만 유지
    const appliedOwned = owned.find((c) => c.code === appliedCode);
    const safeApplied = appliedOwned && !appliedOwned.used ? appliedCode : '';
 
@@ -160,42 +173,75 @@ function normalizeState(raw) {
    });
 }
 
-/**
- * v2 → v1 순으로 읽고,
- * v1이 있으면 v2로 승격 저장
- */
-function readState() {
-   const v2 = safeParse(readRaw(STORAGE_KEY_V2) || '');
-   if (v2) return normalizeState(v2);
+/* ==============================
+   2) Read/Write (per owner)
+   ============================== */
 
-   const v1 = safeParse(readRaw(STORAGE_KEY_V1) || '');
-   const normalized = normalizeState(v1);
-
-   // v1 -> v2 승격 저장(한 번만)
-   if (v1 && hasStorage()) {
-      writeRaw(STORAGE_KEY_V2, JSON.stringify(normalized));
-   }
-
-   return normalized;
+function readStateByOwner(okey) {
+   const key = getStorageKey(okey);
+   const raw = safeParse(readRaw(key) || '');
+   return normalizeState(raw);
 }
 
-function writeState(nextState) {
-   writeRaw(STORAGE_KEY_V2, JSON.stringify(nextState));
+function writeStateByOwner(okey, nextState) {
+   const key = getStorageKey(okey);
+   writeRaw(key, JSON.stringify(nextState));
+}
+
+/**
+ * ✅ 레거시 글로벌 키 -> 현재 ownerKey로 1회 마이그레이션
+ * - 유저별 분리 전 프로젝트에서 이미 저장된 쿠폰이 있다면 살려서 옮김
+ * - 옮긴 후 레거시 키 삭제(중복 노출/재오염 방지)
+ */
+function migrateLegacyIntoOwner(okey) {
+   if (!hasStorage()) return false;
+
+   const legacyV2 = safeParse(readRaw(LEGACY_KEY_V2) || '');
+   const legacyV1 = safeParse(readRaw(LEGACY_KEY_V1) || '');
+
+   const legacy = legacyV2 || legacyV1;
+   if (!legacy) return false;
+
+   const normalizedLegacy = normalizeState(legacy);
+
+   // ✅ 현재 owner 저장이 비어있을 때만 옮기는 게 안전
+   const current = readStateByOwner(okey);
+   const hasAny =
+      (current.owned?.length || 0) > 0 || Boolean(current.appliedCode);
+
+   if (!hasAny) {
+      writeStateByOwner(okey, normalizedLegacy);
+   }
+
+   // ✅ 레거시 삭제: 이제부터는 유저별 key만 신뢰
+   removeRaw(LEGACY_KEY_V2);
+   removeRaw(LEGACY_KEY_V1);
+
+   return true;
 }
 
 /* ==============================
-   2) Store 상태 + 구독
+   3) Store Core
    ============================== */
 
-let state = readState();
+let state = (() => {
+   // ✅ 최초는 guest로 읽기
+   const s = readStateByOwner(ownerKey);
+
+   // ✅ 레거시가 있으면 guest로 한번 옮겨줌(초기 진입 보호)
+   // (로그인 되면 setOwner에서 다시 해당 유저로 읽음)
+   const hasAny = (s.owned?.length || 0) > 0 || Boolean(s.appliedCode);
+   if (!hasAny) migrateLegacyIntoOwner(ownerKey);
+
+   return readStateByOwner(ownerKey);
+})();
 
 /** @type {Set<(state: CouponState) => void>} */
 const listeners = new Set();
 
 function notify() {
-   // 저장 + applied 정리(안정성)
    state = normalizeState(state);
-   writeState(state);
+   writeStateByOwner(ownerKey, state);
    listeners.forEach((fn) => fn(state));
 }
 
@@ -218,6 +264,36 @@ function fail(message) {
 }
 
 export const couponStore = {
+   /* ------------------------------
+      owner switching (핵심)
+   ------------------------------ */
+
+   /**
+    * ✅ 로그인/로그아웃 시 호출
+    * - userId 없으면 guest로 스위칭
+    * - 스위칭 시 해당 owner의 state를 다시 로드 + notify
+    */
+   setOwner(userId) {
+      const nextOwner = normalizeOwnerKey(userId || 'guest');
+      if (nextOwner === ownerKey) return;
+
+      ownerKey = nextOwner;
+
+      // ✅ 레거시가 남아 있으면 "현재 로그인 유저"쪽으로도 1회 이동 시도
+      migrateLegacyIntoOwner(ownerKey);
+
+      state = readStateByOwner(ownerKey);
+      listeners.forEach((fn) => fn(state));
+   },
+
+   getOwner() {
+      return ownerKey;
+   },
+
+   /* ------------------------------
+      subscribe / getters
+   ------------------------------ */
+
    subscribe(listener) {
       listeners.add(listener);
       listener(state);
@@ -232,13 +308,13 @@ export const couponStore = {
       return COUPON_CATALOG;
    },
 
-   getOwned() {
-      return state.owned;
+   getOwned({ includeUsed = true } = {}) {
+      if (includeUsed) return state.owned;
+      return state.owned.filter((c) => !c.used);
    },
 
    /**
-    * 적용된 쿠폰 객체 반환 (없으면 null)
-    * - used 쿠폰이면 자동 null
+    * ✅ 적용된 쿠폰 객체 반환 (없으면 null)
     */
    getAppliedCoupon() {
       const code = normalizeCode(state.appliedCode);
@@ -254,10 +330,10 @@ export const couponStore = {
       };
    },
 
-   /**
-    * 쿠폰 등록
-    * @returns {{ok: boolean, message: string}}
-    */
+   /* ------------------------------
+      commands
+   ------------------------------ */
+
    register(codeInput) {
       const code = normalizeCode(codeInput);
       if (!code) return fail('쿠폰 코드를 입력해 주세요.');
@@ -282,10 +358,6 @@ export const couponStore = {
       return ok(`쿠폰 등록 완료: ${next.code}`);
    },
 
-   /**
-    * 쿠폰 적용(보유 쿠폰 중 1개)
-    * @returns {{ok: boolean, message: string}}
-    */
    apply(codeInput) {
       const code = normalizeCode(codeInput);
       if (!code) return fail('적용할 쿠폰을 선택해 주세요.');
@@ -306,10 +378,6 @@ export const couponStore = {
       notify();
    },
 
-   /**
-    * 결제 완료 시점에 호출(사용 처리)
-    * - 적용 중이었다면 자동 해제
-    */
    markUsed(codeInput) {
       const code = normalizeCode(codeInput);
       if (!code) return;
@@ -327,10 +395,6 @@ export const couponStore = {
       notify();
    },
 
-   /**
-    * (운영 편의) 보유 쿠폰 삭제
-    * - MVP에선 잘 안 쓰지만 관리 기능 붙일 때 유용
-    */
    removeOwned(codeInput) {
       const code = normalizeCode(codeInput);
       if (!code) return;
@@ -344,18 +408,20 @@ export const couponStore = {
    },
 
    /**
-    * (디버그/초기화) 전부 초기화
+    * ✅ 현재 ownerKey 범위에서만 초기화
     */
    clearAll() {
       state = { owned: [], appliedCode: '' };
-
-      // ✅ v2/v1 저장 데이터까지 제거(완전 초기화)
-      if (hasStorage()) {
-         window.localStorage.removeItem(STORAGE_KEY_V2);
-         window.localStorage.removeItem(STORAGE_KEY_V1);
-      }
-
+      removeRaw(getStorageKey(ownerKey));
       notify();
    },
+
+   /**
+    * ✅ 레거시 키 완전 제거(정리용)
+    * - 보통은 안 써도 됨(마이그레이션에서 자동 제거함)
+    */
+   purgeLegacyKeys() {
+      removeRaw(LEGACY_KEY_V2);
+      removeRaw(LEGACY_KEY_V1);
+   },
 };
-// couponStore.clearAll();

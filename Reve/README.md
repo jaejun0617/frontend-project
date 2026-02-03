@@ -334,53 +334,51 @@
 
 ---
 
-## 12) 👤 MyPage 멤버십/등급 UI 통합 (membership.js 기준)
+## ✅ 12) MyPage 개선 (Membership 통합 + Coupon UX)
 
-### ✅ 목표
+### 목표
 
-- Cart/Mypage 등 여러 화면에서 “등급/적립 정책”이 중복 구현되지 않도록
-- **membership.js 단일 소스**로 계산/표시를 통일
-- 마이페이지에서 등급 정보를 “내 정보” 흐름 안에 자연스럽게 녹여 UX 강화
+- 마이페이지에서 **등급/적립 정책을 membership.js 단일 소스**로 통일
+- 쿠폰은 “관리 화면”답게 **보유/적용/해제 흐름을 안정적**으로 구성
+- 사용 완료 쿠폰은 기본 숨기고(리스트 노이즈 제거), 필요 시 펼쳐보기 제공
 
-### ✅ 변경 사항
+---
 
-#### 1) MyPage가 membership.js를 직접 사용하도록 통일
+### 변경 요약
 
-- `src/pages/mypage/index.js`
-   - 기존 `grade.js` 기반 계산 제거
-   - `getMembershipSnapshot({ totalSpent, checkoutTotal })`로 등급/진행률/적립률/다음 등급까지를 일관되게 계산
-   - `formatPercent(rate)`로 퍼센트 표기 통일
+#### 1) grade.js 의존 제거 → membership.js 단일 소스로 통일
 
-#### 2) “내 정보(Profile)” 패널에 멤버십 요약 통합
+- MyPage의 “내 정보 / 회원등급” 패널에서 등급 계산을 전부 `getMembershipSnapshot()` 기반으로 사용
+- 정책 변경 시 `membership.js`만 수정하면 Cart/MyPage/결제완료 화면이 모두 동기화됨
 
-- 기존: 이름/권한/누적 구매만 표시
-- 개선: 아래 정보까지 한 화면에서 확인 가능
-   - 현재 등급
-   - 적립률
-   - 다음 등급까지 남은 금액 (최고 등급이면 유지 상태 표시)
+#### 2) 내 정보(Profile) 패널에 멤버십 요약 추가
 
-#### 3) “회원등급(Grade)” 패널도 동일 로직 재사용
+- 사용자 기본 정보(이름/권한/누적구매/포인트)
+- 멤버십 요약(현재 등급/적립률/다음 등급까지 남은 금액)
 
-- membership snapshot의 `progressRatio`를 기반으로
-   - 진행바 퍼센트(pct) 계산
-   - 다음 등급/남은 금액 표시
-   - 최고 등급일 때 100% 고정 표시
+#### 3) 회원등급(Grade) 패널 진행바 버그 수정
 
-### ✅ UX 보강 (쿠폰 관리)
+- 기존: `progressRatio` 같은 필드 참조로 진행률이 깨질 수 있음
+- 수정: `progressToNextPct(0~100)`를 기준으로 진행바 렌더링 통일
 
-- 마이페이지 쿠폰 적용/해제도 confirmModal 기반으로 실수 방지
-   - 적용: “쿠폰을 적용할까요?”
-   - 해제: “쿠폰을 해제할까요?”
-- toast로 성공/실패 피드백 제공
+#### 4) 쿠폰 UX 개선: 사용 완료 쿠폰 기본 숨김 + 토글 제공
 
-### ✅ 관련 파일
+- 기본 정책: `used === true` 쿠폰은 기본 리스트에서 숨김
+- 필요 시 “사용 완료 쿠폰 보기(N)” 버튼을 눌러 펼쳐보기 가능
+- 승급 쿠폰은 `UPGRADE_` prefix 기반으로 배지(pill) 표시
+
+#### 5) init 안정화
+
+- 중복 init 방지(`data-bound`) 체크를 **가장 먼저** 수행
+- 토스트 생성은 bound 체크 통과 후 실행 → 중복 생성/부작용 방지
+
+---
+
+### 관련 파일
 
 - `src/pages/mypage/index.js`
 - `src/utils/membership.js`
-- `src/components/ConfirmModal.js`
-- `src/components/Toast.js`
-
----
+- `src/store/couponStore.js` (유저별 분리/승급쿠폰 정책 연동 시 확장)
 
 ---
 

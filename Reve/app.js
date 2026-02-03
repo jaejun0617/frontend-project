@@ -36,7 +36,7 @@ import { cartStore } from './src/store/cartStore.js';
 import { authStore } from './src/store/authStore.js';
 import { initToast } from './src/components/Toast.js';
 import { confirmModal } from './src/components/ConfirmModal.js';
-
+import { couponStore } from './src/store/couponStore.js';
 /* ==============================
    0) DOM 마운트 유틸
    ============================== */
@@ -325,10 +325,9 @@ authStore.subscribe(() => {
    const nowLogin = authStore.isLoggedIn();
    const u = authStore.getUser?.();
 
-   // 유저별 장바구니 분리
-   cartStore.setOwner(u?.id || null);
+   cartStore.setOwner(u?.id || 'guest');
+   couponStore.setOwner(u?.id || 'guest'); // ✅ 딱 1번만
 
-   // 로그인/로그아웃 토스트
    if (!prevLogin && nowLogin) {
       toast.show(`${u?.name || '사용자'}님 환영합니다 👋`, { duration: 1400 });
    }
@@ -338,7 +337,6 @@ authStore.subscribe(() => {
 
    prevLogin = nowLogin;
 });
-
 // 장바구니 변화 시: 카운트 + 리스트 카드 상태 동기화
 cartStore.subscribe(() => {
    updateCartCount();
