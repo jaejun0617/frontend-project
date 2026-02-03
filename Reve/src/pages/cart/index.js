@@ -17,19 +17,26 @@
  *
  * ✅ 멤버십(등급/적립) 표시
  * - membership.js 단일 소스로 현재등급/적립률/예상 적립포인트/다음등급까지 표시
+ *
+ * ✅ 주문 저장
+ * - 결제 성공 직후 orderStore.createOrder(payload) 저장 → MyPage 주문내역 즉시 반영
+ *
+ * ✅ 포인트 정책(확정)
+ * - "상품금액만" 적립 (배송비 제외)
  * =============================================
  */
 
 import { cartStore } from '../../store/cartStore.js';
 import { couponStore } from '../../store/couponStore.js';
 import { authStore } from '../../store/authStore.js';
+import { orderStore } from '../../store/orderStore.js';
 
 import { formatPrice } from '../../utils/format.js';
 import { calcLinePrice } from '../../utils/pricing.js';
 
 import { initToast } from '../../components/Toast.js';
 import { confirmModal } from '../../components/ConfirmModal.js';
-import { orderStore } from '../../store/orderStore.js';
+
 import {
    getMembershipSnapshot,
    formatPercent,
@@ -74,6 +81,7 @@ function renderEmpty() {
   `;
 }
 
+/** XSS 방지용 escape */
 function escapeHtml(value) {
    return String(value ?? '')
       .replaceAll('&', '&amp;')
@@ -87,6 +95,10 @@ function clamp(n, min, max) {
    return Math.max(min, Math.min(max, n));
 }
 
+/**
+ * ✅ 배송비 계산
+ * - 상품금액(쿠폰 반영) 기준으로 무료배송 여부 판단
+ */
 function calcShipping(subtotalAfterCoupon) {
    if (subtotalAfterCoupon <= 0) return 0;
    return subtotalAfterCoupon < FREE_SHIPPING_THRESHOLD ? SHIPPING_FEE : 0;
@@ -135,9 +147,9 @@ function getInCartSizeSet(items, productId) {
  * - pricing.js(calcLinePrice)가 "기본 세일 + 쿠폰" 반영 담당
  */
 function calcCartPricing(detailedItems, coupon) {
-   let subtotalAfterSale = 0;
-   let couponDiscountTotal = 0;
-   let totalAfterCoupon = 0;
+   let subtotalAfterSale = 0; // 상품 세일 반영 합
+   let couponDiscountTotal = 0; // 쿠폰 할인 합
+   let totalAfterCoupon = 0; // 쿠폰까지 반영된 최종 상품 합(배송비 제외)
 
    const computedRows = detailedItems.map((row) => {
       const qty = clamp(Number(row.qty || 1), 1, 99);
@@ -294,10 +306,8 @@ function renderCart(detailedItems) {
    const rawItems = cartStore.getState()?.items ?? [];
 
    // ✅ 멤버십(단일 소스) 기반 요약 계산
-   // - 적립 기준: "배송비 제외"가 일반적이라 checkoutTotal에 totalAfterCoupon을 사용
-   // - 배송비 포함 적립을 원하면 checkoutTotal: total 로 바꾸면 됨
+   // ✅ 포인트/예상적립 기준: 상품금액만(배송비 제외) = totalAfterCoupon
    const user = authStore.getUser?.();
-   // ✅ 변경 (상품금액만: 배송비 제외)
    const pointsBase = pricingCore.totalAfterCoupon;
 
    const { tierInfo, earnRate, expectedPoints } = getMembershipSnapshot({
@@ -313,7 +323,6 @@ function renderCart(detailedItems) {
               const currentSize = String(options?.size ?? '').trim();
               const inCartSizeSet = getInCartSizeSet(rawItems, product?.id);
 
-              // ✅ 컬러 옵션 제거했으니 사이즈만 표기
               const optionText = options?.size ? `사이즈: ${options.size}` : '';
 
               const hasBaseSale =
@@ -351,7 +360,6 @@ function renderCart(detailedItems) {
 
                   ${optionText ? `<p class='cart-item__meta'>${escapeHtml(optionText)}</p>` : ''}
 
-                  <!-- ✅ Cart에서도 상품리스트와 동일한 사이즈 pill -->
                   ${renderSizePills({ product, currentSize, inCartSizeSet })}
 
                   <div class='cart-item__controls' aria-label='Quantity Controls'>
@@ -398,7 +406,6 @@ function renderCart(detailedItems) {
           </div>
         </div>
 
-        <!-- ✅ 쿠폰 -->
         ${renderCouponSection({
            owned,
            appliedCoupon,
@@ -446,6 +453,10 @@ function renderCart(detailedItems) {
    3) API-ready Checkout Flow
    ============================== */
 
+/**
+ * ✅ 서버로 보내기 좋은 주문 payload 형태로 구성
+ * - 지금은 mock 결제지만, 이후 결제 API 붙일 때 그대로 활용 가능
+ */
 function buildCheckoutPayload({ detailedItems, pricing, appliedCoupon }) {
    const user = authStore.getUser?.();
 
@@ -473,9 +484,9 @@ function buildCheckoutPayload({ detailedItems, pricing, appliedCoupon }) {
       pricing: {
          subtotalAfterSale: pricing.subtotalAfterSale,
          couponDiscountTotal: pricing.couponDiscountTotal,
-         totalAfterCoupon: pricing.totalAfterCoupon,
-         shipping: pricing.shipping,
-         total: pricing.total,
+         totalAfterCoupon: pricing.totalAfterCoupon, // ✅ 상품금액(쿠폰 반영)
+         shipping: pricing.shipping, // ✅ 배송비
+         total: pricing.total, // ✅ 실제 결제 총액(배송비 포함)
          currency: 'KRW',
       },
       createdAt: new Date().toISOString(),
@@ -488,6 +499,14 @@ async function checkout(payload) {
    return { ok: true, data: { paidAt: Date.now(), orderId: payload.orderId } };
 }
 
+/**
+ * ✅ 결제 처리(스토어 업데이트 포함)
+ * - orderStore 저장
+ * - coupon 사용처리
+ * - totalSpent 누적(배송비 포함 정책 유지)
+ * - points 적립(배송비 제외 정책 확정)
+ * - 승급 쿠폰 지급
+ */
 async function handleCheckout({ detailedItems }) {
    const appliedCoupon = couponStore.getAppliedCoupon();
 
@@ -511,37 +530,39 @@ async function handleCheckout({ detailedItems }) {
    if (!result?.ok) return { ok: false };
 
    /* =========================================
-     ✅ [여기] 주문 저장 (결제 성공 확정 직후)
-     - owner는 app.js에서 이미 스위칭됨
-     - 그래도 안전하게 userId 체크
+     ✅ 1) 주문 저장 (결제 성공 확정 직후)
+     - 로그인 유저만 저장(guest는 주문내역 탭에 굳이 남기지 않는 정책)
   ========================================= */
    if (payload?.userId) {
       orderStore.createOrder({
          ...payload,
-         status: 'PAID', // ✅ orderStore가 normalizeStatus 해줌
+         status: 'PAID', // normalizeStatus가 보정
       });
    }
 
-   // ✅ 쿠폰 사용 처리 + 적용 해제
+   /* =========================================
+     ✅ 2) 쿠폰 사용 처리 + 적용 해제
+  ========================================= */
    if (appliedCoupon?.code) {
       couponStore.markUsed?.(appliedCoupon.code);
       couponStore.clearApplied?.();
    }
 
-   // ✅ 결제 전 유저 스냅샷
+   /* =========================================
+     ✅ 3) 유저 누적 구매 / 포인트 갱신
+  ========================================= */
    const userBefore = authStore.getUser?.();
    const prevSpent = Number(userBefore?.totalSpent ?? 0);
    const prevPoints = Number(userBefore?.points ?? 0);
 
-   // ✅ 누적 구매액 정책(기존 유지): 총 결제금액(배송비 포함)
+   // ✅ 누적 구매액 정책(유지): 총 결제금액(배송비 포함)
    const addedSpent = Number(payload.pricing.total || 0);
    const nextSpent = prevSpent + addedSpent;
 
-   // ✅ 포인트 정책(새로 확정): 상품금액만(배송비 제외)
+   // ✅ 포인트 정책(확정): 상품금액만(배송비 제외)
    const pointsBase = Number(payload.pricing.totalAfterCoupon || 0);
 
-   // ✅ 적립률은 “결제 후 등급” 기준으로 계산하고 싶으면 nextSpent로 계산
-   // - 지금은 일관성 있게 nextSpent 기준으로 계산(결제 후 등급 반영)
+   // ✅ 결제 후 등급(= nextSpent) 기준으로 이번 적립 계산(자연스러움)
    const snap = getMembershipSnapshot({
       totalSpent: nextSpent,
       checkoutTotal: pointsBase,
@@ -550,33 +571,25 @@ async function handleCheckout({ detailedItems }) {
    const earnedPoints = Number(snap.expectedPoints || 0);
    const nextPoints = prevPoints + earnedPoints;
 
-   // ✅ 유저 정보 업데이트(누적구매 + 포인트)
    authStore.updateUser?.({
       totalSpent: nextSpent,
       points: nextPoints,
    });
 
-   // ✅ 장바구니 비우기
-   cartStore.clear?.();
-
-   // ✅ 승급 쿠폰 지급
-   // - prevSpent → nextSpent 기준으로 “새로 달성한 등급들”을 모두 계산
-   // - 실버→로얄처럼 2단 점프면 골드/로얄 쿠폰 둘 다 지급(정책)
-   let grantedUpgradeCoupons = [];
+   /* =========================================
+     ✅ 4) 승급 쿠폰 지급
+     - prevSpent → nextSpent 비교
+     - 실버→로얄처럼 점프 승급이면 중간 등급 포함 모두 지급(정책)
+     - (중요) owner 스위칭은 app.js에서 관리하므로 여기서 setOwner 재호출 X
+  ========================================= */
+   const grantedUpgradeCoupons = [];
 
    if (userBefore?.id) {
-      // ✅ (안전) 지급 전에 현재 owner를 로그인 유저로 고정
-      // - setOwner가 "변경 시에만" state를 갈아끼우도록 구현돼 있으면 가장 좋음
-      couponStore.setOwner?.(userBefore.id);
-
-      // ✅ 결제 전/후 누적 구매액 차이로 승급 구간 계산
       const upgradedTiers = getUpgradedTiers({
          prevTotalSpent: prevSpent,
          nextTotalSpent: nextSpent,
       });
 
-      // ✅ 승급한 등급들에 대해 쿠폰 지급
-      // - register가 이미 보유 중이면 fail 처리하므로 중복 지급 방지됨
       upgradedTiers.forEach((tier) => {
          const tierName = String(tier?.name || '').trim();
          if (!tierName) return;
@@ -589,6 +602,9 @@ async function handleCheckout({ detailedItems }) {
       });
    }
 
+   // ✅ 결제 완료 후 장바구니 비우기
+   cartStore.clear?.();
+
    return {
       ok: true,
       payload,
@@ -597,6 +613,7 @@ async function handleCheckout({ detailedItems }) {
       grantedUpgradeCoupons,
    };
 }
+
 /* ==============================
    4) Page init
    ============================== */
@@ -634,12 +651,11 @@ export async function initCartPage() {
 
       /* ------------------------------
          B) 쿠폰 라디오 클릭 UX
-         - 라디오의 기본 체크 동작을 막고(preventDefault),
-           "모달 결과"로만 store 상태를 바꾼 뒤 paint()로 UI를 맞춘다.
+         - 라디오 기본 체크 동작을 막고(preventDefault),
+           모달 결과로만 store 상태를 바꾼 뒤 paint()로 UI를 맞춘다.
       ------------------------------ */
       const couponInput = e.target.closest('[data-coupon-radio]');
       if (couponInput) {
-         // ✅ 브라우저 기본 라디오 체크 변경 방지 (깜빡/불일치 예방)
          e.preventDefault();
 
          const applied = couponStore.getAppliedCoupon();
@@ -652,13 +668,14 @@ export async function initCartPage() {
          const detailed = await cartStore.getDetailedItems();
          const eligibleCount = countCouponEligibleLines(detailed);
 
+         // ✅ 적용 가능한 상품이 없으면 UX 안내 후 원복
          if (eligibleCount <= 0) {
             toast.show('쿠폰 적용 가능한 상품이 없어요.', { duration: 1400 });
             await paint();
             return;
          }
 
-         // 1) 현재 적용 쿠폰을 다시 클릭 → 해제 confirm
+         // 1) 이미 적용된 쿠폰을 다시 클릭 → 해제 confirm
          if (currentCode && nextCode === currentCode) {
             const ok = await confirmModal({
                title: '쿠폰 해제',
@@ -707,7 +724,7 @@ export async function initCartPage() {
 
       /* ------------------------------
          C) 구매하기
-         - 결제 확인 → Mock 결제 → 완료 모달(요약 + 등급)
+         - 결제 확인 → Mock 결제 → 완료 모달 → (선택) 성공 페이지 이동
       ------------------------------ */
       if (e.target.closest('[data-checkout]')) {
          const detailed = await cartStore.getDetailedItems();
@@ -733,7 +750,10 @@ export async function initCartPage() {
          const pricing = result?.payload?.pricing;
          const coupon = result?.payload?.coupon;
 
-         // ✅ 승급 쿠폰 지급 내역(있으면 모달에 함께 노출)
+         // ✅ orderId는 안전하게 추출 (추후 payload 구조 변해도 안전)
+         const orderId = String(result?.payload?.orderId || '').trim();
+
+         // ✅ 승급 쿠폰 지급 내역
          const granted = Array.isArray(result?.grantedUpgradeCoupons)
             ? result.grantedUpgradeCoupons
             : [];
@@ -741,13 +761,14 @@ export async function initCartPage() {
          const upgradeLines =
             granted.length > 0
                ? `🎁 승급 쿠폰 지급: ${granted.join(', ')}`
-               : ''; // 없으면 빈 문자열
+               : '';
 
          // ✅ 결제 후 최신 유저 기준으로 등급 재계산
+         // ✅ 여기서도 포인트 정책과 동일하게 "상품금액(배송비 제외)" 기준으로 snapshot
          const user = authStore.getUser?.();
          const { tierInfo } = getMembershipSnapshot({
             totalSpent: user?.totalSpent ?? 0,
-            checkoutTotal: Number(pricing?.total ?? 0),
+            checkoutTotal: Number(pricing?.totalAfterCoupon ?? 0), // ✅ 배송비 제외
          });
 
          const summaryLines = [
@@ -756,9 +777,9 @@ export async function initCartPage() {
                : '🎫 사용 쿠폰: 없음',
             `🚚 배송비: ₩ ${formatPrice(pricing?.shipping ?? 0)}`,
             `💳 최종 결제: ₩ ${formatPrice(pricing?.total ?? 0)}`,
-            upgradeLines, // ✅ 여기!
+            upgradeLines,
          ]
-            .filter(Boolean) // ✅ 빈 줄 제거
+            .filter(Boolean)
             .join('\n');
 
          const tierLines = [
@@ -770,12 +791,32 @@ export async function initCartPage() {
                : '👑 최고 등급이에요. 유지하면 혜택이 계속 적용돼요!',
          ].join('\n');
 
-         await confirmModal({
+         const go = await confirmModal({
             title: '결제 완료 ✅',
             message: `결제가 완료되었습니다.\n\n${summaryLines}\n\n${tierLines}`,
-            confirmText: '확인',
-            cancelText: '닫기',
+            confirmText: '주문내역 보기',
+            cancelText: '계속 쇼핑',
          });
+
+         // ✅ UX: 버튼 선택에 따라 이동
+         if (go) {
+            // orderId가 없으면 주문내역 탭으로라도 이동(방어)
+            window.dispatchEvent(
+               new CustomEvent('app:navigate', {
+                  detail: {
+                     href: orderId
+                        ? `/checkout/success?orderId=${orderId}`
+                        : `/mypage`,
+                  },
+               }),
+            );
+         } else {
+            window.dispatchEvent(
+               new CustomEvent('app:navigate', {
+                  detail: { href: `/product` },
+               }),
+            );
+         }
 
          return;
       }
@@ -795,7 +836,6 @@ export async function initCartPage() {
          ).trim();
          if (!nextSize) return;
 
-         // ✅ 현재 라인의 이전 사이즈(문구/불필요 모달 방지)
          const state = cartStore.getState();
          const currentLine = state.items.find((it) => it.key === key);
          const prevSize = String(currentLine?.options?.size || '').trim();
@@ -822,7 +862,6 @@ export async function initCartPage() {
             return;
          }
 
-         // ⚠️ 병합 여부는 현재 message 기반 판별(스토어에서 merged 플래그 주면 더 견고해짐)
          const didMerge = String(result?.message || '').includes('병합');
 
          if (prevSize) {

@@ -5,6 +5,12 @@
  * - 라우터/레이아웃 조립
  * - 전역 UI 초기화 (Sidebar/SearchDrawer/Toast/AuthUi)
  * - 전역 이벤트 위임 (상품 카드: 사이즈 선택/장바구니 토글)
+ *
+ * ✅ 이번 수정 포인트(안정성/UX)
+ * 1) /checkout/success 라우트 render/afterRender 패턴 통일
+ * 2) requireAuth redirectTo: pathname + search(쿼리)까지 포함
+ * 3) 상품 카드에서 "제거"는 상품 라인의 key 1개가 아니라
+ *    같은 productId 라인을 모두 제거(멀티 사이즈 담김 대비)
  * =============================================
  */
 
@@ -23,6 +29,10 @@ import { CartPage, initCartPage } from './src/pages/cart/index.js';
 import { MyPage, initMyPage } from './src/pages/mypage/index.js';
 import { AuthPage, initAuthPage } from './src/pages/auth/index.js';
 import { AdminPage, initAdminPage } from './src/pages/admin/index.js';
+import {
+   CheckoutSuccessPage,
+   initCheckoutSuccessPage,
+} from './src/pages/checkoutSuccess/index.js';
 
 // Utils
 import { initSidebar } from './src/utils/sidebar.js';
@@ -38,6 +48,7 @@ import { initToast } from './src/components/Toast.js';
 import { confirmModal } from './src/components/ConfirmModal.js';
 import { couponStore } from './src/store/couponStore.js';
 import { orderStore } from './src/store/orderStore.js';
+
 /* ==============================
    0) DOM 마운트 유틸
    ============================== */
@@ -101,6 +112,7 @@ const routes = {
    '/mypage': {
       render: () => MyPage(),
       afterRender: () => {
+         // ✅ 마이페이지는 로그인 필수
          const ok = requireAuth({ redirectTo: '/mypage' });
          if (!ok) return;
          initMyPage();
@@ -110,10 +122,17 @@ const routes = {
    '/admin': {
       render: () => AdminPage(),
       afterRender: () => {
+         // ✅ 관리자만 접근
          const ok = requireAdmin({ redirectTo: '/admin' });
          if (!ok) return;
          initAdminPage();
       },
+   },
+
+   // ✅ 결제 완료 페이지 (패턴 통일: render는 항상 "함수 호출" 형태)
+   '/checkout/success': {
+      render: () => CheckoutSuccessPage(),
+      afterRender: () => initCheckoutSuccessPage(),
    },
 
    '/404': {
@@ -183,7 +202,7 @@ function getCartLines(productId) {
 
 /**
  * ✅ 상품당 "현재 담긴 사이즈"를 1개 기준으로 반환
- * - 상품당 1라인 UX를 가정 (리스트 기준)
+ * - 리스트 UX: 대표 1라인만 카드에 표시(현재 구조)
  */
 function getCartSizeForProduct(productId) {
    const lines = getCartLines(productId);
@@ -193,6 +212,18 @@ function getCartSizeForProduct(productId) {
       key: first?.key || '',
       size: String(first?.options?.size || '').trim(),
    };
+}
+
+/**
+ * ✅ (중요) 상품 카드에서 "제거"는 상품의 특정 key 1개만 지우면
+ * 멀티 라인(사이즈 여러개 담김)에서 사용자가 혼란스러울 수 있음.
+ * 그래서 같은 productId의 모든 라인을 지우는 헬퍼를 둔다.
+ */
+function removeProductLines(productId) {
+   const lines = getCartLines(productId);
+   lines.forEach((line) => {
+      if (line?.key) cartStore.remove?.(line.key);
+   });
 }
 
 /**
@@ -311,11 +342,10 @@ updateCartCount();
 authUi.refresh();
 
 /* ==============================
-   7) authStore 구독: 카트 owner 전환 + 토스트
+   7) authStore 구독: owner 전환 + 토스트
    ============================== */
 
-// 앱 시작 시 현재 유저 기준 owner 세팅
-// 1) 초기 owner 세팅
+// ✅ 앱 시작 시 현재 유저 기준 owner 세팅(1회)
 {
    const u = authStore.getUser?.();
    const owner = u?.id || 'guest';
@@ -330,7 +360,6 @@ let prevOwner = authStore.getUser?.()?.id || 'guest';
 authStore.subscribe(() => {
    const nowLogin = authStore.isLoggedIn();
    const u = authStore.getUser?.();
-
    const owner = u?.id || 'guest';
 
    // ✅ owner가 바뀔 때만 스토어 스위칭
@@ -352,7 +381,7 @@ authStore.subscribe(() => {
    prevLogin = nowLogin;
 });
 
-// 장바구니 변화 시: 카운트 + 리스트 카드 상태 동기화
+// ✅ 장바구니 변화 시: 카운트 + 리스트 카드 상태 동기화
 cartStore.subscribe(() => {
    updateCartCount();
    syncProductCardsWithCart();
@@ -389,7 +418,6 @@ document.addEventListener('click', async (e) => {
          // 단, 이미 장바구니에 담긴 상태라면 "선택 해제"보다 "담긴 사이즈 유지"가 더 안전함
          const cartInfo = getCartSizeForProduct(productId);
          if (cartInfo.hasAny && cartInfo.size) {
-            // 담긴 사이즈는 유지
             setCardSelectedSize(card, cartInfo.size);
             return;
          }
@@ -417,7 +445,7 @@ document.addEventListener('click', async (e) => {
          // ✅ 옵션 변경 + 병합까지 cartStore가 처리
          cartStore.updateOptions?.(cartInfo.key, { size: picked });
 
-         // UI 동기화
+         // ✅ UI 동기화
          setCardSelectedSize(card, picked);
          syncProductCardsWithCart();
 
@@ -443,9 +471,10 @@ document.addEventListener('click', async (e) => {
    const productId = card?.getAttribute('data-product-id');
    if (!card || !productId) return;
 
-   // ✅ 로그인 가드
+   // ✅ 로그인 가드 (redirectTo는 쿼리까지 포함하는 게 안전)
+   const redirectTo = window.location.pathname + window.location.search;
    const okAuth = requireAuth({
-      redirectTo: window.location.pathname || '/product',
+      redirectTo: redirectTo || '/product',
    });
    if (!okAuth) return;
 
@@ -455,10 +484,13 @@ document.addEventListener('click', async (e) => {
    ).trim();
    const cartInfo = getCartSizeForProduct(productId);
 
-   // ✅ 이미 담긴 상태 & 선택 사이즈가 비어있으면 → "그냥 취소"를 허용 (요구사항)
-   // (사용자는 굳이 사이즈 선택을 다시 안 해도 취소하고 싶음)
+   /**
+    * ✅ 정책: 이미 담긴 상태에서 "선택 사이즈가 비어있으면"
+    * - 사용자는 사이즈를 다시 고르지 않아도 "그냥 제거"가 가능해야 한다.
+    * - 단, 멀티 라인(사이즈 여러개)일 수 있으므로 productId 라인을 전부 제거
+    */
    if (cartInfo.hasAny && !selectedSize) {
-      cartStore.remove?.(cartInfo.key);
+      removeProductLines(productId);
       syncProductCardsWithCart();
       toast.show('장바구니에서 제거했어요', { duration: 1400 });
       return;
@@ -472,9 +504,12 @@ document.addEventListener('click', async (e) => {
       return;
    }
 
-   // ✅ 이미 담긴 상태에서 같은 사이즈면 → 취소(삭제)
+   /**
+    * ✅ 이미 담긴 상태에서 같은 사이즈면 → 제거
+    * - 멀티 라인 가능성 때문에 "해당 상품 라인 전체 제거"가 UX상 더 직관적
+    */
    if (cartInfo.hasAny && cartInfo.size === selectedSize) {
-      cartStore.remove?.(cartInfo.key);
+      removeProductLines(productId);
       syncProductCardsWithCart();
       toast.show('장바구니에서 제거했어요', { duration: 1400 });
       return;

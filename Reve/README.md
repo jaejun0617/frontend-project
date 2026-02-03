@@ -16,22 +16,25 @@
 - `authStore` 구독으로 store owner 스위칭
    - `cartStore.setOwner(userId || 'guest')`
    - `couponStore.setOwner(userId || 'guest')`
+   - `orderStore.setOwner(userId || 'guest')`
 - `cartStore` 구독으로 헤더 뱃지/리스트 상태 동기화
 
 ### 페이지
 
 - `src/pages/auth/index.js` : 로그인/회원가입 + `redirectTo` 지원
 - `src/pages/product/index.js` : 상품 리스트(그리드)
-- `src/pages/productDetail/index.js` : 상품 상세(옵션/장바구니/바로구매) **(진행 중)**
-- `src/pages/cart/index.js` : 장바구니 + 쿠폰 + 결제(mock) + 멤버십/포인트/승급쿠폰
+- `src/pages/productDetail/index.js` : 상품 상세(옵션/장바구니/바로구매)
+- `src/pages/cart/index.js` : 장바구니 + 쿠폰 + 결제(mock) + 멤버십/포인트/승급쿠폰 + 주문 저장
+- `src/pages/checkoutSuccess/index.js` : 결제 완료 페이지(주문 요약/등급/포인트 안내)
 - `src/pages/search/index.js` : 검색 페이지 구조 (확장 예정)
-- `src/pages/mypage/index.js` : 마이페이지(내정보/등급/쿠폰)
+- `src/pages/mypage/index.js` : 마이페이지(내정보/배송지/주문내역/주문·배송/등급/쿠폰)
 
 ### 스토어
 
 - `src/store/authStore.js` : 로그인 상태, 유저 persist (totalSpent/points 포함)
 - `src/store/cartStore.js` : 유저별 장바구니, 옵션 라인, 라인 병합
 - `src/store/couponStore.js` : 유저별 쿠폰 등록/적용/사용 처리, persist + owner 스위칭
+- `src/store/orderStore.js` : 유저별 주문 저장소, 결제 완료 시 주문 생성
 
 ### 유틸/컴포넌트
 
@@ -93,7 +96,7 @@
 - 회원가입
 - `localStorage` 유저 저장 + 성공 시 자동 로그인
 - 로그인 상태 persist 유지
-- 결제 연동 확장
+- 결제 연동 확장(유저 상태 확장)
    - `totalSpent`: 누적 구매액
    - `points`: 보유 포인트 (결제 시 적립)
 
@@ -166,7 +169,7 @@
 ### ✅ 유저별 장바구니 분리
 
 - storage key: `reve_cart_v1:<ownerKey>`
-- 로그인/로그아웃 시 `setOwner(userId)`로 자동 스위칭
+- 로그인/로그아웃 시 `setOwner(userId || 'guest')`로 자동 스위칭
 - guest 장바구니도 유지
 
 ### ✅ 라인 구조
@@ -221,6 +224,8 @@
 - 모달 confirm 결과로만 store 상태 변경 후 `paint()`로 UI 정렬
    1. 쿠폰 선택 → confirm → 확인 시 apply, 취소 시 원복
    2. 적용 중 쿠폰 재클릭 → confirm → 확인 시 clear, 취소 시 유지
+- 쿠폰 적용 가능한 상품이 없으면:
+   - 토스트 안내 + UI 즉시 복구
 
 ### ✅ 구매하기 UX (결제 확인 → Mock 결제 → 완료 모달)
 
@@ -230,6 +235,9 @@
    - 사용 쿠폰 / 배송비 / 최종 결제금액
    - 현재 등급 + 다음 등급까지 남은 금액
    - (있으면) 승급 쿠폰 지급 내역
+- 완료 모달 버튼 2개 분기
+   - 확인(주문내역 보기) → `/checkout/success?orderId=...` 이동
+   - 취소(계속 쇼핑) → `/product` 이동
 
 ### ✅ Cart Summary: 멤버십(등급/적립) 노출
 
@@ -248,9 +256,12 @@
 
 ### ✅ store owner 스위칭(중요)
 
-- `authStore.subscribe()`에서 로그인 상태 변경 시:
-   - `cartStore.setOwner(u?.id || 'guest')`
-   - `couponStore.setOwner(u?.id || 'guest')` ← 딱 1번만
+- 앱 시작 시 현재 유저 기준 owner 세팅
+   - `cartStore.setOwner(owner)`
+   - `couponStore.setOwner(owner)`
+   - `orderStore.setOwner(owner)`
+- `authStore.subscribe()`에서 로그인 상태 변경 시 owner 변경 감지 후 스위칭
+   - owner가 바뀔 때만 스토어 setOwner 실행(중복 리셋/깜빡 방지)
 
 ### ✅ 장바구니 변화 시 동기화
 
@@ -263,12 +274,19 @@
 - `syncProductCardsWithCart()`
    - 아이콘 빨강 유지
    - 담긴 사이즈 pill 표시
+   - 담긴 사이즈가 있으면 카드의 선택값도 해당 사이즈로 맞춤
 
-### ✅ store 구독 구조
+### ✅ 상품 카드 이벤트 위임 UX (리스트)
 
-- `authStore` 변화 시 cart owner 스위칭
-- 로그인/로그아웃 토스트
-- `cartStore` 변화 시 뱃지/리스트 동기화
+- 사이즈 pill 클릭
+   - 같은 사이즈 재클릭: “선택 해제” (단, 이미 담긴 경우 담긴 사이즈 유지)
+   - 이미 담긴 상태에서 다른 사이즈 클릭: “변경 모달” → 확인 시 `updateOptions` 반영
+- 장바구니 아이콘 클릭(토글)
+   - 비로그인: `/auth?redirectTo=현재경로`
+   - 사이즈 필요한 상품 미선택: 토스트 안내
+   - 이미 담긴 상태 + 같은 사이즈: 제거
+   - 이미 담긴 상태 + 다른 사이즈: 변경 모달 후 변경
+   - 이미 담긴 상태 + 선택 사이즈가 비어있으면: “그냥 제거” 허용
 
 ---
 
@@ -291,7 +309,8 @@
 - users: `reve_users_v1`
 - auth: `reve_auth_v1`
 - cart: `reve_cart_v1:<ownerKey>`
-- coupons: `reve_coupons_v1:<ownerKey>`
+- coupons: `reve_coupons_v1:<ownerKey>` ✅ (유저별 분리)
+- orders: `reve_orders_v1:<ownerKey>` ✅ (유저별 분리)
 - after signup modal: `sessionStorage.reve_after_signup_modal`
 
 ### 전역 커스텀 이벤트
@@ -363,3 +382,88 @@
 - 결제 완료 모달에 지급 내역 표시(있을 때만)
 
 ---
+
+## 14) 🧾 주문(Order) 시스템 (유저별 주문내역)
+
+### ✅ 목표
+
+- 결제 완료 시 주문 데이터를 저장하고,
+- 마이페이지 "주문내역" 탭에서 즉시 확인 가능하도록 연결
+- 결제 완료 페이지(`/checkout/success`)에서 주문 요약을 보여주는 흐름까지 완성
+
+### ✅ `orderStore` (localStorage 유저별 분리)
+
+- 파일: `src/store/orderStore.js`
+- storage key: `reve_orders_v1:<ownerKey>`
+- owner 전환: `orderStore.setOwner(userId || 'guest')`
+
+### ✅ 제공 API
+
+- `getOrders()` : 주문 리스트(최신순)
+- `getOrder(orderId)` : 단일 주문 조회
+- `createOrder(orderPayload)` : 주문 생성(중복 orderId 방지)
+- `updateOrderStatus(orderId, status)` : 상태 변경(PAID/SHIPPING/DELIVERED/CANCELED)
+
+### ✅ 결제 → 주문 저장 흐름
+
+- 구현 위치: `src/pages/cart/index.js` → `handleCheckout()`
+- 결제 성공 직후(쿠폰 사용 처리 전에):
+   - `orderStore.createOrder({ ...payload, status: 'PAID' })` 저장
+- 이후:
+   - 쿠폰 사용 처리 + 적용 해제
+   - 유저 totalSpent/points 업데이트
+   - 장바구니 clear
+   - 승급 쿠폰 지급
+
+### ✅ MyPage 주문내역 탭 연동
+
+- `orderStore.getOrders()` 기반으로 렌더링
+- 결제 직후 바로 주문 리스트에 반영되는 구조
+
+---
+
+## 15) ✅ 결제 완료 페이지(Checkout Success) 추가
+
+### ✅ 목표
+
+- “결제 완료 = 모달에서 끝”이 아니라,
+- `/checkout/success?orderId=...` 페이지에서 **주문 요약 + 멤버십 + 포인트**까지 확인 가능하게 만들기
+
+### ✅ 라우팅 추가
+
+- `app.js` routes에 추가
+   - `'/checkout/success': { render: CheckoutSuccessPage, afterRender: initCheckoutSuccessPage }`
+
+### ✅ 페이지 기능 (`src/pages/checkoutSuccess/index.js`)
+
+- 쿼리스트링 `orderId` 파싱
+- `orderStore.getOrder(orderId)`로 주문 조회
+   - 주문이 없으면 empty 상태 렌더(마이페이지/쇼핑 계속하기 CTA)
+- 주문이 있으면:
+   - 주문번호 / 결제일시 / 상태
+   - 결제 요약(쿠폰/배송비/최종 결제금액)
+   - 주문 상품 일부 리스트(최대 5개 + 나머지는 주문내역 안내)
+   - 멤버십 안내(현재 등급/적립률/다음 등급까지)
+   - 보유 포인트 표시(authStore 기반)
+- CTA 버튼
+   - “주문내역 보기” → `/mypage` 이동(추후 탭 딥링크 확장 가능)
+   - “쇼핑 계속하기” → `/product`
+
+### ✅ 스타일 추가
+
+- `src/styles/checkout-success.css`
+   - 카드 레이아웃(success-card)
+   - row 스타일(success-row)
+   - items 리스트
+   - actions 버튼 2열 반응형
+   - empty/loading 상태 스타일
+
+---
+
+## 16) 다음 작업 후보 (남은 TODO)
+
+- 마이페이지 탭 “배송지” 실 구현 (CRUD + 기본 배송지)
+- “주문/배송” 탭 실 구현 (order status 기반 타임라인/필터)
+- 결제 완료 페이지에서 “주문내역 탭 딥링크(mypage:open)” 처리
+- 주문 상태 업데이트(관리자/시뮬레이션) UI
+- 검색 `/search?q=` 쿼리 연동 + 결과 렌더링(ProductGrid)
