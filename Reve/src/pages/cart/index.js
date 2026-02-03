@@ -3,16 +3,9 @@
  * 📍 위치: src/pages/cart/index.js
  * 역할: 장바구니(Cart) 페이지
  *
- * ✅ 포함 기능
- * - 무료배송 기준선 + 배송비(30만원 미만 3,000원)
- * - 쿠폰 적용 가능 상품(라인) 개수 표시
- * - 보유 쿠폰 선택 적용/해제 (새로고침 유지: couponStore)
- * - 기본 세일(product.price) + 쿠폰 할인(pricing.js) 누적 반영
- * - checkout 버튼 활성화: (아이템 >= 1) && (최종금액 > 0)
- *
- * ✅ 확장 포인트 (API-ready)
- * - buildCheckoutPayload()로 결제 요청 데이터 구성
- * - checkout()에서 실제 API 연결 가능
+ * ✅ 추가 기능(이번 작업)
+ * - 장바구니에서 사이즈 변경(pill UI)
+ * - 사이즈가 필요한 상품인데 선택이 없으면 checkout 비활성
  * =============================================
  */
 
@@ -71,6 +64,62 @@ function calcShipping(subtotalAfterCoupon) {
 function countCouponEligibleLines(detailedItems) {
    return detailedItems.filter((row) => Boolean(row.product?.couponEligible))
       .length;
+}
+
+/** ✅ 상품의 사이즈 옵션 목록 만들기 */
+function getSizeOptions(product) {
+   const apparel = Array.isArray(product?.apparelSizes)
+      ? product.apparelSizes
+      : [];
+   const shoe = Array.isArray(product?.shoeSizes) ? product.shoeSizes : [];
+   const shoeText = shoe.map((s) => String(s));
+
+   // 중복 제거 + 빈 값 제거
+   const uniq = new Set(
+      [...apparel, ...shoeText].map((x) => String(x).trim()).filter(Boolean),
+   );
+   return Array.from(uniq);
+}
+
+function hasSizeOption(product) {
+   return getSizeOptions(product).length > 0;
+}
+
+/** ✅ 사이즈 pill 렌더 (장바구니에서 변경 가능) */
+function renderSizePills({ key, product, selectedSize }) {
+   const sizes = getSizeOptions(product);
+   if (!sizes.length) return '';
+
+   const current = String(selectedSize || '').trim();
+
+   return `
+    <div class="cart-item__size" aria-label="Size Options">
+      <p class="cart-item__sizeLabel">
+        사이즈
+        ${current ? `<strong class="pill">${current}</strong>` : `<strong class="pill is-warn">선택 필요</strong>`}
+      </p>
+
+      <div class="cart-sizepills" role="group" aria-label="사이즈 선택">
+        ${sizes
+           .map((s) => {
+              const active = current === s;
+              return `
+                <button
+                  type="button"
+                  class="cart-sizepill ${active ? 'is-active' : ''}"
+                  data-size-pill
+                  data-cart-key="${key}"
+                  data-size="${s}"
+                  aria-pressed="${active ? 'true' : 'false'}"
+                >
+                  ${s}
+                </button>
+              `;
+           })
+           .join('')}
+      </div>
+    </div>
+  `;
 }
 
 /**
@@ -187,35 +236,37 @@ function renderCart(detailedItems) {
    const appliedCoupon = couponStore.getAppliedCoupon();
    const { owned } = couponStore.getState();
 
-   const {
-      computedRows,
-      subtotalAfterSale,
-      couponDiscountTotal,
-      totalAfterCoupon,
-   } = calcCartPricing(detailedItems, appliedCoupon);
+   const pricingCore = calcCartPricing(detailedItems, appliedCoupon);
 
-   const shipping = calcShipping(totalAfterCoupon);
-   const total = totalAfterCoupon + shipping;
+   const shipping = calcShipping(pricingCore.totalAfterCoupon);
+   const total = pricingCore.totalAfterCoupon + shipping;
 
    const eligibleCount = countCouponEligibleLines(detailedItems);
 
    const freeShippingText =
-      totalAfterCoupon <= 0
+      pricingCore.totalAfterCoupon <= 0
          ? '담긴 상품이 없어요.'
-         : totalAfterCoupon < FREE_SHIPPING_THRESHOLD
-           ? `무료배송까지 ₩ ${formatPrice(FREE_SHIPPING_THRESHOLD - totalAfterCoupon)} 남음`
+         : pricingCore.totalAfterCoupon < FREE_SHIPPING_THRESHOLD
+           ? `무료배송까지 ₩ ${formatPrice(FREE_SHIPPING_THRESHOLD - pricingCore.totalAfterCoupon)} 남음`
            : '무료배송 적용 ✅';
 
-   const canCheckout = detailedItems.length > 0 && total > 0;
+   // ✅ 사이즈가 필요한데 선택이 없는 라인이 있는지 체크
+   const hasMissingSize = pricingCore.computedRows.some((row) => {
+      if (!hasSizeOption(row.product)) return false;
+      return !String(row.options?.size || '').trim();
+   });
+
+   const canCheckout =
+      pricingCore.computedRows.length > 0 && total > 0 && !hasMissingSize;
 
    return `
     <div class='cart-layout' aria-label='Cart Layout'>
       <div class='cart__list' aria-label='Cart Items'>
-        ${computedRows
+        ${pricingCore.computedRows
            .map(({ key, product, qty, options, computed }) => {
               const optionText = [
                  options?.color ? `컬러: ${options.color}` : '',
-                 options?.size ? `사이즈: ${options.size}` : '',
+                 // 사이즈는 아래 pill로 변경 가능하니까 meta에는 굳이 안 넣어도 됨(원하면 유지 가능)
               ]
                  .filter(Boolean)
                  .join(' · ');
@@ -239,6 +290,13 @@ function renderCart(detailedItems) {
 
                 ${optionText ? `<p class='cart-item__meta'>${optionText}</p>` : ''}
 
+                <!-- ✅ 사이즈 변경 UI -->
+                ${renderSizePills({
+                   key,
+                   product,
+                   selectedSize: options?.size,
+                })}
+
                 <div class='cart-item__controls' aria-label='Quantity Controls'>
                   <button type='button' data-qty-dec aria-label='Decrease quantity'>-</button>
                   <span class='cart-item__qty' data-qty>${qty}</span>
@@ -261,12 +319,12 @@ function renderCart(detailedItems) {
 
         <div class='cart__row'>
           <span>상품 합계(세일 반영)</span>
-          <strong>₩ ${formatPrice(subtotalAfterSale)}</strong>
+          <strong>₩ ${formatPrice(pricingCore.subtotalAfterSale)}</strong>
         </div>
 
         <div class='cart__row'>
           <span>쿠폰 할인</span>
-          <strong>-₩ ${formatPrice(couponDiscountTotal)}</strong>
+          <strong>-₩ ${formatPrice(pricingCore.couponDiscountTotal)}</strong>
         </div>
 
         <div class='cart__row'>
@@ -278,6 +336,12 @@ function renderCart(detailedItems) {
           <span>최종 결제금액</span>
           <strong>₩ ${formatPrice(total)}</strong>
         </div>
+
+        ${
+           hasMissingSize
+              ? `<p class="cart__warn">사이즈 선택이 필요한 상품이 있어요. 사이즈를 선택해 주세요.</p>`
+              : ''
+        }
 
         <button type='button' class='cart__clear' data-cart-clear>
           전체 비우기
@@ -312,7 +376,7 @@ function buildCheckoutPayload({ detailedItems, pricing, appliedCoupon }) {
          name: row.product?.name,
          qty: row.qty,
          options: row.options ?? {},
-         unitPrice: row.product?.price ?? 0, // 세일 반영가
+         unitPrice: row.product?.price ?? 0,
          couponDiscountUnit: row.computed?.couponDiscount ?? 0,
          lineTotal: row.computed?.lineTotal ?? 0,
          couponEligible: Boolean(row.product?.couponEligible),
@@ -336,14 +400,7 @@ function buildCheckoutPayload({ detailedItems, pricing, appliedCoupon }) {
    };
 }
 
-/**
- * ✅ 지금은 더미 결제 (나중에 여기만 API로 교체하면 끝)
- * - return: { ok, data?, message? }
- */
 async function checkout(payload) {
-   // 나중에 여기서:
-   // const res = await postCheckout(payload)
-   // return res
    await new Promise((r) => setTimeout(r, 350));
    return { ok: true, data: { paidAt: Date.now(), orderId: payload.orderId } };
 }
@@ -351,7 +408,6 @@ async function checkout(payload) {
 async function handleCheckout({ detailedItems }) {
    const appliedCoupon = couponStore.getAppliedCoupon();
 
-   // pricing 다시 계산(렌더의 숫자와 동일해야 하므로)
    const pricingCore = calcCartPricing(detailedItems, appliedCoupon);
    const shipping = calcShipping(pricingCore.totalAfterCoupon);
    const total = pricingCore.totalAfterCoupon + shipping;
@@ -369,29 +425,19 @@ async function handleCheckout({ detailedItems }) {
    });
 
    const result = await checkout(payload);
-   if (!result?.ok) {
-      // 실패 UX는 토스트/모달 연결 가능
-      console.warn('[checkout] failed:', result);
-      return { ok: false };
-   }
+   if (!result?.ok) return { ok: false };
 
-   // ✅ 성공 처리 1) 쿠폰 사용 처리(있으면)
    if (appliedCoupon?.code) {
       couponStore.markUsed?.(appliedCoupon.code);
       couponStore.clearApplied?.();
    }
 
-   // ✅ 성공 처리 2) 누적 구매액 반영 (마이페이지 등급 자동 갱신)
+   // ✅ authStore.updateUser가 없을 수도 있으니 방어
    const prev = authStore.getUser?.()?.totalSpent ?? 0;
-   authStore.updateUser?.({
-      totalSpent: Number(prev) + Number(payload.pricing.total || 0),
-   });
+   const nextSpent = Number(prev) + Number(payload.pricing.total || 0);
+   if (authStore.updateUser) authStore.updateUser({ totalSpent: nextSpent });
 
-   // ✅ 성공 처리 3) 장바구니 비우기
    cartStore.clear?.();
-
-   // ✅ 성공 처리 4) 완료 페이지/토스트로 확장 가능
-   // window.dispatchEvent(new CustomEvent('app:navigate', { detail: { href: '/mypage' } }))
    return { ok: true, payload, receipt: result.data };
 }
 
@@ -419,6 +465,19 @@ export async function initCartPage() {
    couponStore.subscribe(() => paint());
 
    cartEl.addEventListener('click', async (e) => {
+      // ✅ 사이즈 pill 클릭 처리
+      const sizePill = e.target.closest('[data-size-pill]');
+      if (sizePill) {
+         const key = String(
+            sizePill.getAttribute('data-cart-key') || '',
+         ).trim();
+         const size = String(sizePill.getAttribute('data-size') || '').trim();
+         if (!key || !size) return;
+
+         cartStore.updateOptions?.(key, { size });
+         return;
+      }
+
       if (e.target.closest('[data-cart-clear]')) {
          cartStore.clear();
          return;
