@@ -26,6 +26,8 @@ import { authStore } from '../../store/authStore.js';
 import { formatPrice } from '../../utils/format.js';
 import { calcLinePrice } from '../../utils/pricing.js';
 import { initToast } from '../../components/Toast.js';
+import { confirmModal } from '../../components/ConfirmModal.js';
+
 const FREE_SHIPPING_THRESHOLD = 300000;
 const SHIPPING_FEE = 3000;
 
@@ -519,8 +521,7 @@ export async function initCartPage() {
          await handleCheckout({ detailedItems: detailed });
          return;
       }
-
-      // ✅ 사이즈 변경 (pill 클릭)
+      // ✅ 사이즈 변경 (pill 클릭) - 모달 확인 후 변경
       const sizeBtn = e.target.closest('[data-cart-size-pill]');
       if (sizeBtn) {
          const itemEl = sizeBtn.closest('[data-cart-item]');
@@ -532,15 +533,71 @@ export async function initCartPage() {
          ).trim();
          if (!nextSize) return;
 
+         // 현재 라인의 사이즈 파악 (모달 문구용)
+         const state = cartStore.getState();
+         const currentLine = state.items.find((it) => it.key === key);
+         const prevSize = String(currentLine?.options?.size || '').trim();
+
+         // 같은 사이즈를 클릭하면 아무 것도 안 함(불필요한 모달 방지)
+         if (prevSize && prevSize === nextSize) return;
+
+         // ✅ 모달: 실수 방지
+         const ok = await confirmModal({
+            title: '사이즈 변경',
+            message: prevSize
+               ? `현재 선택된 사이즈는 ${prevSize}예요.\n${nextSize}로 변경할까요?`
+               : `${nextSize}로 사이즈를 선택할까요?`,
+            confirmText: '변경',
+            cancelText: '취소',
+         });
+
+         if (!ok) return;
+
+         // ✅ 변경 + (필요 시) 동일 라인 병합
+         const prevKey = key;
          const result = cartStore.updateOptions(key, { size: nextSize });
 
-         if (result?.ok) {
-            toast.show('사이즈가 변경됐어요 👌', { duration: 1400 });
-         } else {
+         // updateOptions는 { ok, message, key? } 형태
+         if (!result?.ok) {
             toast.show(result?.message || '사이즈 변경에 실패했어요.', {
                duration: 1400,
             });
+            return;
          }
+
+         const nextKey = String(result?.key || prevKey);
+         const didKeyChange = nextKey !== prevKey;
+
+         // 병합 여부: message에 "병합" 단어가 포함되어 있거나, key 변경 + 기존 라인 합쳐졌을 가능성
+         const didMerge = String(result?.message || '').includes('병합');
+
+         // ✅ 토스트 문구 디테일
+         // - prevSize가 있었으면 "A → B"
+         // - 병합이면 "동일 상품 합쳐짐" 안내
+         if (prevSize) {
+            toast.show(
+               didMerge
+                  ? `사이즈 ${prevSize} → ${nextSize}로 변경됐고, 동일 상품은 합쳐졌어요 ✅`
+                  : `사이즈 ${prevSize} → ${nextSize}로 변경됐어요 👌`,
+               { duration: 1600 },
+            );
+         } else {
+            toast.show(
+               didMerge
+                  ? `사이즈 ${nextSize}로 선택됐고, 동일 상품은 합쳐졌어요 ✅`
+                  : `사이즈 ${nextSize}로 선택됐어요 👌`,
+               { duration: 1600 },
+            );
+         }
+
+         // ✅ UX: 병합/키변경이 발생하면 DOM에 남아있는 data-cart-key가 오래된 값일 수 있음
+         // 우리는 paint()가 store.subscribe로 재렌더되므로 추가 작업은 보통 필요 없지만,
+         // 즉시 클릭 연타 시 혼선 방지를 위해 잠깐 잠금(선택)
+         sizeBtn.disabled = true;
+         setTimeout(() => {
+            sizeBtn.disabled = false;
+         }, 350);
+
          return;
       }
 
