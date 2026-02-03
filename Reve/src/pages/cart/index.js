@@ -6,74 +6,37 @@
  * ✅ 포함 기능
  * - 무료배송 기준선 + 배송비(30만원 미만 3,000원)
  * - 쿠폰 적용 가능 상품(라인) 개수 표시
- * - 보유 쿠폰 선택 적용/해제 (새로고침 유지: couponStore)
+ * - 보유 쿠폰 라디오 선택 + 모달 확인 후 적용/해제 (즉시 적용 X)
  * - 기본 세일(product.price) + 쿠폰 할인(pricing.js) 누적 반영
  * - checkout 버튼 활성화: (아이템 >= 1) && (최종금액 > 0)
  *
- * ✅ 확장 포인트 (API-ready)
- * - buildCheckoutPayload()로 결제 요청 데이터 구성
- * - checkout()에서 실제 API 연결 가능
- *
- * ✅ 이번 추가 포인트
+ * ✅ 옵션(사이즈) 기능
  * - Cart에서도 상품리스트와 동일한 "사이즈 pill" UI 제공
- * - pill 클릭 → cartStore.updateOptions(key, { size })로 사이즈 변경 + 라인 병합
+ * - pill 클릭 → confirmModal → cartStore.updateOptions(key, { size })
+ * - 동일 라인이 있으면 병합될 수 있음(스토어 정책)
+ *
+ * ✅ 멤버십(등급/적립) 표시
+ * - membership.js 단일 소스로 현재등급/적립률/예상 적립포인트/다음등급까지 표시
  * =============================================
  */
 
 import { cartStore } from '../../store/cartStore.js';
 import { couponStore } from '../../store/couponStore.js';
 import { authStore } from '../../store/authStore.js';
+
 import { formatPrice } from '../../utils/format.js';
 import { calcLinePrice } from '../../utils/pricing.js';
+
 import { initToast } from '../../components/Toast.js';
 import { confirmModal } from '../../components/ConfirmModal.js';
 
+import {
+   getMembershipSnapshot,
+   formatPercent,
+} from '../../utils/membership.js';
+
 const FREE_SHIPPING_THRESHOLD = 300000;
 const SHIPPING_FEE = 3000;
-
-/* ==============================
-   Membership (Grade) Utils
-   ============================== */
-
-// ✅ 등급 기준(원화)
-// - 실버: 300만원 미만
-// - 골드: 300~600만원 미만
-// - 로얄: 600~1200만원 미만
-// - VIP: 1200만원 이상
-// (추후 VVIP/VVVIP까지 확장 가능: 여기에만 추가하면 됨)
-const MEMBERSHIP_TIERS = [
-   { name: '실버', min: 0 },
-   { name: '골드', min: 3_000_000 },
-   { name: '로얄', min: 6_000_000 },
-   { name: 'VIP', min: 12_000_000 },
-];
-
-function clampMoney(n) {
-   const v = Number(n || 0);
-   return Number.isFinite(v) ? Math.max(0, v) : 0;
-}
-
-function getTierInfo(totalSpent) {
-   const spent = clampMoney(totalSpent);
-
-   // min 기준 오름차순 정렬 전제
-   let current = MEMBERSHIP_TIERS[0];
-   for (const t of MEMBERSHIP_TIERS) {
-      if (spent >= t.min) current = t;
-   }
-
-   const idx = MEMBERSHIP_TIERS.findIndex((t) => t.name === current.name);
-   const next = idx >= 0 ? MEMBERSHIP_TIERS[idx + 1] : null;
-
-   const remainToNext = next ? Math.max(0, next.min - spent) : 0;
-
-   return {
-      current,
-      next: next || null,
-      remainToNext,
-      spent,
-   };
-}
 
 /* ==============================
    1) Page Template
@@ -127,6 +90,10 @@ function calcShipping(subtotalAfterCoupon) {
    return subtotalAfterCoupon < FREE_SHIPPING_THRESHOLD ? SHIPPING_FEE : 0;
 }
 
+/**
+ * ✅ 쿠폰 적용 가능 라인 수(상품 기준)
+ * - couponEligible: true인 상품 라인만 카운트
+ */
 function countCouponEligibleLines(detailedItems) {
    return detailedItems.filter((row) => Boolean(row.product?.couponEligible))
       .length;
@@ -141,6 +108,7 @@ function getSizeOptions(product) {
       : [];
    const shoe = Array.isArray(product?.shoeSizes) ? product.shoeSizes : [];
    const shoeText = shoe.map((s) => String(s));
+
    return [...apparel, ...shoeText]
       .map((v) => String(v).trim())
       .filter(Boolean);
@@ -148,7 +116,7 @@ function getSizeOptions(product) {
 
 /**
  * ✅ 같은 productId의 "이미 담긴 사이즈들" 집합
- * - Cart에서 pill에 is-in-cart 표시(실수 방지)
+ * - Cart에서 pill에 is-in-cart 표시(실수 방지/가시성)
  */
 function getInCartSizeSet(items, productId) {
    const set = new Set();
@@ -161,7 +129,7 @@ function getInCartSizeSet(items, productId) {
 }
 
 /**
- * Cart 요약 계산
+ * ✅ Cart 요약 계산
  * - pricing.js(calcLinePrice)가 "기본 세일 + 쿠폰" 반영을 담당
  */
 function calcCartPricing(detailedItems, coupon) {
@@ -193,105 +161,111 @@ function calcCartPricing(detailedItems, coupon) {
    };
 }
 
+/**
+ * ✅ 쿠폰 섹션 렌더
+ * - 버튼 제거(MVP 목표)
+ * - 라디오 선택은 "즉시 적용"이 아니라, 클릭 이벤트에서 모달 확인 후 store 변경
+ */
 function renderCouponSection({ owned, appliedCoupon, eligibleCount }) {
    const usableCoupons = owned.filter((c) => !c.used);
    const canApplyAny = eligibleCount > 0;
 
    if (!usableCoupons.length) {
       return `
-     <div class='cart__coupon'>
+       <div class='cart__coupon'>
+         <div class='cart__row'>
+           <span>쿠폰 적용 가능</span>
+           <strong>${eligibleCount}개</strong>
+         </div>
+         <p class='cart__couponmsg'>
+           보유 쿠폰이 없어요. <a href='/mypage' data-link>마이페이지</a>에서 등록해 주세요.
+         </p>
+       </div>
+     `;
+   }
+
+   return `
+     <div class='cart__coupon' aria-label='쿠폰'>
        <div class='cart__row'>
          <span>쿠폰 적용 가능</span>
          <strong>${eligibleCount}개</strong>
        </div>
-       <p class='cart__couponmsg'>
-         보유 쿠폰이 없어요. <a href='/mypage' data-link>마이페이지</a>에서 등록해 주세요.
+
+       ${
+          !canApplyAny
+             ? `<p class='cart__couponmsg'>쿠폰 적용 가능한 상품이 없어요.</p>`
+             : `<p class='cart__couponmsg'>쿠폰을 선택하면 확인 후 적용돼요.</p>`
+       }
+
+       <div class='cart__couponlist' role='group' aria-label='쿠폰 선택'>
+         ${usableCoupons
+            .map((c) => {
+               const pct = Math.round(Number(c.rate || 0) * 100);
+               const checked = appliedCoupon?.code === c.code ? 'checked' : '';
+               const disabled = canApplyAny ? '' : 'disabled';
+
+               return `
+                 <label class='cart__couponitem'>
+                   <input
+                     type='radio'
+                     name='cart-coupon'
+                     value='${escapeHtml(c.code)}'
+                     data-coupon-radio
+                     ${checked}
+                     ${disabled}
+                   />
+                   <span class='cart__couponmeta'>
+                     <strong>${escapeHtml(c.code)}</strong> · ${pct}% · ${escapeHtml(c.title)}
+                   </span>
+                 </label>
+               `;
+            })
+            .join('')}
+       </div>
+
+       <p class='cart__couponstatus' data-coupon-msg>
+         ${
+            appliedCoupon
+               ? `적용 중: ${escapeHtml(appliedCoupon.code)}`
+               : '현재 적용된 쿠폰 없음'
+         }
        </p>
      </div>
    `;
-   }
-
-   return `
-   <div class='cart__coupon' aria-label='쿠폰'>
-     <div class='cart__row'>
-       <span>쿠폰 적용 가능</span>
-       <strong>${eligibleCount}개</strong>
-     </div>
-
-     ${
-        !canApplyAny
-           ? `<p class='cart__couponmsg'>쿠폰 적용 가능한 상품이 없어요.</p>`
-           : `<p class='cart__couponmsg'>쿠폰을 선택하면 확인 후 적용돼요.</p>`
-     }
-
-     <div class='cart__couponlist' role='group' aria-label='쿠폰 선택'>
-       ${usableCoupons
-          .map((c) => {
-             const pct = Math.round(Number(c.rate || 0) * 100);
-             const checked = appliedCoupon?.code === c.code ? 'checked' : '';
-             const disabled = canApplyAny ? '' : 'disabled';
-
-             return `
-             <label class='cart__couponitem'>
-               <input
-                 type='radio'
-                 name='cart-coupon'
-                 value='${escapeHtml(c.code)}'
-                 data-coupon-radio
-                 ${checked}
-                 ${disabled}
-               />
-               <span class='cart__couponmeta'>
-                 <strong>${escapeHtml(c.code)}</strong> · ${pct}% · ${escapeHtml(c.title)}
-               </span>
-             </label>
-           `;
-          })
-          .join('')}
-     </div>
-
-     <p class='cart__couponstatus' data-coupon-msg>
-       ${
-          appliedCoupon
-             ? `적용 중: ${escapeHtml(appliedCoupon.code)}`
-             : '현재 적용된 쿠폰 없음'
-       }
-     </p>
-   </div>
- `;
 }
+
 /**
  * ✅ Cart 라인별 사이즈 pill 렌더
  * - is-active: 이 라인의 현재 사이즈
- * - is-in-cart: 같은 상품에서 다른 라인에 이미 담긴 사이즈(중복 방지/가시성)
+ * - is-in-cart: 같은 상품에서 다른 라인에 이미 담긴 사이즈(가시성)
  */
 function renderSizePills({ product, currentSize, inCartSizeSet }) {
    const sizes = getSizeOptions(product);
    if (!sizes.length) return '';
 
    return `
-    <div class="cart-item__sizes" aria-label="사이즈 선택">
-      ${sizes
-         .map((v) => {
-            const isActive = currentSize === v;
-            const isInCart = inCartSizeSet.has(v);
+     <div class="cart-item__sizes" aria-label="사이즈 선택">
+       ${sizes
+          .map((v) => {
+             const isActive = currentSize === v;
+             const isInCart = inCartSizeSet.has(v);
 
-            return `
-              <button
-                type="button"
-                class="size-pill ${isActive ? 'is-active' : ''} ${isInCart ? 'is-in-cart' : ''}"
-                data-cart-size-pill
-                data-size-value="${escapeHtml(v)}"
-                aria-pressed="${isActive ? 'true' : 'false'}"
-                title="사이즈 ${escapeHtml(v)}"
-              >
-                ${escapeHtml(v)}
-              </button>
-            `;
-         })
-         .join('')}
-    </div>
-  `;
+             return `
+               <button
+                 type="button"
+                 class="size-pill ${isActive ? 'is-active' : ''} ${isInCart ? 'is-in-cart' : ''}"
+                 data-cart-size-pill
+                 data-size-value="${escapeHtml(v)}"
+                 aria-pressed="${isActive ? 'true' : 'false'}"
+                 title="사이즈 ${escapeHtml(v)}"
+               >
+                 ${escapeHtml(v)}
+               </button>
+             `;
+          })
+          .join('')}
+     </div>
+   `;
 }
 
 function renderCart(detailedItems) {
@@ -317,6 +291,13 @@ function renderCart(detailedItems) {
    // ✅ 같은 상품 기준으로 is-in-cart 스타일 찍기 위해 store raw state도 사용
    const rawItems = cartStore.getState()?.items ?? [];
 
+   // ✅ 멤버십(단일 소스) 기반 요약 계산
+   const user = authStore.getUser?.();
+   const { tierInfo, earnRate, expectedPoints } = getMembershipSnapshot({
+      totalSpent: user?.totalSpent ?? 0,
+      checkoutTotal: total,
+   });
+
    return `
     <div class='cart-layout' aria-label='Cart Layout'>
       <div class='cart__list' aria-label='Cart Items'>
@@ -338,33 +319,49 @@ function renderCart(detailedItems) {
               const hasCouponDiscount = computed.couponDiscount > 0;
 
               return `
-              <article class='cart-item' data-cart-item data-cart-key='${escapeHtml(key)}'>
-                <div class='cart-item__info'>
-                  <p class='cart-item__name'>${escapeHtml(product.name)}</p>
+                <article class='cart-item' data-cart-item data-cart-key='${escapeHtml(
+                   key,
+                )}'>
+                  <div class='cart-item__info'>
+                    <p class='cart-item__name'>${escapeHtml(product.name)}</p>
 
-                  <div class='cart-item__pricebox'>
-                    ${hasBaseSale ? `<span class='cart-item__base'>₩ ${formatPrice(product.basePrice)}</span>` : ''}
-                    <p class='cart-item__price'>₩ ${formatPrice(product.price)}</p>
-                    ${hasCouponDiscount ? `<p class='cart-item__coupon'>쿠폰 -₩ ${formatPrice(computed.couponDiscount)}</p>` : ''}
+                    <div class='cart-item__pricebox'>
+                      ${
+                         hasBaseSale
+                            ? `<span class='cart-item__base'>₩ ${formatPrice(
+                                 product.basePrice,
+                              )}</span>`
+                            : ''
+                      }
+                      <p class='cart-item__price'>₩ ${formatPrice(
+                         product.price,
+                      )}</p>
+                      ${
+                         hasCouponDiscount
+                            ? `<p class='cart-item__coupon'>쿠폰 -₩ ${formatPrice(
+                                 computed.couponDiscount,
+                              )}</p>`
+                            : ''
+                      }
+                    </div>
                   </div>
-                </div>
 
-                ${optionText ? `<p class='cart-item__meta'>${escapeHtml(optionText)}</p>` : ''}
+                  ${optionText ? `<p class='cart-item__meta'>${escapeHtml(optionText)}</p>` : ''}
 
-                <!-- ✅ Cart에서도 상품리스트와 동일한 사이즈 pill -->
-                ${renderSizePills({ product, currentSize, inCartSizeSet })}
+                  <!-- ✅ Cart에서도 상품리스트와 동일한 사이즈 pill -->
+                  ${renderSizePills({ product, currentSize, inCartSizeSet })}
 
-                <div class='cart-item__controls' aria-label='Quantity Controls'>
-                  <button type='button' data-qty-dec aria-label='Decrease quantity'>-</button>
-                  <span class='cart-item__qty' data-qty>${qty}</span>
-                  <button type='button' data-qty-inc aria-label='Increase quantity'>+</button>
-                </div>
+                  <div class='cart-item__controls' aria-label='Quantity Controls'>
+                    <button type='button' data-qty-dec aria-label='Decrease quantity'>-</button>
+                    <span class='cart-item__qty' data-qty>${qty}</span>
+                    <button type='button' data-qty-inc aria-label='Increase quantity'>+</button>
+                  </div>
 
-                <button type='button' class='cart-item__remove' data-remove aria-label='Remove item'>
-                  삭제
-                </button>
-              </article>
-            `;
+                  <button type='button' class='cart-item__remove' data-remove aria-label='Remove item'>
+                    삭제
+                  </button>
+                </article>
+              `;
            })
            .join('')}
       </div>
@@ -372,6 +369,33 @@ function renderCart(detailedItems) {
       <aside class='cart__summary' aria-label='Cart Summary'>
         <p class='cart__hint'>${freeShippingText}</p>
 
+        <!-- ✅ 멤버십 요약 -->
+        <div class='cart__membership' aria-label='회원 등급 및 적립'>
+          <div class='cart__row'>
+            <span>회원 등급</span>
+            <strong>${tierInfo.current.name} · 적립 ${formatPercent(
+               earnRate,
+            )}</strong>
+          </div>
+
+          <div class='cart__row'>
+            <span>이번 결제 적립 예상</span>
+            <strong>${formatPrice(expectedPoints)}P</strong>
+          </div>
+
+          <div class='cart__row cart__row--muted'>
+            <span>다음 등급까지</span>
+            <strong>
+              ${
+                 tierInfo.next
+                    ? `₩ ${formatPrice(tierInfo.remainToNext)}`
+                    : '최고 등급'
+              }
+            </strong>
+          </div>
+        </div>
+
+        <!-- ✅ 쿠폰 -->
         ${renderCouponSection({
            owned,
            appliedCoupon,
@@ -456,6 +480,7 @@ function buildCheckoutPayload({ detailedItems, pricing, appliedCoupon }) {
 }
 
 async function checkout(payload) {
+   // ✅ Mock 결제(실 결제 연동 전)
    await new Promise((r) => setTimeout(r, 350));
    return { ok: true, data: { paidAt: Date.now(), orderId: payload.orderId } };
 }
@@ -482,16 +507,19 @@ async function handleCheckout({ detailedItems }) {
    const result = await checkout(payload);
    if (!result?.ok) return { ok: false };
 
+   // ✅ 쿠폰 사용 처리 + 적용 해제
    if (appliedCoupon?.code) {
       couponStore.markUsed?.(appliedCoupon.code);
       couponStore.clearApplied?.();
    }
 
+   // ✅ 누적 구매액 갱신(등급 산정 데이터)
    const prev = authStore.getUser?.()?.totalSpent ?? 0;
    authStore.updateUser?.({
       totalSpent: Number(prev) + Number(payload.pricing.total || 0),
    });
 
+   // ✅ 결제 완료 후 장바구니 비우기
    cartStore.clear?.();
 
    return { ok: true, payload, receipt: result.data };
@@ -504,6 +532,7 @@ async function handleCheckout({ detailedItems }) {
 export async function initCartPage() {
    const cartEl = document.querySelector('[data-cart]');
    if (!cartEl) return;
+
    const toast = initToast();
    let paintSeq = 0;
 
@@ -515,41 +544,47 @@ export async function initCartPage() {
       cartEl.innerHTML = detailed.length ? renderCart(detailed) : renderEmpty();
    }
 
+   // ✅ 최초 렌더
    await paint();
 
+   // ✅ store 변경 시 자동 리렌더
    cartStore.subscribe(() => paint());
    couponStore.subscribe(() => paint());
 
    cartEl.addEventListener('click', async (e) => {
-      // ✅ 전체 비우기
+      /* ------------------------------
+         A) 전체 비우기
+      ------------------------------ */
       if (e.target.closest('[data-cart-clear]')) {
          cartStore.clear();
          return;
       }
 
-      // ✅ 쿠폰 선택/해제: 라디오 클릭 → 모달로 확정 (즉시 적용 X)
+      /* ------------------------------
+         B) 쿠폰 라디오 클릭 UX
+         - 즉시 적용 X
+         - 모달 확인 후 apply/clear
+         - 취소 시 paint()로 UI 원복
+      ------------------------------ */
       const couponInput = e.target.closest('[data-coupon-radio]');
       if (couponInput) {
-         // 현재 적용 쿠폰
          const applied = couponStore.getAppliedCoupon(); // {code,title,rate} | null
          const currentCode = String(applied?.code || '').trim();
 
-         // 사용자가 클릭한 쿠폰
          const nextCode = String(couponInput.value || '')
             .trim()
             .toUpperCase();
 
-         // 쿠폰 적용 가능한 라인 수(안전빵)
          const detailed = await cartStore.getDetailedItems();
          const eligibleCount = countCouponEligibleLines(detailed);
 
          if (eligibleCount <= 0) {
             toast.show('쿠폰 적용 가능한 상품이 없어요.', { duration: 1400 });
-            await paint(); // ✅ UI를 store 기준으로 복구
+            await paint();
             return;
          }
 
-         // 1) 적용된 쿠폰을 다시 클릭 → 해제 시도
+         // 1) 현재 적용 쿠폰을 "다시 클릭" → 해제 confirm
          if (currentCode && nextCode === currentCode) {
             const ok = await confirmModal({
                title: '쿠폰 해제',
@@ -563,11 +598,11 @@ export async function initCartPage() {
                toast.show('쿠폰을 해제했어요.', { duration: 1400 });
             }
 
-            await paint(); // ✅ 취소든 확인이든 store가 진짜, UI 롤백
+            await paint();
             return;
          }
 
-         // 2) 다른 쿠폰 선택 → 적용 시도
+         // 2) 다른 쿠폰 선택 → 적용 confirm
          const owned = couponStore.getState()?.owned ?? [];
          const picked = owned.find((c) => c.code === nextCode);
 
@@ -583,7 +618,6 @@ export async function initCartPage() {
 
          if (ok) {
             const result = couponStore.apply(nextCode);
-
             if (result?.ok) {
                toast.show('쿠폰이 적용됐어요 🎫', { duration: 1400 });
             } else {
@@ -593,26 +627,27 @@ export async function initCartPage() {
             }
          }
 
-         await paint(); // ✅ 취소 시 라디오 선택이 바뀐 것처럼 보여도 즉시 복구
+         // ✅ 취소든 확인이든, store가 진짜 상태이므로 재렌더로 UI 정렬
+         await paint();
          return;
       }
 
-      // ✅ 구매하기 - 모달 확인 → Mock 결제 → 완료 모달
+      /* ------------------------------
+         C) 구매하기
+         - 결제 확인 모달 → Mock 결제 → 결제 완료 모달(요약 + 등급 안내)
+      ------------------------------ */
       if (e.target.closest('[data-checkout]')) {
          const detailed = await cartStore.getDetailedItems();
          if (!detailed.length) return;
 
-         // 1) 결제 전 확인 모달
          const okPay = await confirmModal({
             title: '결제 확인',
             message: '결제를 진행할까요?',
             confirmText: '결제하기',
             cancelText: '취소',
          });
-
          if (!okPay) return;
 
-         // 2) 결제 진행 (Mock)
          const result = await handleCheckout({ detailedItems: detailed });
 
          if (!result?.ok) {
@@ -622,20 +657,15 @@ export async function initCartPage() {
             return;
          }
 
-         // 3) 결제 완료 모달(요약 + 등급)
+         // ✅ 결제 요약 + 등급 안내(결제 후 최신 user 기준)
          const pricing = result?.payload?.pricing;
          const coupon = result?.payload?.coupon;
 
-         // ✅ 결제 후 최신 유저 totalSpent 기준으로 등급 계산
          const user = authStore.getUser?.();
-         const tier = getTierInfo(user?.totalSpent ?? 0);
-
-         const tierLines = [
-            `🏷️ 현재 등급: ${tier.current.name}`,
-            tier.next
-               ? `⬆️ 다음 등급(${tier.next.name})까지 ₩ ${formatPrice(tier.remainToNext)} 남았어요`
-               : '👑 최고 등급이에요. 유지하면 혜택이 계속 적용돼요!',
-         ].join('\n');
+         const { tierInfo } = getMembershipSnapshot({
+            totalSpent: user?.totalSpent ?? 0,
+            checkoutTotal: Number(pricing?.total ?? 0),
+         });
 
          const summaryLines = [
             coupon?.code
@@ -645,6 +675,15 @@ export async function initCartPage() {
             `💳 최종 결제: ₩ ${formatPrice(pricing?.total ?? 0)}`,
          ].join('\n');
 
+         const tierLines = [
+            `🏷️ 현재 등급: ${tierInfo.current.name}`,
+            tierInfo.next
+               ? `⬆️ 다음 등급(${tierInfo.next.name})까지 ₩ ${formatPrice(
+                    tierInfo.remainToNext,
+                 )} 남았어요`
+               : '👑 최고 등급이에요. 유지하면 혜택이 계속 적용돼요!',
+         ].join('\n');
+
          await confirmModal({
             title: '결제 완료 ✅',
             message: `결제가 완료되었습니다.\n\n${summaryLines}\n\n${tierLines}`,
@@ -652,10 +691,13 @@ export async function initCartPage() {
             cancelText: '닫기',
          });
 
-         // handleCheckout 내부에서 cartStore.clear()까지 끝났으므로 여기서 추가 처리 필요 없음
          return;
       }
-      // ✅ 사이즈 변경 (pill 클릭) - 모달 확인 후 변경
+
+      /* ------------------------------
+         D) 사이즈 변경 (pill 클릭)
+         - 모달 확인 → updateOptions(병합 가능) → 토스트 디테일
+      ------------------------------ */
       const sizeBtn = e.target.closest('[data-cart-size-pill]');
       if (sizeBtn) {
          const itemEl = sizeBtn.closest('[data-cart-item]');
@@ -667,15 +709,14 @@ export async function initCartPage() {
          ).trim();
          if (!nextSize) return;
 
-         // 현재 라인의 사이즈 파악 (모달 문구용)
+         // ✅ 현재 라인의 이전 사이즈(문구/불필요 모달 방지)
          const state = cartStore.getState();
          const currentLine = state.items.find((it) => it.key === key);
          const prevSize = String(currentLine?.options?.size || '').trim();
 
-         // 같은 사이즈를 클릭하면 아무 것도 안 함(불필요한 모달 방지)
+         // ✅ 같은 사이즈 클릭은 무시
          if (prevSize && prevSize === nextSize) return;
 
-         // ✅ 모달: 실수 방지
          const ok = await confirmModal({
             title: '사이즈 변경',
             message: prevSize
@@ -684,14 +725,12 @@ export async function initCartPage() {
             confirmText: '변경',
             cancelText: '취소',
          });
-
          if (!ok) return;
 
          // ✅ 변경 + (필요 시) 동일 라인 병합
          const prevKey = key;
          const result = cartStore.updateOptions(key, { size: nextSize });
 
-         // updateOptions는 { ok, message, key? } 형태
          if (!result?.ok) {
             toast.show(result?.message || '사이즈 변경에 실패했어요.', {
                duration: 1400,
@@ -700,14 +739,10 @@ export async function initCartPage() {
          }
 
          const nextKey = String(result?.key || prevKey);
-         const didKeyChange = nextKey !== prevKey;
-
-         // 병합 여부: message에 "병합" 단어가 포함되어 있거나, key 변경 + 기존 라인 합쳐졌을 가능성
          const didMerge = String(result?.message || '').includes('병합');
+         const didKeyChange = nextKey !== prevKey; // 참고용(병합되면 바뀔 수 있음)
 
          // ✅ 토스트 문구 디테일
-         // - prevSize가 있었으면 "A → B"
-         // - 병합이면 "동일 상품 합쳐짐" 안내
          if (prevSize) {
             toast.show(
                didMerge
@@ -724,9 +759,7 @@ export async function initCartPage() {
             );
          }
 
-         // ✅ UX: 병합/키변경이 발생하면 DOM에 남아있는 data-cart-key가 오래된 값일 수 있음
-         // 우리는 paint()가 store.subscribe로 재렌더되므로 추가 작업은 보통 필요 없지만,
-         // 즉시 클릭 연타 시 혼선 방지를 위해 잠깐 잠금(선택)
+         // ✅ 연타 방지(병합/리렌더 직전 클릭 혼선 방지)
          sizeBtn.disabled = true;
          setTimeout(() => {
             sizeBtn.disabled = false;
@@ -735,7 +768,9 @@ export async function initCartPage() {
          return;
       }
 
-      // ✅ 라인 조작(key 기준)
+      /* ------------------------------
+         E) 라인 조작 (key 기준)
+      ------------------------------ */
       const itemEl = e.target.closest('[data-cart-item]');
       const key = itemEl?.getAttribute('data-cart-key');
       if (!key) return;
