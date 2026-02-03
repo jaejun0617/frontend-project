@@ -155,77 +155,67 @@ function renderCouponSection({ owned, appliedCoupon, eligibleCount }) {
 
    if (!usableCoupons.length) {
       return `
-      <div class='cart__coupon'>
-        <div class='cart__row'>
-          <span>쿠폰 적용 가능</span>
-          <strong>${eligibleCount}개</strong>
-        </div>
-        <p class='cart__couponmsg'>
-          보유 쿠폰이 없어요. <a href='/mypage' data-link>마이페이지</a>에서 등록해 주세요.
-        </p>
-      </div>
-    `;
+     <div class='cart__coupon'>
+       <div class='cart__row'>
+         <span>쿠폰 적용 가능</span>
+         <strong>${eligibleCount}개</strong>
+       </div>
+       <p class='cart__couponmsg'>
+         보유 쿠폰이 없어요. <a href='/mypage' data-link>마이페이지</a>에서 등록해 주세요.
+       </p>
+     </div>
+   `;
    }
 
    return `
-    <div class='cart__coupon'>
-      <div class='cart__row'>
-        <span>쿠폰 적용 가능</span>
-        <strong>${eligibleCount}개</strong>
-      </div>
+   <div class='cart__coupon' aria-label='쿠폰'>
+     <div class='cart__row'>
+       <span>쿠폰 적용 가능</span>
+       <strong>${eligibleCount}개</strong>
+     </div>
 
-      ${
-         !canApplyAny
-            ? `<p class='cart__couponmsg'>쿠폰 적용 가능한 상품이 없어요.</p>`
-            : `<p class='cart__couponmsg'>보유 쿠폰 중 1개를 선택해 적용할 수 있어요.</p>`
-      }
+     ${
+        !canApplyAny
+           ? `<p class='cart__couponmsg'>쿠폰 적용 가능한 상품이 없어요.</p>`
+           : `<p class='cart__couponmsg'>쿠폰을 선택하면 확인 후 적용돼요.</p>`
+     }
 
-      <div class='cart__couponlist' role='group' aria-label='쿠폰 선택'>
-        ${usableCoupons
-           .map((c) => {
-              const pct = Math.round(Number(c.rate || 0) * 100);
-              const checked = appliedCoupon?.code === c.code ? 'checked' : '';
-              const disabled = canApplyAny ? '' : 'disabled';
+     <div class='cart__couponlist' role='group' aria-label='쿠폰 선택'>
+       ${usableCoupons
+          .map((c) => {
+             const pct = Math.round(Number(c.rate || 0) * 100);
+             const checked = appliedCoupon?.code === c.code ? 'checked' : '';
+             const disabled = canApplyAny ? '' : 'disabled';
 
-              return `
-              <label class='cart__couponitem'>
-                <input
-                  type='radio'
-                  name='cart-coupon'
-                  value='${escapeHtml(c.code)}'
-                  data-coupon-radio
-                  ${checked}
-                  ${disabled}
-                />
-                <span class='cart__couponmeta'>
-                  <strong>${escapeHtml(c.code)}</strong> · ${pct}% · ${escapeHtml(c.title)}
-                </span>
-              </label>
-            `;
-           })
-           .join('')}
-      </div>
+             return `
+             <label class='cart__couponitem'>
+               <input
+                 type='radio'
+                 name='cart-coupon'
+                 value='${escapeHtml(c.code)}'
+                 data-coupon-radio
+                 ${checked}
+                 ${disabled}
+               />
+               <span class='cart__couponmeta'>
+                 <strong>${escapeHtml(c.code)}</strong> · ${pct}% · ${escapeHtml(c.title)}
+               </span>
+             </label>
+           `;
+          })
+          .join('')}
+     </div>
 
-      <div class='cart__couponactions'>
-        <button type='button' class='cart__couponbtn' data-coupon-apply ${canApplyAny ? '' : 'disabled'}>
-          적용
-        </button>
-        <button type='button' class='cart__couponbtn' data-coupon-clear ${appliedCoupon ? '' : 'disabled'}>
-          해제
-        </button>
-      </div>
-
-      <p class='cart__couponstatus' data-coupon-msg>
-        ${
-           appliedCoupon
-              ? `적용 중: ${escapeHtml(appliedCoupon.code)} (${Math.round((appliedCoupon.rate || 0) * 100)}%)`
-              : '현재 적용된 쿠폰 없음'
-        }
-      </p>
-    </div>
-  `;
+     <p class='cart__couponstatus' data-coupon-msg>
+       ${
+          appliedCoupon
+             ? `적용 중: ${escapeHtml(appliedCoupon.code)}`
+             : '현재 적용된 쿠폰 없음'
+       }
+     </p>
+   </div>
+ `;
 }
-
 /**
  * ✅ Cart 라인별 사이즈 pill 렌더
  * - is-active: 이 라인의 현재 사이즈
@@ -493,23 +483,73 @@ export async function initCartPage() {
          return;
       }
 
-      // ✅ 쿠폰 적용
-      if (e.target.closest('[data-coupon-apply]')) {
-         const radio = cartEl.querySelector('input[data-coupon-radio]:checked');
-         const msgEl = cartEl.querySelector('[data-coupon-msg]');
+      // ✅ 쿠폰 선택/해제: 라디오 클릭 → 모달로 확정 (즉시 적용 X)
+      const couponInput = e.target.closest('[data-coupon-radio]');
+      if (couponInput) {
+         // 현재 적용 쿠폰
+         const applied = couponStore.getAppliedCoupon(); // {code,title,rate} | null
+         const currentCode = String(applied?.code || '').trim();
 
-         const code = String(radio?.value || '')
+         // 사용자가 클릭한 쿠폰
+         const nextCode = String(couponInput.value || '')
             .trim()
             .toUpperCase();
-         const result = couponStore.apply(code);
 
-         if (msgEl) msgEl.textContent = result.message;
-         return;
-      }
+         // 쿠폰 적용 가능한 라인 수(안전빵)
+         const detailed = await cartStore.getDetailedItems();
+         const eligibleCount = countCouponEligibleLines(detailed);
 
-      // ✅ 쿠폰 해제
-      if (e.target.closest('[data-coupon-clear]')) {
-         couponStore.clearApplied();
+         if (eligibleCount <= 0) {
+            toast.show('쿠폰 적용 가능한 상품이 없어요.', { duration: 1400 });
+            await paint(); // ✅ UI를 store 기준으로 복구
+            return;
+         }
+
+         // 1) 적용된 쿠폰을 다시 클릭 → 해제 시도
+         if (currentCode && nextCode === currentCode) {
+            const ok = await confirmModal({
+               title: '쿠폰 해제',
+               message: `쿠폰(${currentCode})을 사용하지 않을까요?`,
+               confirmText: '해제',
+               cancelText: '유지',
+            });
+
+            if (ok) {
+               couponStore.clearApplied();
+               toast.show('쿠폰을 해제했어요.', { duration: 1400 });
+            }
+
+            await paint(); // ✅ 취소든 확인이든 store가 진짜, UI 롤백
+            return;
+         }
+
+         // 2) 다른 쿠폰 선택 → 적용 시도
+         const owned = couponStore.getState()?.owned ?? [];
+         const picked = owned.find((c) => c.code === nextCode);
+
+         const title = String(picked?.title || nextCode);
+         const pct = Math.round(Number(picked?.rate || 0) * 100);
+
+         const ok = await confirmModal({
+            title: '쿠폰 적용',
+            message: `쿠폰 "${title}" (${pct}%)을 사용하시겠어요?`,
+            confirmText: '적용',
+            cancelText: '취소',
+         });
+
+         if (ok) {
+            const result = couponStore.apply(nextCode);
+
+            if (result?.ok) {
+               toast.show('쿠폰이 적용됐어요 🎫', { duration: 1400 });
+            } else {
+               toast.show(result?.message || '쿠폰 적용에 실패했어요.', {
+                  duration: 1400,
+               });
+            }
+         }
+
+         await paint(); // ✅ 취소 시 라디오 선택이 바뀐 것처럼 보여도 즉시 복구
          return;
       }
 

@@ -1,261 +1,286 @@
-# Reve | Vite + JS Commerce SPA
+# REVE MVP 기능 구현 기록 (Auth / Cart / Product / Search)
 
-## 0) 한 줄 컨셉 (앱 정체성)
-
-- 명품 편집샵 Reve SPA
-- 핵심 흐름: 검색/탐색 → 장바구니 → 로그인/구매 전환
+> 목적: MVP 전자상거래 흐름을 “라우터 기반 SPA + localStorage 기반 스토어”로 구현  
+> 범위: 인증/권한, 쿠폰, 장바구니(옵션), 상품리스트 UX, 전역 이벤트 위임, 검색 구조
 
 ---
 
-## 1) 목표와 학습 포인트
+## 0) 프로젝트 구조 개요
 
-- SPA 라우팅(커스텀 라우터)으로 페이지 전환 감 익히기
-- Firebase(Auth/Firestore/Storage) 기반의 인증 및 데이터 흐름 경험하기
-- 상태 관리(user/cart)와 UI 동기화(합계/수량/권한 가드) 경험하기
-- 검색 UX, 장바구니/주문 플로우, 마이페이지, 관리자 기능까지 단계적으로 확장하기
+### 전역 진입점
 
----
+- `app.js`
+   - 라우터/레이아웃 조립
+   - 전역 UI 초기화(사이드바/검색드로어/토스트/인증 UI)
+   - 전역 이벤트 위임(상품리스트 사이즈 선택/장바구니 담기)
+   - sessionStorage 기반 “회원가입 후 메인 모달” 플로우 처리
+   - auth/cart store 구독으로 UI 동기화
 
-## 2) 기술 스택 및 구조 (Tech Stack)
+### 페이지
 
-- Frontend: Vite (Bundler) + Vanilla JS (SPA 구현)
-- Backend as a Service: Firebase (Auth, Firestore, Storage)
-- Deployment: Netlify (CI/CD 자동화)
-- Architecture: Feature-based Module 분리
-   - src/api: Firebase 통신 로직
-   - src/components: 재사용 UI (Header, Footer, Skeleton)
-   - src/pages: 각 라우트별 독립 페이지 모듈
-   - src/store: 전역 상태 관리 (간단한 Object 또는 Pub/Sub 패턴)
+- `src/pages/auth/index.js` : 로그인/회원가입 + redirectTo 지원
+- `src/pages/product/index.js` : 상품 리스트 렌더(그리드)
+- `src/pages/productDetail/index.js` : 상품 상세(옵션 선택/장바구니/바로구매) (진행 중)
+- `src/pages/cart/index.js` : 장바구니 + 쿠폰 + 결제(더미)
+- `src/pages/search/index.js` : 검색 페이지 구조 (확장 예정)
 
----
+### 스토어
 
-## 3) 라우팅 설계 (Public/Protected)
+- `src/store/authStore.js` : 로그인 상태, 유저 persist
+- `src/store/cartStore.js` : 유저별 장바구니, 옵션 라인, 라인 병합
+- `src/store/couponStore.js` : 쿠폰 등록/적용/사용처리, persist
 
-### Public
+### 유틸/컴포넌트
 
-- 메인(Home)
-- 상품 목록/상세(Product)
-- 검색(Search)
-- 장바구니(Cart)
-- 인증(Auth: Login/Join)
-
-### Protected (가드 필요)
-
-- 주문(Checkout)
-- 주문완료(Order Complete)
-- 마이페이지(MyPage)
-- 관리자(Admin Dashboard)
-
-### 보호 로직(가드) 개요
-
-- 페이지 진입 전 `onAuthStateChanged`로 인증 상태/권한 확인
-- 비로그인 사용자는 `redirect?next=/checkout` 형태로 인증 페이지로 이동
-- Admin은 `role === 'admin'` 조건 통과 시 접근 허용
+- `src/utils/router.js` : 라우팅
+- `src/utils/guards.js` : requireAuth / requireAdmin
+- `src/utils/searchDrawer.js` : 검색 서랍 전역 UI
+- `src/utils/sidebar.js` : 사이드바 전역 UI
+- `src/utils/authUi.js` : Header 메뉴 노출/갱신
+- `src/components/Toast.js` : 토스트(중앙 표시)
+- `src/components/ConfirmModal.js` : 확인/취소 모달
+- `src/components/ProductCard.js` : 상품 카드(사이즈 pill + 장바구니 아이콘 버튼)
 
 ---
 
-## 4) 라우트 목록
+## 1) 🔎 검색바(Search) 구현 현황
 
-| Route             | Page           | 타입      | 목적                                    |
-| ----------------- | -------------- | --------- | --------------------------------------- |
-| `/`               | Home           | Public    | 메인 진입. 추천/인기 상품으로 탐색 시작 |
-| `/product`        | Product        | Public    | 상품 리스트 탐색(정렬/필터)             |
-| `/product/:id`    | Product Detail | Public    | 상품 상세(이미지, 정보, 리뷰, 추천)     |
-| `/search`         | Search         | Public    | 키워드 기반 결과 + 최근/인기 검색어     |
-| `/cart`           | Cart           | Public    | 장바구니 관리 및 체크아웃 진입          |
-| `/auth`           | Auth           | Public    | 로그인/회원가입 + next 복귀             |
-| `/checkout`       | Checkout       | Protected | 주문서 작성 및 결제 진행                |
-| `/order-complete` | Order Complete | Protected | 결제 완료 및 주문 확인                  |
-| `/mypage`         | MyPage         | Protected | 프로필/배송지/주문내역/활동내역         |
-| `/admin`          | Admin          | Protected | 상품/주문/매출 대시보드                 |
+### ✅ Search Drawer (전역 검색 서랍)
 
----
+- `initSearchDrawer()` 로 **전역 1회 초기화**
+- 라우팅이 바뀌어도 유지되는 UI
+- `app:render` 마다 `searchDrawer.refresh()` 호출해서 **새 DOM 기준 재연결**
+- 보통 Header의 검색 버튼/아이콘에서 열리는 구조
 
-## 5) 핵심 기능 및 아키텍처 요약
+### ✅ Search Page (/search)
 
-### 5-1) 검색 UX
+- 라우트 등록:
+   - `'/search': { render: SearchPage, afterRender: initSearchPage }`
+- 페이지 이동형 검색도 가능한 기반 완료
 
-- 데이터 매칭: 상품명 + 영문/한글 태그 통합 검색(대소문자 구분 없음)
-- 히스토리 관리: localStorage 기반 최근 검색어 CRUD 및 전체 삭제
-- 추천/탭: 추천 검색어 노출 및 탭 전환(인기/최근)
+### ✅ Sidebar + Search 연동 구조
 
-### 5-2) 장바구니 및 주문 플로우
+- `initSidebar()` 전역 초기화 완료
+- “전역 UI(사이드바/검색드로어)” 패턴이 동일하게 동작
 
-- 하이브리드 장바구니
-   - 비로그인: localStorage 저장
-   - 로그인: Firestore와 동기화(선택 또는 자동)
-- 결제
-   - Stripe 결제 연동 및 웹훅 처리
-   - 주문서 작성 → 결제 승인 → 주문 내역 DB 저장 → 완료 페이지
+### 🔧 Search에서 남은 작업(확장 단계)
 
-### 5-3) 마이페이지 및 커뮤니티
-
-- 프로필/배송지
-   - 배송지 CRUD 및 기본 배송지 설정
-- 리뷰 시스템
-   - 별점/텍스트 리뷰
-   - 이미지 업로드(Firebase Storage)
-- 활동 내역
-   - 찜(Wishlist)
-   - 최근 본 상품(Session/Local Storage)
-
-### 5-4) 운영(Admin)
-
-- 대시보드
-   - 총 매출 요약
-   - 주문 상태 변경(배송준비/배송중/완료)
-- 상품 관리
-   - 상품 등록/수정/삭제
+1. 검색어 상태 유지
+   - 드로어 열고 닫아도 입력값 유지 여부
+   - `/search?q=...` 쿼리스트링 연동
+2. 검색 결과 UX
+   - 결과를 ProductGrid에 붙이기
+   - 결과 없음 상태 처리
+3. 검색 추천/자동완성
+   - 최근 검색어 localStorage 저장
+   - 추천 키워드/인기 키워드
+4. 필터(차후)
+   - 카테고리/브랜드/가격대
 
 ---
 
-## 6) UX 및 데이터 알고리즘
+## 2) 🔐 인증(Auth) + 권한(Role) 기반 UI/가드
 
-- 상품 추천: 현재 보고 있는 상품의 tags 기반 유사 상품 추천(Similarity Logic)
-- 할인 시스템: 쿠폰 코드 검증 및 실시간 할인율 적용
-- UX 필수 세트
-   - Skeleton UI: 데이터 로딩 시 레이아웃 안정
-   - Error 처리: API 실패 시 재시도 제공
-   - Empty State: 검색/장바구니가 비었을 때 쇼핑 유도 액션 제공
+### ✅ authStore
 
----
+- 더미 계정 로그인
+   - `admin / 1234 → ADMIN`
+   - `user / 1234 → MEMBER`
+- 회원가입
+   - localStorage에 유저 저장
+   - 성공 시 자동 로그인
+- 로그인 상태 localStorage persist 유지
 
-## 7) 페이지별 기획 설계
+### ✅ guards
 
-### 7-1) Home `/`
+- `requireAuth({ redirectTo })`
+   - 비로그인 → `/auth?redirectTo=/원래경로` 이동
+- `requireAdmin({ redirectTo })`
+   - 관리자만 `/admin` 접근 가능
 
-- 목표: 들어오자마자 탐색 시작
-- 섹션 구성
-   - Hero 배너(카테고리/이벤트)
-   - 추천/인기 상품(6~8개)
-   - 카테고리 바로가기
+### ✅ Header UI 가드
 
----
-
-### 7-2) Product `/product`
-
-- 목표: 상품 탐색의 본진
-- UI 구성
-   - 정렬: 인기/최신/가격낮은/가격높은
-   - 필터: 카테고리/가격대/태그
-   - 리스트: ProductCard Grid
+- 로그인 전: 마이페이지/관리자 메뉴 숨김
+- 로그인 후: 마이페이지 노출
+- ADMIN: 관리자 메뉴 노출
+- 로그아웃 동작 연결
 
 ---
 
-### 7-3) Product Detail `/product/:id`
+## 3) 🎫 쿠폰 시스템(couponStore)
 
-- 목표: 구매 결정을 돕는 상세 정보 제공
-- 섹션 구성
-   - 이미지 갤러리, 가격/할인, 옵션(선택)
-   - 리뷰(별점/텍스트/이미지)
-   - 유사 상품 추천
+### ✅ 상태 + persist
 
----
+- 쿠폰 catalog 기반 정의(서버 대체)
+- 보유 쿠폰 `owned[]`
+- 적용 쿠폰 `appliedCode`
+- 새로고침 유지(localStorage)
 
-### 7-4) Search `/search`
+### ✅ 기능
 
-- 목표: 의도 있는 유저를 빠르게 상품으로
-- UI 구성
-   - 검색창 + 추천/최근 탭
-   - 결과 리스트 + 정렬/필터
+- `register(code)` : 쿠폰 등록
+- `apply(code)` : 쿠폰 적용
+- `clearApplied()` : 적용 해제
+- `markUsed(code)` : 결제 시 사용 처리
+- `clearAll()` : 테스트/디버그용 초기화
 
----
+### ✅ 회원가입 웰컴 쿠폰
 
-### 7-5) Cart `/cart`
-
-- 목표: 구매 직전 최종 정리 화면
-- UI 구성
-   - 아이템 리스트(수량 변경, 삭제)
-   - 가격 요약(상품합계/할인/배송/총합)
-   - CTA: 체크아웃
+- 회원가입 성공 시 `HELLOWORLD(10%)` 1회 지급
 
 ---
 
-### 7-6) Checkout `/checkout`
+## 4) 🎉 회원가입 후 “메인에서” 웰컴 모달 플로우
 
-- 목표: 주문서 작성 및 결제 흐름 제공
-- UI 구성
-   - 배송지 선택/입력
-   - 결제 정보 및 최종 결제 금액
-   - 결제 진행 및 완료 처리
+### 목표 흐름
 
----
+- 회원가입 → **메인으로 이동** → (2초 뒤) 웰컴 모달 표시
 
-### 7-7) Order Complete `/order-complete`
+### 구현 방식
 
-- 목표: 결제 완료 확인 및 주문 요약
-- UI 구성
-   - 주문 번호, 결제 금액, 배송 정보
-   - 주문 내역 보기(마이페이지 연결)
+- Auth 페이지에서 `sessionStorage`에 플래그 저장
+- 홈 렌더 완료 후 `app:render`에서 모달 실행
+- `setTimeout(2000)` 으로 지연 가능
+- 중복 방지: `didRunSignupModal` + `sessionStorage` 즉시 제거(1회성)
 
----
+### 모달 UX
 
-### 7-8) Auth `/auth`
-
-- 목표: 로그인 장벽 최소화
-- 기능
-   - 로그인/회원가입
-   - next 복귀(`?next=/checkout`)
+- 확인: 마이페이지(쿠폰함) 이동
+- 취소: 메인 유지
 
 ---
 
-### 7-9) MyPage `/mypage`
+## 5) 🛒 cartStore 고도화 (유저별 분리 + 옵션 라인)
 
-- 목표: 유저 정보 및 활동 내역 제공
-- 섹션 구성
-   - 프로필/배송지 관리
-   - 주문 내역
-   - 찜 및 최근 본 상품
+### ✅ 유저별 장바구니 분리
 
----
+- storage key: `reve_cart_v1:<ownerKey>`
+- 로그인/로그아웃 시 `setOwner(userId)` 로 자동 스위칭
+- guest 장바구니도 유지
 
-### 7-10) Admin `/admin`
+### ✅ 라인 구조
 
-- 목표: 운영 효율화
-- 기능
-   - 상품 등록/수정/삭제
-   - 주문 상태 변경
-   - 매출 요약
+- `key = productId + options(size 등)` 조합으로 생성
+- 같은 상품이라도 사이즈가 다르면 다른 라인
+- 같은 상품 + 같은 옵션이면 qty 누적
 
----
+### ✅ 추가된 API
 
-## 8) 구현 범위(MVP) 체크리스트
-
-- [ ] 라우터: 경로 변경 시 페이지 렌더링(뒤로가기 포함)
-- [ ] Home: 추천 리스트 섹션
-- [ ] Product: 리스트 렌더 + 정렬/필터(최소 1개)
-- [ ] Product Detail: 상세 페이지 뼈대 + 장바구니 담기
-- [ ] Search: `?q=` 렌더 + 최근 검색어 저장
-- [ ] Cart: 수량 변경/삭제 + 총합 계산
-- [ ] Auth: 로그인 성공 처리 + next 복귀
-- [ ] Checkout/Order Complete: Protected 라우트 가드 적용
-- [ ] MyPage/Admin: 권한 가드 + 기본 뼈대
-- [ ] 공통 UX: Skeleton / Empty / Error 최소 1회 적용
+- `getItemsByProductId(productId)`
+   - 리스트에서 “담김 표시” 용
+- `hasLine(productId, options?)`
+   - 특정 옵션 라인이 담겼는지 체크
+- `updateOptions(key, nextOptions)`
+   - 장바구니에서 사이즈 변경
+   - 변경 후 동일 라인이 있으면 qty 병합(중복 라인 방지)
 
 ---
 
-## 9) 폴더/역할 요약
+## 6) 🧾 ProductCard(상품리스트) UX 개편
 
-- `app.js`: 앱 엔트리(조립 + 렌더 시작점)
-- `src/api`: Firebase 통신 로직
-- `src/components`: 재사용 UI 조각
-- `src/pages`: 페이지 엔트리(뼈대 + 섹션)
-- `src/store`: 상태 관리(user/cart)
-- `src/utils`: 포맷/헬퍼
+### ✅ 옵션
+
+- 컬러 제거(명품 샵 컨셉)
+- 사이즈만 지원
+
+### ✅ 사이즈 선택 UX
+
+- 기본 선택 없음(실수 방지)
+- 사이즈 있는 상품은 선택해야 장바구니 가능
+- UI: select → **pill UI** 로 변경
+
+### ✅ 장바구니 버튼 UI
+
+- 텍스트 버튼 → `favorite.svg` 아이콘 버튼
+- 카드 하단 우측 고정(floating)
+- 담김 상태: `.is-added` 로 빨간 배경 표시
+
+### ✅ 담김 상태 유지(리스트 동기화)
+
+- 장바구니에 담긴 상품: 리스트에서도 빨간 아이콘 유지
+- 담긴 사이즈 pill도 `is-in-cart` 표시 가능하도록 설계
 
 ---
 
-## 10) 다음 설계 후보(Backlog)
+## 7) 🧺 CartPage(장바구니) 확장
 
-- [ ] 찜(Wishlist) 고도화(동기화/폴더)
-- [ ] 검색 자동완성/추천 키워드 고도화
-- [ ] 무한 스크롤 또는 페이지네이션
-- [ ] 쿠폰/프로모션 UI
-- [ ] 관리자 통계 차트
+### ✅ 기존 기능
+
+- 무료배송 기준선 + 배송비
+- 쿠폰 적용 가능 라인 수 표시
+- 쿠폰 선택 적용/해제(새로고침 유지)
+- 기본 세일 + 쿠폰 할인 누적 반영
+- checkout 조건: (아이템 ≥ 1) && (최종금액 > 0)
+
+### ✅ 추가 기능(이번 작업 포인트)
+
+- Cart에서도 상품리스트와 동일한 **사이즈 pill UI**
+- pill 클릭 → `cartStore.updateOptions(key, { size })`
+   - 필요 시 동일 라인 병합
+- 사이즈 변경 시 토스트: “사이즈가 변경됐어요”
+
+### 🔧 보강 예정(요구사항 반영)
+
+- 사이즈 변경 시 confirmModal:
+   - “사이즈를 변경할까요?”
+   - 확인 → 변경 적용 + 토스트
+   - 취소 → 변경 취소
 
 ---
 
-## 11) 메모
+## 8) ⚙️ app.js 전역 이벤트 위임(핵심 엔진)
 
-- 처음엔 목업 데이터(JSON)로 시작 → UI/라우팅/상태 관리 감부터 잡기
-- Firebase/Stripe는 MVP 이후 단계적으로 연결
+### ✅ 사이즈 pill 선택(상품 리스트)
+
+- pill 클릭 → 카드에 `data-selected-size` 저장
+- aria-pressed / is-active 토글
+- 재클릭 시 선택 해제(UX 옵션)
+
+### ✅ 장바구니 담기 가드
+
+- 비로그인: `/auth?redirectTo=현재경로`
+- 사이즈 필요한 상품인데 미선택:
+   - 토스트로 “사이즈를 선택해 주세요”
+
+### ✅ 리스트 동기화
+
+- `syncProductCardsWithCart()`
+   - 아이콘 빨강 유지
+   - 담긴 사이즈 pill 표시
+
+### ✅ store 구독 구조 정리
+
+- authStore 변화 시 cart owner 스위칭
+- 로그인/로그아웃 토스트
+- cartStore 변화 시 뱃지/리스트 동기화
+
+---
+
+## 9) 🧩 ProductDetailPage(상세) 요구사항(진행 중)
+
+### 목표
+
+- 장바구니 클릭 시 토스트
+- 사이즈 필요한 상품 미선택 상태에서 장바구니 클릭:
+   - “사이즈 선택” 토스트
+- 사이즈 선택 후 다른 사이즈 클릭:
+   - “변경할까요?” 모달(확인 시 변경)
+- 바로구매 클릭:
+   - “장바구니로 이동할까요?” 모달
+   - 확인 시 `/cart` 이동
+
+---
+
+## 10) 저장소 키 / 이벤트 규칙(중요)
+
+### localStorage / sessionStorage
+
+- users: `reve_users_v1`
+- cart: `reve_cart_v1:<ownerKey>`
+- after signup modal: `sessionStorage.reve_after_signup_modal`
+
+### 전역 커스텀 이벤트
+
+- navigate: `app:navigate` (detail: { href })
+
+---
