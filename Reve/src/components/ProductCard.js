@@ -60,11 +60,12 @@ export function ProductCard(product) {
 
    // ✅ 컬러 제거: 사이즈만 지원
    const sizes = getSizeOptions(product);
-   const defaultSize = sizes[0] ? String(sizes[0]) : '';
-   const hasSize = Boolean(defaultSize);
-
+   //  const defaultSize = sizes[0] ? String(sizes[0]) : '';
+   //  const hasSize = Boolean(defaultSize);
+   const defaultSize = '';
+   const hasSize = sizes.length > 0;
    return `
-  <article class="product-card" data-product-id="${safeId}" data-selected-size="${escapeHtml(defaultSize)}">
+  <article class="product-card" data-product-id="${safeId}" data-selected-size="">
     <a
       class="product-card__thumb"
       href="/product/${safeId}"
@@ -105,24 +106,23 @@ export function ProductCard(product) {
          hasSize
             ? `
           <div class="product-card__sizes" aria-label="사이즈 선택" data-size-pills>
-            ${sizes
-               .map((s, idx) => {
-                  const v = String(s).trim();
-                  if (!v) return '';
-                  const isSelected = idx === 0; // 기본값 첫번째
-                  return `
-                  <button
-                    type="button"
-                    class="size-pill ${isSelected ? 'is-active' : ''}"
-                    data-size-pill
-                    data-size-value="${escapeHtml(v)}"
-                    aria-pressed="${isSelected ? 'true' : 'false'}"
-                  >
-                    ${escapeHtml(v)}
-                  </button>
-                `;
-               })
-               .join('')}
+          ${sizes
+             .map((s) => {
+                const v = String(s).trim();
+                if (!v) return '';
+                return `
+                <button
+                  type="button"
+                  class="size-pill"
+                  data-size-pill
+                  data-size-value="${escapeHtml(v)}"
+                  aria-pressed="false"
+                >
+                  ${escapeHtml(v)}
+                </button>
+              `;
+             })
+             .join('')}
           </div> 
         `
             : ''

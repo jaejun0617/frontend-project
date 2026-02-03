@@ -128,9 +128,9 @@
 }
 
 .product-tag {
-   font-size: 11px;
+   font-size: 14px;
    line-height: 1;
-   padding: 6px 8px;
+   padding: 8px 8px;
    border-radius: 999px;
    border: 1px solid rgba(0, 0, 0, 0.1);
    background: rgba(0, 0, 0, 0.02);
@@ -188,6 +188,7 @@
       transform 120ms ease,
       background-color 120ms ease,
       border-color 120ms ease;
+   opacity: 0.92;
 }
 
 .size-pill:hover {
@@ -195,7 +196,8 @@
 }
 
 .size-pill.is-active {
-   border-color: rgba(0, 0, 0, 0.45);
+   border-color: rgba(0, 0, 0, 0.55);
+   opacity: 1;
 }
 
 /* ✅ 하단 고정 액션 영역 */

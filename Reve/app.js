@@ -295,20 +295,27 @@ document.addEventListener('click', (e) => {
    const card = pill.closest('[data-product-id]');
    if (!card) return;
 
-   // 같은 카드 안 pill들 active 정리
+   const isAlreadyActive = pill.classList.contains('is-active');
+
+   // ✅ 모두 해제
    card.querySelectorAll('[data-size-pill]').forEach((btn) => {
       btn.classList.remove('is-active');
       btn.setAttribute('aria-pressed', 'false');
    });
 
+   // ✅ 같은 거 다시 누른 경우: 선택 해제 상태로 종료
+   if (isAlreadyActive) {
+      card.setAttribute('data-selected-size', '');
+      return;
+   }
+
+   // ✅ 새로 선택
    pill.classList.add('is-active');
    pill.setAttribute('aria-pressed', 'true');
 
-   // 선택값 저장(장바구니 담기에서 읽음)
    const size = String(pill.getAttribute('data-size-value') || '').trim();
    card.setAttribute('data-selected-size', size);
 });
-
 /**
  * ✅ (B) 장바구니 담기
  * - 로그인 가드
