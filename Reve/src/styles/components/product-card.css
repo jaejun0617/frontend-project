@@ -165,3 +165,67 @@
    outline: 2px solid rgba(0, 0, 0, 0.35);
    outline-offset: 2px;
 }
+
+/* ===== ProductCard Size Chips ===== */
+.product-card__options {
+   margin-top: 10px;
+}
+
+.pc-opt__head {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   margin-bottom: 8px;
+}
+
+.pc-opt__label {
+   font-size: 12px;
+   font-weight: 600;
+   opacity: 0.75;
+}
+
+.pc-opt__hint {
+   font-size: 12px;
+   font-weight: 600;
+   opacity: 0.9;
+}
+
+.pc-sizes {
+   display: flex;
+   gap: 10px;
+   flex-wrap: wrap;
+}
+
+.pc-size {
+   width: 32px;
+   height: 32px;
+   border-radius: 999px;
+   border: 2px solid rgba(0, 0, 0, 0.12);
+   background: #fff;
+   cursor: pointer;
+   font-weight: 700;
+   font-size: 14px;
+   line-height: 1;
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   transition:
+      transform 120ms ease,
+      border-color 120ms ease,
+      background-color 120ms ease;
+}
+
+.pc-size:hover {
+   transform: translateY(-1px);
+   border-color: rgba(0, 0, 0, 0.25);
+}
+
+.pc-size.is-selected {
+   border-color: rgba(0, 0, 0, 0.55);
+   background: rgba(0, 0, 0, 0.03);
+}
+
+.pc-size:focus-visible {
+   outline: 2px solid rgba(0, 0, 0, 0.35);
+   outline-offset: 2px;
+}

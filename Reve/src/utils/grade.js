@@ -66,3 +66,5 @@ export function formatPercent(rate) {
    const r = Number(rate || 0);
    return `${Math.round(r * 100)}%`;
 }
+
+// grade.clearAll();

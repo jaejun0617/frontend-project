@@ -46,7 +46,6 @@ function renderDetail(product) {
       ? product.apparelSizes
       : [];
    const shoeSizes = Array.isArray(product.shoeSizes) ? product.shoeSizes : [];
-   const colors = Array.isArray(product.colors) ? product.colors : [];
 
    return `
     <div class='product-detail__layout' data-product-id='${product.id}'>
@@ -61,24 +60,6 @@ function renderDetail(product) {
           <strong class='pd-final'>₩ ${formatPrice(price)}</strong>
           ${hasSale ? `<span class='pd-rate'>-${Math.round(product.discountRate * 100)}%</span>` : ''}
         </div>
-
-        ${
-           colors.length
-              ? `
-          <div class='product-detail__option'>
-            <p class='pd-label'>컬러</p>
-            <div class='pd-chips' data-opt-color>
-              ${colors
-                 .map(
-                    (c) =>
-                       `<button type="button" class="pd-chip" data-color="${c.en}">${c.en}</button>`,
-                 )
-                 .join('')}
-            </div>
-          </div>
-        `
-              : ''
-        }
 
         ${
            apparelSizes.length

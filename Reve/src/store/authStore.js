@@ -116,3 +116,4 @@ export const authStore = {
       notify();
    },
 };
+// authStore.clearAll();

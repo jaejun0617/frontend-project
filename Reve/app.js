@@ -1,7 +1,10 @@
 /**
  * =============================================
  * 📍 위치: app.js
- * 역할: 앱 진입점(Entry) - 라우터/레이아웃 조립 + init 함수 실행
+ * 역할: 앱 진입점(Entry)
+ * - 라우터/레이아웃 조립
+ * - 전역 UI 초기화 (Sidebar/SearchDrawer/Toast/AuthUi)
+ * - 전역 이벤트 위임 (장바구니 담기, 사이즈 선택 등)
  * =============================================
  */
 
@@ -25,16 +28,15 @@ import { AdminPage, initAdminPage } from './src/pages/admin/index.js';
 import { initSidebar } from './src/utils/sidebar.js';
 import { initSearchDrawer } from './src/utils/searchDrawer.js';
 import { initRouter } from './src/utils/router.js';
-
-import { cartStore } from './src/store/cartStore.js';
-import { initToast } from './src/components/Toast.js';
-
-import { initAuthUi } from './src/utils/authUi.js';
 import { requireAuth, requireAdmin } from './src/utils/guards.js';
-import { authStore } from './src/store/authStore.js';
+import { initAuthUi } from './src/utils/authUi.js';
 
-// Components
+// Stores / Components
+import { cartStore } from './src/store/cartStore.js';
+import { authStore } from './src/store/authStore.js';
+import { initToast } from './src/components/Toast.js';
 import { confirmModal } from './src/components/ConfirmModal.js';
+
 /* ==============================
    0) DOM 마운트 유틸
    ============================== */
@@ -100,7 +102,7 @@ const routes = {
    '/mypage': {
       render: () => MyPage(),
       afterRender: () => {
-         // ✅ 로그인 가드
+         // ✅ 로그인 필요 페이지: 렌더 후 가드 (비로그인이면 /auth로 이동)
          const ok = requireAuth({ redirectTo: '/mypage' });
          if (!ok) return;
          initMyPage();
@@ -110,12 +112,14 @@ const routes = {
    '/admin': {
       render: () => AdminPage(),
       afterRender: () => {
+         // ✅ 관리자만 접근
          const ok = requireAdmin({ redirectTo: '/admin' });
          if (!ok) return;
          initAdminPage();
       },
    },
 
+   // 404
    '/404': {
       render: () =>
          "<section class='page'><h1>404</h1><p>페이지를 찾을 수 없습니다.</p></section>",
@@ -123,31 +127,26 @@ const routes = {
 };
 
 /* ==============================
-   3) 앱 시작
+   3) 앱 시작 (Router & Global UI)
    ============================== */
 
 initRouter({ mount, layout, routes });
 
+// 전역 UI들은 1번만 init (라우팅이 바뀌어도 유지되는 구조)
 initSidebar();
-
 const searchDrawer = initSearchDrawer();
 const toast = initToast();
 const authUi = initAuthUi();
-
-// 앱 시작 후 1번
-const user = authStore.getUser?.();
-cartStore.setOwner(user?.id || null);
-
-// 로그인/로그아웃 순간마다 스위칭
-authStore.subscribe(() => {
-   const u = authStore.getUser?.();
-   cartStore.setOwner(u?.id || null);
-});
 
 /* ==============================
    4) UI 상태 갱신 유틸
    ============================== */
 
+/**
+ * ✅ 장바구니 카운트 뱃지 갱신
+ * - 0이면 숨김(UX)
+ * - 페이지가 렌더링될 때마다 새 DOM 기준으로 갱신해야 함
+ */
 function updateCartCount() {
    const count = cartStore.getCount();
    const badgeEls = document.querySelectorAll('[data-cart-count]');
@@ -162,23 +161,26 @@ function updateCartCount() {
       el.textContent = String(count);
    });
 }
-let didRunSignupModal = false;
+
 /* ==============================
-   5) 렌더 후 훅
+   5) 회원가입 후 메인에서 모달 띄우기
    ============================== */
 
-window.addEventListener('app:render', () => {
-   searchDrawer.refresh();
-   updateCartCount();
-   authUi.refresh();
+/**
+ * ✅ sessionStorage 플래그를 이용해 "메인 이동 후" 모달 띄우기
+ * - auth 페이지에서 세션스토리지에 데이터 저장
+ * - 홈으로 네비게이션 완료 후(app:render) 모달 실행
+ * - 중복 실행 방지 위해 1회성 처리
+ */
+let didRunSignupModal = false;
 
-   // ✅ 회원가입 후 "메인에서" 모달 띄우기
+function runAfterSignupModalIfNeeded() {
    if (didRunSignupModal) return;
 
    const raw = sessionStorage.getItem('reve_after_signup_modal');
    if (!raw) return;
 
-   // 한 번만 실행되게 먼저 제거(중복 방지)
+   // ✅ 중복 방지: 먼저 제거
    sessionStorage.removeItem('reve_after_signup_modal');
    didRunSignupModal = true;
 
@@ -190,11 +192,10 @@ window.addEventListener('app:render', () => {
    }
 
    const name = data?.name || '고객';
-   const coupon = data?.coupon;
+   const coupon = data?.coupon; // {title, code, rateText}
    const delayMs = Number(data?.delayMs ?? 0);
    const confirmHref = String(data?.confirmHref || '/mypage');
 
-   // ✅ 2초 뒤 모달
    setTimeout(async () => {
       const message = coupon
          ? `${name}님, 가입을 환영합니다 ✨\n\n🎫 ${coupon.title}이 지급되었어요.\n• 코드: ${coupon.code}\n• 혜택: ${coupon.rateText}\n\n지금 마이페이지 쿠폰함에서 확인할까요?`
@@ -213,26 +214,112 @@ window.addEventListener('app:render', () => {
          );
       }
    }, delayMs);
+}
+
+/* ==============================
+   6) 렌더 후 훅 (라우팅마다 실행)
+   ============================== */
+
+window.addEventListener('app:render', () => {
+   // ✅ 새로 렌더된 DOM 기준으로 UI를 갱신해야 함
+   searchDrawer.refresh();
+   updateCartCount();
+   authUi.refresh();
+
+   // ✅ 회원가입 후 모달 (메인에서 뜨게)
+   runAfterSignupModalIfNeeded();
 });
 
-// 최초 1회도 안전하게 실행
+// 최초 1회도 안전하게 갱신
 updateCartCount();
 authUi.refresh();
 
-// 장바구니 상태 변화 시 즉시 반영
-cartStore.subscribe(() => {
-   updateCartCount();
-});
-
 /* ==============================
-   6) 전역 이벤트: 장바구니 담기
+   7) authStore 구독: 카트 owner 전환 + 환영 토스트
    ============================== */
 
+// 앱 시작 직후 1번: 현재 로그인 유저 기준으로 cart owner 세팅
+{
+   const u = authStore.getUser?.();
+   cartStore.setOwner(u?.id || null);
+}
+
+/**
+ * ✅ authStore 변화가 생기면
+ * 1) cartStore ownerKey 스위칭 (로그인/로그아웃 시 장바구니 분리)
+ * 2) 로그인 순간 환영 토스트
+ * 3) 로그아웃 순간 토스트
+ */
+let prevLogin = authStore.isLoggedIn();
+
+authStore.subscribe(() => {
+   const nowLogin = authStore.isLoggedIn();
+   const u = authStore.getUser?.();
+
+   // 1) 유저별 카트 분리 적용
+   cartStore.setOwner(u?.id || null);
+
+   // 2) 로그인 순간
+   if (!prevLogin && nowLogin) {
+      const name = u?.name || '사용자';
+      toast.show(`${name}님 환영합니다 👋`, { duration: 1400 });
+   }
+
+   // 3) 로그아웃 순간
+   if (prevLogin && !nowLogin) {
+      toast.show('로그아웃 완료', { duration: 1400 });
+   }
+
+   prevLogin = nowLogin;
+});
+
+// cartStore가 바뀌면 카운트 갱신
+cartStore.subscribe(() => updateCartCount());
+
+/* ==============================
+   8) 전역 이벤트 위임
+   - (A) 사이즈 칩 선택
+   - (B) 장바구니 담기
+   ============================== */
+
+/**
+ * ✅ (A) 사이즈 칩 선택
+ * - ProductCard에서 data-size-pill / data-size-value 구조를 쓰는 전제
+ * - 클릭하면 카드의 data-selected-size를 갱신하고,
+ *   선택 스타일(is-selected) 및 aria-checked를 업데이트
+ */
+document.addEventListener('click', (e) => {
+   const pill = e.target.closest('[data-size-pill]');
+   if (!pill) return;
+
+   const card = pill.closest('[data-product-id]');
+   if (!card) return;
+
+   const value = String(pill.getAttribute('data-size-value') || '').trim();
+   card.setAttribute('data-selected-size', value);
+
+   // ✅ 같은 카드 내부의 모든 pill 상태 초기화 후, 클릭한 것만 선택
+   card.querySelectorAll('[data-size-pill]').forEach((btn) => {
+      const isOn = btn === pill;
+      btn.classList.toggle('is-selected', isOn);
+      btn.setAttribute('aria-checked', isOn ? 'true' : 'false');
+   });
+
+   // (선택) "사이즈 선택해주세요" 같은 힌트가 있으면 숨김
+   card.querySelector('[data-size-hint]')?.setAttribute('hidden', '');
+});
+
+/**
+ * ✅ (B) 장바구니 담기
+ * - 로그인 가드
+ * - 사이즈 있는 상품은 "선택 필수" 가드
+ * - options: { size } 를 cartStore에 전달
+ */
 document.addEventListener('click', async (e) => {
    const btn = e.target.closest('[data-add-cart]');
    if (!btn) return;
 
-   // ✅ 로그인 가드: guest면 로그인 페이지로 보내고, 현재 위치로 되돌아오게
+   // ✅ 로그인 가드: 비로그인이면 /auth로 이동
    const ok = requireAuth({
       redirectTo: window.location.pathname || '/product',
    });
@@ -242,36 +329,38 @@ document.addEventListener('click', async (e) => {
    const productId = card?.getAttribute('data-product-id');
    if (!productId) return;
 
-   await cartStore.addById(productId, 1);
+   // ✅ 카드에서 선택된 사이즈 읽기
+   // - 구버전(select)과 신버전(data-selected-size) 둘 다 대응
+   const size =
+      card?.querySelector('[data-opt-size]')?.value ??
+      card?.getAttribute('data-selected-size') ??
+      '';
+
+   // ✅ 사이즈가 있는 상품이면, 선택 안 했을 때 차단
+   const hasSize = card?.getAttribute('data-has-size') === '1';
+   const selectedSize = String(size || '').trim();
+
+   if (hasSize && !selectedSize) {
+      // (선택) 카드 내 힌트 표시
+      card?.querySelector('[data-size-hint]')?.removeAttribute('hidden');
+
+      toast.show('사이즈를 선택해야 장바구니에 담을 수 있어요 👟', {
+         duration: 1600,
+      });
+      return;
+   }
+
+   // ✅ 담기 (options에 size 포함)
+   await cartStore.addById(productId, 1, { size: selectedSize });
 
    // UX 피드백 + 토스트
    btn.textContent = '담김 ✓';
    btn.disabled = true;
 
-   toast.show('장바구니에 담겼어요');
+   toast.show('장바구니에 담겼어요', { duration: 1400 });
 
    setTimeout(() => {
       btn.textContent = '장바구니';
       btn.disabled = false;
    }, 1400);
-});
-
-let prevLogin = authStore.isLoggedIn();
-
-authStore.subscribe(() => {
-   const nowLogin = authStore.isLoggedIn();
-
-   // 로그인 순간
-   if (!prevLogin && nowLogin) {
-      const user = authStore.getUser();
-      const name = user?.name || '사용자';
-      toast.show(`${name}님 환영합니다 👋`, { duration: 1400 });
-   }
-
-   // 로그아웃 순간(선택)
-   if (prevLogin && !nowLogin) {
-      toast.show('로그아웃 완료');
-   }
-
-   prevLogin = nowLogin;
 });
