@@ -1,6 +1,63 @@
 /* =============================================
- * 📍 위치: src/styles/mypage.css
- * 역할: 마이페이지(탭/패널 + profile/grade) 스타일
+ * REVE UI Styles (MyPage + Cart) - FULL MERGED
+ * - MyPage + Address + Modal + Cart + Coupon
+ * - scoped utilities to prevent global collisions
+ * ============================================= */
+
+/* =============================================
+ * 0) Shared (scoped utilities)
+ * - DO NOT define .pill / .btn globally
+ * ============================================= */
+
+:where(.mypage, .cart-page) .pill {
+   display: inline-flex;
+   align-items: center;
+   padding: 6px 10px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.03);
+   font-size: 12px;
+   font-weight: 900;
+}
+
+:where(.mypage, .cart-page) .hint {
+   margin: 10px 0 0;
+   font-size: 12px;
+   opacity: 0.7;
+   line-height: 1.4;
+}
+
+:where(.mypage, .cart-page) .empty__title {
+   margin: 0;
+   font-weight: 900;
+}
+
+:where(.mypage, .cart-page) .empty__desc {
+   margin: 6px 0 0;
+   opacity: 0.7;
+}
+
+/* scoped button baseline (keeps existing .btn usage but avoids global pollution) */
+:where(.mypage, .cart-page) .btn {
+   height: 40px;
+   padding: 0 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.14);
+   background: transparent;
+   cursor: pointer;
+   font-weight: 800;
+}
+
+:where(.mypage, .cart-page) .btn.primary {
+   background: rgba(0, 0, 0, 0.1);
+}
+
+:where(.mypage, .cart-page) .btn.subtle {
+   background: rgba(0, 0, 0, 0.04);
+}
+
+/* =============================================
+ * 1) MyPage Layout / Tabs
  * ============================================= */
 
 .mypage__layout {
@@ -15,10 +72,9 @@
    }
 }
 
-/* 좌측 탭 */
 .mypage__nav {
    position: sticky;
-   top: 72px; /* 헤더 높이에 맞춰 조절 */
+   top: 72px;
 }
 
 .mypage__tabs {
@@ -61,7 +117,7 @@
    background: rgba(0, 0, 0, 0.03);
 }
 
-/* 패널 */
+/* Panels */
 .mypage__panel {
    display: none;
 }
@@ -86,19 +142,10 @@
    font-size: 13px;
 }
 
-/* 공통 pill */
-.pill {
-   display: inline-flex;
-   align-items: center;
-   padding: 6px 10px;
-   border-radius: 999px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(0, 0, 0, 0.03);
-   font-size: 12px;
-   font-weight: 900;
-}
+/* =============================================
+ * 2) MyPage Profile / Grade
+ * ============================================= */
 
-/* Profile */
 .profile-card,
 .grade-card {
    border: 1px solid rgba(0, 0, 0, 0.08);
@@ -133,14 +180,6 @@
    font-size: 13px;
 }
 
-.hint {
-   margin: 10px 0 0;
-   font-size: 12px;
-   opacity: 0.7;
-   line-height: 1.4;
-}
-
-/* Grade */
 .grade-top {
    display: grid;
    gap: 10px;
@@ -220,17 +259,10 @@
    background: rgba(0, 0, 0, 0.6);
 }
 
-/* empty */
-.empty__title {
-   margin: 0;
-   font-weight: 900;
-}
-.empty__desc {
-   margin: 6px 0 0;
-   opacity: 0.7;
-}
+/* =============================================
+ * 3) MyPage Orders
+ * ============================================= */
 
-/* Orders */
 .order-list {
    list-style: none;
    padding: 0;
@@ -259,6 +291,7 @@
    margin: 0;
    font-size: 13px;
 }
+
 .order-card__time {
    margin: 4px 0 0;
    font-size: 12px;
@@ -285,4 +318,754 @@
    display: flex;
    gap: 10px;
    flex-wrap: wrap;
+}
+
+/* =============================================
+ * 4) MyPage Address Tab
+ * ============================================= */
+
+.mypage [data-address-wrap] {
+   display: block;
+}
+
+.address-top {
+   display: grid;
+   gap: 16px;
+}
+
+.address-head {
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: 12px;
+}
+
+.address-head .mypage__sectionTitle {
+   margin: 0;
+}
+
+.address-head .mypage__sectionDesc {
+   margin: 6px 0 0;
+   color: rgba(0, 0, 0, 0.6);
+}
+
+.address-empty {
+   padding: 20px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   background: #fff;
+   display: grid;
+   gap: 10px;
+}
+
+.address-empty .empty__title {
+   margin: 0;
+   font-weight: 700;
+   font-size: 16px;
+}
+
+.address-empty .empty__desc {
+   margin: 0;
+   color: rgba(0, 0, 0, 0.6);
+   line-height: 1.5;
+}
+
+.address-list {
+   list-style: none;
+   padding: 0;
+   margin: 0;
+   display: grid;
+   gap: 12px;
+}
+
+.address-card {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   background: #fff;
+   padding: 14px;
+   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
+}
+
+.address-card.is-default {
+   border-color: rgba(0, 0, 0, 0.16);
+   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.06);
+}
+
+.address-card__top {
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: 12px;
+}
+
+.address-card__title {
+   display: flex;
+   align-items: center;
+   flex-wrap: wrap;
+   gap: 8px;
+   min-width: 0;
+}
+
+.address-card__title strong {
+   font-size: 15px;
+}
+
+.address-card__title .muted {
+   color: rgba(0, 0, 0, 0.6);
+   font-size: 13px;
+   white-space: nowrap;
+}
+
+.address-card__actions {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   flex-wrap: wrap;
+   justify-content: flex-end;
+}
+
+.address-card__body {
+   margin-top: 10px;
+   display: grid;
+   gap: 6px;
+}
+
+.address-card__body p {
+   margin: 0;
+   line-height: 1.5;
+}
+
+.address-card__body .muted {
+   color: rgba(0, 0, 0, 0.6);
+   font-size: 13px;
+}
+
+/* card-level pill stays consistent with scoped .pill */
+.address-card .pill {
+   height: 22px;
+   padding: 0 10px;
+   font-size: 12px;
+   font-weight: 700;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.04);
+}
+
+@media (max-width: 520px) {
+   .address-card__top {
+      flex-direction: column;
+      align-items: stretch;
+   }
+
+   .address-card__actions {
+      justify-content: flex-start;
+   }
+
+   .address-head {
+      flex-direction: column;
+      align-items: stretch;
+   }
+}
+
+/* =============================================
+ * 5) Address Form Modal
+ * ============================================= */
+
+.address-form-overlay {
+   position: fixed;
+   inset: 0;
+   z-index: 9999;
+   display: grid;
+   place-items: center;
+   padding: 18px;
+   background: rgba(0, 0, 0, 0.45);
+}
+
+.address-form-modal {
+   width: min(560px, 100%);
+   border-radius: 18px;
+   background: #fff;
+   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+   overflow: hidden;
+}
+
+.address-form-modal .reve-modal__header {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   padding: 16px;
+   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.address-form-modal .reve-modal__title {
+   margin: 0;
+   font-size: 16px;
+   font-weight: 800;
+   letter-spacing: -0.2px;
+}
+
+.address-form-modal .reve-modal__close {
+   width: 36px;
+   height: 36px;
+   border-radius: 10px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: rgba(0, 0, 0, 0.03);
+   cursor: pointer;
+   font-size: 18px;
+   line-height: 1;
+}
+
+.address-form-modal .reve-modal__body {
+   padding: 16px 16px 12px;
+}
+
+.address-form-modal .reve-modal__footer {
+   padding: 14px 16px 16px;
+   border-top: 1px solid rgba(0, 0, 0, 0.08);
+   display: flex;
+   justify-content: flex-end;
+   gap: 10px;
+}
+
+.form-grid {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 12px;
+}
+
+.form-field {
+   display: grid;
+   gap: 6px;
+}
+
+.form-field .k {
+   font-size: 12px;
+   font-weight: 700;
+   color: rgba(0, 0, 0, 0.7);
+}
+
+.form-field input[type='text'] {
+   height: 42px;
+   padding: 0 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: #fff;
+   outline: none;
+}
+
+.form-field input[type='text']:focus {
+   border-color: rgba(0, 0, 0, 0.28);
+   box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.06);
+}
+
+.form-field.checkbox {
+   grid-column: 1 / -1;
+   display: flex;
+   align-items: center;
+   gap: 10px;
+   padding: 10px 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: rgba(0, 0, 0, 0.02);
+}
+
+.form-field.checkbox input[type='checkbox'] {
+   width: 18px;
+   height: 18px;
+}
+
+.address-form-modal .muted {
+   margin: 10px 0 0;
+   font-size: 12px;
+   color: rgba(0, 0, 0, 0.55);
+}
+
+@media (max-width: 520px) {
+   .form-grid {
+      grid-template-columns: 1fr;
+   }
+}
+
+/* =============================================
+ * 6) Cart Layout / Items
+ * ============================================= */
+
+.cart-layout {
+   display: grid;
+   gap: 16px;
+}
+
+@media (min-width: 768px) {
+   .cart-layout {
+      grid-template-columns: minmax(0, 1fr) 320px;
+      align-items: start;
+   }
+}
+
+@media (min-width: 768px) {
+   .cart__summary {
+      position: sticky;
+      top: calc(6svh + 16px);
+   }
+}
+
+.cart__list {
+   display: grid;
+   gap: 12px;
+}
+
+.cart-item {
+   display: grid;
+   gap: 10px;
+   padding: 14px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: rgba(255, 255, 255, 0.95);
+}
+
+.cart-item__info {
+   display: flex;
+   align-items: baseline;
+   justify-content: space-between;
+   gap: 12px;
+}
+
+.cart-item__name {
+   margin: 0;
+   font-weight: 700;
+   min-width: 0;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.cart-item__price {
+   margin: 0;
+   font-weight: 700;
+   opacity: 0.9;
+   flex: 0 0 auto;
+}
+
+.cart-item__controls {
+   display: inline-flex;
+   align-items: center;
+   gap: 10px;
+}
+
+.cart-item__controls button {
+   width: 36px;
+   height: 36px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.03);
+   cursor: pointer;
+}
+
+.cart-item__qty {
+   min-width: 24px;
+   text-align: center;
+   font-weight: 700;
+}
+
+.cart-item__remove {
+   justify-self: end;
+   padding: 10px 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: transparent;
+   cursor: pointer;
+}
+
+.cart__summary {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   padding: 14px;
+   background: rgba(255, 255, 255, 0.95);
+   display: grid;
+   gap: 12px;
+}
+
+.cart__row {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+}
+
+.cart__clear,
+.cart__checkout {
+   width: 100%;
+   height: 44px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   cursor: pointer;
+}
+
+.cart__clear {
+   background: rgba(0, 0, 0, 0.03);
+}
+
+.cart__checkout {
+   background: rgba(0, 0, 0, 0.08);
+   font-weight: 700;
+}
+
+.cart__checkout:disabled {
+   opacity: 0.6;
+   cursor: not-allowed;
+}
+
+.cart__divider {
+   border: 0;
+   border-top: 1px solid rgba(0, 0, 0, 0.08);
+   margin: 4px 0;
+}
+
+.cart__shipping-hint {
+   margin: 0;
+   font-size: 12px;
+   opacity: 0.72;
+}
+
+.cart__membership {
+   display: grid;
+   gap: 8px;
+   padding: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: rgba(0, 0, 0, 0.02);
+   margin: 10px 0 12px;
+}
+
+.cart__row--muted {
+   opacity: 0.72;
+   font-size: 13px;
+}
+
+/* =============================================
+ * 7) Cart - Shipping Address Summary
+ * ============================================= */
+
+.cart__address {
+   margin-top: 12px;
+   padding: 14px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: #fff;
+   border-radius: 14px;
+}
+
+.cart__address .cart__row {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   margin: 0;
+}
+
+.cart__address .cart__row > span {
+   font-size: 12px;
+   color: rgba(0, 0, 0, 0.55);
+   letter-spacing: -0.2px;
+}
+
+.cart__address .cart__row > strong {
+   font-size: 14px;
+   font-weight: 800;
+   color: rgba(0, 0, 0, 0.9);
+   letter-spacing: -0.2px;
+   display: inline-flex;
+   align-items: center;
+   gap: 8px;
+   min-width: 0;
+}
+
+.cart__address .cart__row > strong > span,
+.cart__address .cart__row > strong {
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.cart__address .cart__couponmsg {
+   margin: 10px 0 0;
+   padding: 10px 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.06);
+   background: rgba(0, 0, 0, 0.02);
+   font-size: 13px;
+   color: rgba(0, 0, 0, 0.7);
+   line-height: 1.45;
+   display: -webkit-box;
+   -webkit-line-clamp: 2;
+   -webkit-box-orient: vertical;
+   overflow: hidden;
+}
+
+.cart__address .btn.subtle,
+.cart__address .btn {
+   margin-top: 10px;
+   width: 100%;
+   height: 38px;
+   font-size: 13px;
+   font-weight: 700;
+   letter-spacing: -0.2px;
+}
+
+.cart__address .btn.subtle {
+   background: rgba(0, 0, 0, 0.04);
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   color: rgba(0, 0, 0, 0.82);
+}
+
+.cart__address .btn.subtle:hover {
+   background: rgba(0, 0, 0, 0.06);
+}
+
+.cart__address .pill {
+   height: 22px;
+   padding: 0 10px;
+   font-size: 12px;
+   font-weight: 800;
+   background: rgba(0, 0, 0, 0.05);
+   color: rgba(0, 0, 0, 0.75);
+}
+
+.cart__summary > .cart__address + .cart__membership {
+   margin-top: 12px;
+}
+
+/* =============================================
+ * 8) Cart Coupon UI
+ * - NOTE: .cart__couponmsg is also used in cart address summary
+ *   So we keep it general, but refine inside .cart__coupon scope
+ * ============================================= */
+
+.cart__coupon {
+   display: grid;
+   gap: 10px;
+   padding: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: rgba(0, 0, 0, 0.02);
+   border-radius: 14px;
+}
+
+.cart__coupon .cart__couponmsg {
+   margin: 0;
+   font-size: 13px;
+   opacity: 0.85;
+   line-height: 1.4;
+   padding: 0;
+   border: 0;
+   background: transparent;
+   display: block;
+}
+
+.cart__couponlist {
+   display: grid;
+   gap: 8px;
+}
+
+.cart__couponitem {
+   display: flex;
+   align-items: center;
+   gap: 10px;
+   padding: 10px 12px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: rgba(255, 255, 255, 0.9);
+   cursor: pointer;
+   user-select: none;
+   transition:
+      transform 120ms ease,
+      background 120ms ease,
+      border-color 120ms ease;
+}
+
+.cart__couponitem:hover {
+   transform: translateY(-1px);
+   border-color: rgba(0, 0, 0, 0.14);
+   background: rgba(255, 255, 255, 1);
+}
+
+.cart__couponitem input[type='radio'] {
+   width: 16px;
+   height: 16px;
+   accent-color: rgba(0, 0, 0, 0.85);
+   cursor: pointer;
+}
+
+.cart__couponitem:has(input[type='radio']:checked) {
+   border-color: rgba(0, 0, 0, 0.22);
+   background: rgba(0, 0, 0, 0.04);
+}
+
+.cart__couponitem:has(input[type='radio']:disabled) {
+   opacity: 0.55;
+   cursor: not-allowed;
+}
+
+.cart__couponitem:has(input[type='radio']:disabled):hover {
+   transform: none;
+   border-color: rgba(0, 0, 0, 0.08);
+   background: rgba(255, 255, 255, 0.9);
+}
+
+.cart__couponmeta {
+   display: inline-flex;
+   align-items: center;
+   gap: 8px;
+   min-width: 0;
+   font-size: 13px;
+}
+
+.cart__couponmeta strong {
+   font-size: 13px;
+   font-weight: 800;
+   letter-spacing: 0.2px;
+}
+
+.cart__couponactions {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 8px;
+}
+
+.cart__couponbtn {
+   height: 40px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(255, 255, 255, 0.9);
+   cursor: pointer;
+   font-weight: 700;
+   transition:
+      transform 120ms ease,
+      background 120ms ease,
+      opacity 120ms ease;
+}
+
+.cart__couponbtn:hover {
+   transform: translateY(-1px);
+   background: rgba(255, 255, 255, 1);
+}
+
+.cart__couponbtn:disabled {
+   opacity: 0.55;
+   cursor: not-allowed;
+   transform: none;
+}
+
+.cart__couponstatus {
+   margin: 0;
+   font-size: 12.5px;
+   opacity: 0.85;
+   padding-top: 4px;
+   border-top: 1px dashed rgba(0, 0, 0, 0.12);
+}
+
+@media (max-width: 420px) {
+   .cart__couponactions {
+      grid-template-columns: 1fr;
+   }
+}
+
+/* =============================================
+ * 9) MyPage Coupon UI
+ * - Scope to MyPage to avoid cart collisions
+ * ============================================= */
+
+.mypage .coupon-box {
+   border: 1px solid rgba(0, 0, 0, 0.1);
+   border-radius: 16px;
+   padding: 12px;
+   background: rgba(0, 0, 0, 0.02);
+   display: grid;
+   gap: 10px;
+}
+
+.mypage .coupon-box__row {
+   display: grid;
+   grid-template-columns: minmax(0, 1fr) 92px;
+   gap: 10px;
+   align-items: center;
+}
+
+.mypage .coupon-box__input {
+   height: 44px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   padding: 0 12px;
+   background: rgba(255, 255, 255, 0.9);
+   outline: none;
+}
+
+.mypage .coupon-box__input:focus {
+   border-color: rgba(0, 0, 0, 0.26);
+}
+
+.mypage .coupon-box__btn {
+   height: 44px;
+   border-radius: 12px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(0, 0, 0, 0.06);
+   cursor: pointer;
+   font-weight: 900;
+}
+
+.mypage .coupon-box__msg {
+   margin: 0;
+   font-size: 13px;
+   opacity: 0.78;
+}
+
+.mypage .coupon-owned {
+   display: grid;
+   gap: 12px;
+}
+
+.mypage .coupon-owned__header {
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: 12px;
+}
+
+.mypage .coupon-owned__list {
+   list-style: none;
+   padding: 0;
+   margin: 0;
+   display: grid;
+   gap: 10px;
+}
+
+.mypage .coupon-item {
+   border: 1px solid rgba(0, 0, 0, 0.1);
+   border-radius: 16px;
+   padding: 12px;
+   background: rgba(255, 255, 255, 0.95);
+   display: grid;
+   gap: 10px;
+}
+
+.mypage .coupon-item.is-used {
+   opacity: 0.6;
+}
+
+.mypage .coupon-item__title {
+   margin: 0;
+   font-weight: 900;
+}
+
+.mypage .coupon-item__meta {
+   margin: 4px 0 0;
+   font-size: 13px;
+   opacity: 0.8;
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   flex-wrap: wrap;
+}
+
+.mypage .dot {
+   opacity: 0.55;
+}
+
+.mypage .coupon-item__actions {
+   display: flex;
+   gap: 8px;
+   justify-content: flex-end;
 }
