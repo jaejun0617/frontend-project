@@ -25,7 +25,7 @@ import { couponStore } from '../../store/couponStore.js';
 import { authStore } from '../../store/authStore.js';
 import { formatPrice } from '../../utils/format.js';
 import { calcLinePrice } from '../../utils/pricing.js';
-
+import { initToast } from '../../components/Toast.js';
 const FREE_SHIPPING_THRESHOLD = 300000;
 const SHIPPING_FEE = 3000;
 
@@ -468,7 +468,7 @@ async function handleCheckout({ detailedItems }) {
 export async function initCartPage() {
    const cartEl = document.querySelector('[data-cart]');
    if (!cartEl) return;
-
+   const toast = initToast();
    let paintSeq = 0;
 
    async function paint() {
@@ -520,17 +520,27 @@ export async function initCartPage() {
          return;
       }
 
-      // ✅ 사이즈 pill 클릭(핵심)
+      // ✅ 사이즈 변경 (pill 클릭)
       const sizeBtn = e.target.closest('[data-cart-size-pill]');
       if (sizeBtn) {
          const itemEl = sizeBtn.closest('[data-cart-item]');
          const key = itemEl?.getAttribute('data-cart-key');
-         const size = String(
+         if (!key) return;
+
+         const nextSize = String(
             sizeBtn.getAttribute('data-size-value') || '',
          ).trim();
-         if (!key || !size) return;
+         if (!nextSize) return;
 
-         cartStore.updateOptions(key, { size });
+         const result = cartStore.updateOptions(key, { size: nextSize });
+
+         if (result?.ok) {
+            toast.show('사이즈가 변경됐어요 👌', { duration: 1400 });
+         } else {
+            toast.show(result?.message || '사이즈 변경에 실패했어요.', {
+               duration: 1400,
+            });
+         }
          return;
       }
 
