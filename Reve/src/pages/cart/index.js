@@ -33,6 +33,8 @@ import { confirmModal } from '../../components/ConfirmModal.js';
 import {
    getMembershipSnapshot,
    formatPercent,
+   getUpgradedTiers,
+   getUpgradeCouponCode,
 } from '../../utils/membership.js';
 
 const FREE_SHIPPING_THRESHOLD = 300000;
@@ -130,7 +132,7 @@ function getInCartSizeSet(items, productId) {
 
 /**
  * ✅ Cart 요약 계산
- * - pricing.js(calcLinePrice)가 "기본 세일 + 쿠폰" 반영을 담당
+ * - pricing.js(calcLinePrice)가 "기본 세일 + 쿠폰" 반영 담당
  */
 function calcCartPricing(detailedItems, coupon) {
    let subtotalAfterSale = 0;
@@ -292,10 +294,13 @@ function renderCart(detailedItems) {
    const rawItems = cartStore.getState()?.items ?? [];
 
    // ✅ 멤버십(단일 소스) 기반 요약 계산
+   // - 적립 기준: "배송비 제외"가 일반적이라 checkoutTotal에 totalAfterCoupon을 사용
+   // - 배송비 포함 적립을 원하면 checkoutTotal: total 로 바꾸면 됨
    const user = authStore.getUser?.();
    const { tierInfo, earnRate, expectedPoints } = getMembershipSnapshot({
       totalSpent: user?.totalSpent ?? 0,
-      checkoutTotal: total,
+      checkoutTotal: pricingCore.totalAfterCoupon, // ✅ 적립 기준(배송비 제외)
+      // checkoutTotal: total, // ✅ 배송비 포함 적립 정책이면 이걸 사용
    });
 
    return `
@@ -306,12 +311,8 @@ function renderCart(detailedItems) {
               const currentSize = String(options?.size ?? '').trim();
               const inCartSizeSet = getInCartSizeSet(rawItems, product?.id);
 
-              const optionText = [
-                 options?.color ? `컬러: ${options.color}` : '',
-                 options?.size ? `사이즈: ${options.size}` : '',
-              ]
-                 .filter(Boolean)
-                 .join(' · ');
+              // ✅ 컬러 옵션 제거했으니 사이즈만 표기
+              const optionText = options?.size ? `사이즈: ${options.size}` : '';
 
               const hasBaseSale =
                  Number(product.basePrice ?? 0) > Number(product.price ?? 0);
@@ -513,18 +514,43 @@ async function handleCheckout({ detailedItems }) {
       couponStore.clearApplied?.();
    }
 
-   // ✅ 누적 구매액 갱신(등급 산정 데이터)
-   const prev = authStore.getUser?.()?.totalSpent ?? 0;
-   authStore.updateUser?.({
-      totalSpent: Number(prev) + Number(payload.pricing.total || 0),
-   });
+   // ✅ 결제 전 유저 스냅샷(승급 판단용)
+   const userBefore = authStore.getUser?.();
+   const prevSpent = Number(userBefore?.totalSpent ?? 0);
+
+   // ✅ 누적 구매액 반영(정책: 총 결제금액 기준)
+   const added = Number(payload?.pricing?.total ?? 0);
+   const nextSpent = prevSpent + added;
+
+   // ✅ 먼저 totalSpent 갱신 (이후 UI/등급 계산이 최신 값 기준이 되도록)
+   authStore.updateUser?.({ totalSpent: nextSpent });
+
+   // ✅ 승급 쿠폰 지급
+   // - getUpgradedTiers가 "새로 달성한 등급들"을 Tier[]로 반환
+   // - 그 Tier.name으로 쿠폰 코드 매핑 → register() 지급
+   const grantedUpgradeCoupons = [];
+
+   // 로그인 유저만 지급(guest 방지)
+   if (userBefore?.id) {
+      const upgraded = getUpgradedTiers({
+         prevTotalSpent: prevSpent,
+         nextTotalSpent: nextSpent,
+      });
+
+      upgraded.forEach((tier) => {
+         const code = getUpgradeCouponCode(tier?.name);
+         if (!code) return;
+
+         const r = couponStore.register?.(code);
+         if (r?.ok) grantedUpgradeCoupons.push(code);
+      });
+   }
 
    // ✅ 결제 완료 후 장바구니 비우기
    cartStore.clear?.();
 
-   return { ok: true, payload, receipt: result.data };
+   return { ok: true, payload, receipt: result.data, grantedUpgradeCoupons };
 }
-
 /* ==============================
    4) Page init
    ============================== */
@@ -562,13 +588,15 @@ export async function initCartPage() {
 
       /* ------------------------------
          B) 쿠폰 라디오 클릭 UX
-         - 즉시 적용 X
-         - 모달 확인 후 apply/clear
-         - 취소 시 paint()로 UI 원복
+         - 라디오의 기본 체크 동작을 막고(preventDefault),
+           "모달 결과"로만 store 상태를 바꾼 뒤 paint()로 UI를 맞춘다.
       ------------------------------ */
       const couponInput = e.target.closest('[data-coupon-radio]');
       if (couponInput) {
-         const applied = couponStore.getAppliedCoupon(); // {code,title,rate} | null
+         // ✅ 브라우저 기본 라디오 체크 변경 방지 (깜빡/불일치 예방)
+         e.preventDefault();
+
+         const applied = couponStore.getAppliedCoupon();
          const currentCode = String(applied?.code || '').trim();
 
          const nextCode = String(couponInput.value || '')
@@ -584,7 +612,7 @@ export async function initCartPage() {
             return;
          }
 
-         // 1) 현재 적용 쿠폰을 "다시 클릭" → 해제 confirm
+         // 1) 현재 적용 쿠폰을 다시 클릭 → 해제 confirm
          if (currentCode && nextCode === currentCode) {
             const ok = await confirmModal({
                title: '쿠폰 해제',
@@ -627,14 +655,13 @@ export async function initCartPage() {
             }
          }
 
-         // ✅ 취소든 확인이든, store가 진짜 상태이므로 재렌더로 UI 정렬
          await paint();
          return;
       }
 
       /* ------------------------------
          C) 구매하기
-         - 결제 확인 모달 → Mock 결제 → 결제 완료 모달(요약 + 등급 안내)
+         - 결제 확인 → Mock 결제 → 완료 모달(요약 + 등급)
       ------------------------------ */
       if (e.target.closest('[data-checkout]')) {
          const detailed = await cartStore.getDetailedItems();
@@ -657,10 +684,20 @@ export async function initCartPage() {
             return;
          }
 
-         // ✅ 결제 요약 + 등급 안내(결제 후 최신 user 기준)
          const pricing = result?.payload?.pricing;
          const coupon = result?.payload?.coupon;
 
+         // ✅ 승급 쿠폰 지급 내역(있으면 모달에 함께 노출)
+         const granted = Array.isArray(result?.grantedUpgradeCoupons)
+            ? result.grantedUpgradeCoupons
+            : [];
+
+         const upgradeLines =
+            granted.length > 0
+               ? `🎁 승급 쿠폰 지급: ${granted.join(', ')}`
+               : ''; // 없으면 빈 문자열
+
+         // ✅ 결제 후 최신 유저 기준으로 등급 재계산
          const user = authStore.getUser?.();
          const { tierInfo } = getMembershipSnapshot({
             totalSpent: user?.totalSpent ?? 0,
@@ -673,7 +710,10 @@ export async function initCartPage() {
                : '🎫 사용 쿠폰: 없음',
             `🚚 배송비: ₩ ${formatPrice(pricing?.shipping ?? 0)}`,
             `💳 최종 결제: ₩ ${formatPrice(pricing?.total ?? 0)}`,
-         ].join('\n');
+            upgradeLines, // ✅ 여기!
+         ]
+            .filter(Boolean) // ✅ 빈 줄 제거
+            .join('\n');
 
          const tierLines = [
             `🏷️ 현재 등급: ${tierInfo.current.name}`,
@@ -696,7 +736,7 @@ export async function initCartPage() {
 
       /* ------------------------------
          D) 사이즈 변경 (pill 클릭)
-         - 모달 확인 → updateOptions(병합 가능) → 토스트 디테일
+         - 모달 확인 → updateOptions(병합 가능) → 토스트
       ------------------------------ */
       const sizeBtn = e.target.closest('[data-cart-size-pill]');
       if (sizeBtn) {
@@ -727,8 +767,6 @@ export async function initCartPage() {
          });
          if (!ok) return;
 
-         // ✅ 변경 + (필요 시) 동일 라인 병합
-         const prevKey = key;
          const result = cartStore.updateOptions(key, { size: nextSize });
 
          if (!result?.ok) {
@@ -738,11 +776,9 @@ export async function initCartPage() {
             return;
          }
 
-         const nextKey = String(result?.key || prevKey);
+         // ⚠️ 병합 여부는 현재 message 기반 판별(스토어에서 merged 플래그 주면 더 견고해짐)
          const didMerge = String(result?.message || '').includes('병합');
-         const didKeyChange = nextKey !== prevKey; // 참고용(병합되면 바뀔 수 있음)
 
-         // ✅ 토스트 문구 디테일
          if (prevSize) {
             toast.show(
                didMerge

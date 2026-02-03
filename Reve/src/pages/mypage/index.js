@@ -261,7 +261,7 @@ function renderOwned(owned, appliedCode) {
             const pct = Math.round(Number(c?.rate || 0) * 100 || 0);
             const used = Boolean(c?.used);
             const isApplied = appliedCode === code && Boolean(code);
-
+            const isUpgradeCoupon = code.startsWith('UPGRADE_');
             const status = used
                ? '사용됨'
                : isApplied
@@ -269,33 +269,36 @@ function renderOwned(owned, appliedCode) {
                  : '사용 가능';
 
             return `
-            <li class="coupon-item ${used ? 'is-used' : ''}">
-              <div class="coupon-item__info">
-                <p class="coupon-item__title">${escapeHtml(title)}</p>
-                <p class="coupon-item__meta">
-                  <strong>${escapeHtml(code)}</strong>
-                  <span class="dot">•</span>
-                  ${pct}%
-                  <span class="dot">•</span>
-                  <span class="coupon-item__status ${
-                     used ? 'is-used' : isApplied ? 'is-applied' : ''
-                  }">
-                    ${escapeHtml(status)}
-                  </span>
-                </p>
-              </div>
-
-              <div class="coupon-item__actions">
-                ${
-                   used
-                      ? `<button type="button" class="btn" disabled>사용 완료</button>`
-                      : isApplied
-                        ? `<button type="button" class="btn subtle" data-coupon-clear>해제</button>`
-                        : `<button type="button" class="btn primary" data-coupon-apply="${escapeHtml(code)}">적용</button>`
-                }
-              </div>
-            </li>
-          `;
+                 <li class="coupon-item ${used ? 'is-used' : ''}">
+                   <div class="coupon-item__info">
+                     <p class="coupon-item__title">${escapeHtml(title)}</p>
+                     <p class="coupon-item__meta">
+                       <strong>${escapeHtml(code)}</strong>
+                       ${
+                          code.startsWith('UPGRADE_')
+                             ? `<span class="pill pill--upgrade" aria-label="승급 쿠폰">승급</span>`
+                             : ''
+                       }
+                       <span class="dot">•</span>
+                       ${pct}%
+                       <span class="dot">•</span>
+                       <span class="coupon-item__status ${used ? 'is-used' : isApplied ? 'is-applied' : ''}">
+                         ${escapeHtml(status)}
+                       </span>
+                     </p>
+                   </div>
+               
+                   <div class="coupon-item__actions">
+                     ${
+                        used
+                           ? `<button type="button" class="btn" disabled>사용 완료</button>`
+                           : isApplied
+                             ? `<button type="button" class="btn subtle" data-coupon-clear>해제</button>`
+                             : `<button type="button" class="btn primary" data-coupon-apply="${escapeHtml(code)}">적용</button>`
+                     }
+                   </div>
+                 </li>
+               `;
          })
          .join('')}
     </ul>

@@ -28,3 +28,9 @@
 .cart-badge[hidden] {
    display: none;
 }
+/* 승급 쿠폰 배지 */
+.pill--upgrade {
+   border: 1px solid #d9b54c;
+   background: rgba(217, 181, 76, 0.12);
+   color: #a07a12;
+}

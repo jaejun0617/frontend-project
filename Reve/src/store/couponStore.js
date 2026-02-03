@@ -24,6 +24,8 @@ const STORAGE_KEY_V1 = 'eclat_coupons_v1';
  * ✅ 쿠폰 카탈로그(서버 대체)
  * - 나중에 DB/서버로 바꿔도 store API는 그대로 두면 됨
  */
+// couponStore.js 내부 COUPON_CATALOG에 추가
+
 const COUPON_CATALOG = {
    HELLOWORLD: {
       code: 'HELLOWORLD',
@@ -31,20 +33,27 @@ const COUPON_CATALOG = {
       rate: 0.1,
       description: '기본 세일 + 추가 10% 쿠폰 할인',
    },
-   VIP: {
-      code: 'VIP',
-      title: 'VIP 15%',
-      rate: 0.15,
-      description: '기본 세일 + 추가 15% 쿠폰 할인',
+
+   // ✅ 승급 축하 쿠폰(정책은 여기서만 관리)
+   UPGRADE_GOLD: {
+      code: 'UPGRADE_GOLD',
+      title: '골드 승급 축하 7%',
+      rate: 0.07,
+      description: '골드 승급 기념 추가 7% 할인',
    },
-   SEASON: {
-      code: 'SEASON',
-      title: '시즌 8%',
-      rate: 0.08,
-      description: '기본 세일 + 추가 8% 쿠폰 할인',
+   UPGRADE_ROYAL: {
+      code: 'UPGRADE_ROYAL',
+      title: '로얄 승급 축하 10%',
+      rate: 0.1,
+      description: '로얄 승급 기념 추가 10% 할인',
+   },
+   UPGRADE_VIP: {
+      code: 'UPGRADE_VIP',
+      title: 'VIP 승급 축하 12%',
+      rate: 0.12,
+      description: 'VIP 승급 기념 추가 12% 할인',
    },
 };
-
 /* ==============================
    0) localStorage 유틸
    ============================== */

@@ -331,3 +331,110 @@
    - 다음 등급까지 남은 금액(최고 등급이면 “최고 등급”)
 
 ---
+
+---
+
+## 12) 👤 MyPage 멤버십/등급 UI 통합 (membership.js 기준)
+
+### ✅ 목표
+
+- Cart/Mypage 등 여러 화면에서 “등급/적립 정책”이 중복 구현되지 않도록
+- **membership.js 단일 소스**로 계산/표시를 통일
+- 마이페이지에서 등급 정보를 “내 정보” 흐름 안에 자연스럽게 녹여 UX 강화
+
+### ✅ 변경 사항
+
+#### 1) MyPage가 membership.js를 직접 사용하도록 통일
+
+- `src/pages/mypage/index.js`
+   - 기존 `grade.js` 기반 계산 제거
+   - `getMembershipSnapshot({ totalSpent, checkoutTotal })`로 등급/진행률/적립률/다음 등급까지를 일관되게 계산
+   - `formatPercent(rate)`로 퍼센트 표기 통일
+
+#### 2) “내 정보(Profile)” 패널에 멤버십 요약 통합
+
+- 기존: 이름/권한/누적 구매만 표시
+- 개선: 아래 정보까지 한 화면에서 확인 가능
+   - 현재 등급
+   - 적립률
+   - 다음 등급까지 남은 금액 (최고 등급이면 유지 상태 표시)
+
+#### 3) “회원등급(Grade)” 패널도 동일 로직 재사용
+
+- membership snapshot의 `progressRatio`를 기반으로
+   - 진행바 퍼센트(pct) 계산
+   - 다음 등급/남은 금액 표시
+   - 최고 등급일 때 100% 고정 표시
+
+### ✅ UX 보강 (쿠폰 관리)
+
+- 마이페이지 쿠폰 적용/해제도 confirmModal 기반으로 실수 방지
+   - 적용: “쿠폰을 적용할까요?”
+   - 해제: “쿠폰을 해제할까요?”
+- toast로 성공/실패 피드백 제공
+
+### ✅ 관련 파일
+
+- `src/pages/mypage/index.js`
+- `src/utils/membership.js`
+- `src/components/ConfirmModal.js`
+- `src/components/Toast.js`
+
+---
+
+---
+
+## 12) 🎁 승급 쿠폰(Upgrade Reward) 지급
+
+### ✅ 목표
+
+- 결제 완료 시 **등급 상승(승급)** 이 발생하면 즉시 “축하 쿠폰”을 지급
+- 사용자에게 “결제 = 끝”이 아니라, 다음 구매를 유도하는 보상 루프 제공
+
+---
+
+### ✅ 정책(단일 소스)
+
+- `src/utils/membership.js`
+   - `UPGRADE_COUPON_BY_TIER`
+      - 골드 → `UPGRADE_GOLD`
+      - 로얄 → `UPGRADE_ROYAL`
+      - VIP → `UPGRADE_VIP`
+
+> 상위 등급 추가(VVIP 등)는 membership 정책 테이블에만 추가하면 전체 반영 가능
+
+---
+
+### ✅ 승급 감지 로직
+
+- 결제 전/후 누적 구매액을 비교하여 승급 여부 판단
+- 승급이 여러 단계 점프(예: 실버 → 로얄) 되면:
+   - 중간 등급 포함하여 **모든 승급 쿠폰을 지급**(정책)
+
+- 구현 위치:
+   - `src/pages/cart/index.js` → `handleCheckout()`
+
+---
+
+### ✅ 쿠폰 지급 방식
+
+- 지급은 `couponStore.register(code)`로 처리
+   - 이미 보유한 쿠폰이면 자동으로 중복 등록 방지됨
+- 결제 성공 시 반환값에 지급된 쿠폰 리스트 포함
+   - `grantedUpgradeCoupons: string[]`
+
+---
+
+### ✅ UI 반영
+
+#### 1) 결제 완료 모달에 보상 안내
+
+- 결제 완료 모달에 아래 내용을 추가 표시
+   - `🎁 승급 쿠폰 지급: UPGRADE_GOLD ...` (지급된 경우에만 노출)
+
+#### 2) 마이페이지 쿠폰 리스트에 승급 배지 표시
+
+- `UPGRADE_*` 쿠폰은 “승급” 배지로 시각적 구분
+- 사용자는 MyPage에서 승급 보상을 즉시 확인 가능
+
+---
