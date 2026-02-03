@@ -4,7 +4,7 @@
  * 역할: 앱 진입점(Entry)
  * - 라우터/레이아웃 조립
  * - 전역 UI 초기화 (Sidebar/SearchDrawer/Toast/AuthUi)
- * - 전역 이벤트 위임 (장바구니 담기, 사이즈 선택 등)
+ * - 전역 이벤트 위임 (상품 카드: 사이즈 선택/장바구니 토글)
  * =============================================
  */
 
@@ -70,9 +70,7 @@ function layout(pageHtml) {
    ============================== */
 
 const routes = {
-   '/': {
-      render: () => HomePage(),
-   },
+   '/': { render: () => HomePage() },
 
    '/product': {
       render: () => ProductPage(),
@@ -102,7 +100,6 @@ const routes = {
    '/mypage': {
       render: () => MyPage(),
       afterRender: () => {
-         // ✅ 로그인 필요 페이지: 렌더 후 가드 (비로그인이면 /auth로 이동)
          const ok = requireAuth({ redirectTo: '/mypage' });
          if (!ok) return;
          initMyPage();
@@ -112,14 +109,12 @@ const routes = {
    '/admin': {
       render: () => AdminPage(),
       afterRender: () => {
-         // ✅ 관리자만 접근
          const ok = requireAdmin({ redirectTo: '/admin' });
          if (!ok) return;
          initAdminPage();
       },
    },
 
-   // 404
    '/404': {
       render: () =>
          "<section class='page'><h1>404</h1><p>페이지를 찾을 수 없습니다.</p></section>",
@@ -132,7 +127,7 @@ const routes = {
 
 initRouter({ mount, layout, routes });
 
-// 전역 UI들은 1번만 init (라우팅이 바뀌어도 유지되는 구조)
+// 전역 UI는 1회만 초기화 (라우팅이 바뀌어도 유지)
 initSidebar();
 const searchDrawer = initSearchDrawer();
 const toast = initToast();
@@ -144,8 +139,6 @@ const authUi = initAuthUi();
 
 /**
  * ✅ 장바구니 카운트 뱃지 갱신
- * - 0이면 숨김(UX)
- * - 페이지가 렌더링될 때마다 새 DOM 기준으로 갱신해야 함
  */
 function updateCartCount() {
    const count = cartStore.getCount();
@@ -161,10 +154,51 @@ function updateCartCount() {
       el.textContent = String(count);
    });
 }
+
 /**
- * ✅ 상품 리스트에서 "담김 상태" 표시 동기화
- * - productId 기준으로 장바구니에 1개라도 있으면 아이콘 빨강(클래스) 유지
- * - 사이즈가 있는 상품은, 담긴 사이즈 pill도 표시(옵션)
+ * ✅ 카드 UI: 선택된 사이즈를 dataset + pill active에 반영
+ * - value='' 이면 "선택 없음" 상태
+ */
+function setCardSelectedSize(cardEl, value) {
+   const next = String(value || '').trim();
+   cardEl.setAttribute('data-selected-size', next);
+
+   const pills = cardEl.querySelectorAll('[data-size-pill]');
+   pills.forEach((btn) => {
+      const v = String(btn.getAttribute('data-size-value') || '').trim();
+      const isOn = Boolean(next) && v === next;
+
+      btn.classList.toggle('is-active', isOn);
+      btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+   });
+}
+
+/**
+ * ✅ 장바구니에서 특정 productId 라인들 조회
+ */
+function getCartLines(productId) {
+   return cartStore.getItemsByProductId?.(productId) ?? [];
+}
+
+/**
+ * ✅ 상품당 "현재 담긴 사이즈"를 1개 기준으로 반환
+ * - 상품당 1라인 UX를 가정 (리스트 기준)
+ */
+function getCartSizeForProduct(productId) {
+   const lines = getCartLines(productId);
+   const first = lines[0];
+   return {
+      hasAny: lines.length > 0,
+      key: first?.key || '',
+      size: String(first?.options?.size || '').trim(),
+   };
+}
+
+/**
+ * ✅ 상품 카드 "담김 상태" 동기화
+ * - 장바구니에 있으면 아이콘 빨강(is-added)
+ * - 담긴 사이즈가 있으면 해당 pill도 active로 맞춤
+ * - 담긴 게 없으면 기본 선택 없음(= active 없음)
  */
 function syncProductCardsWithCart() {
    const cards = document.querySelectorAll('[data-product-id]');
@@ -174,39 +208,44 @@ function syncProductCardsWithCart() {
       const productId = card.getAttribute('data-product-id');
       if (!productId) return;
 
-      const inCartLines = cartStore.getItemsByProductId?.(productId) ?? [];
-      const inCart = inCartLines.length > 0;
-
-      // 1) 아이콘 상태
       const favBtn = card.querySelector('[data-add-cart]');
+      const inCart = cartStore.hasLine?.(productId) ?? false;
+
       if (favBtn) favBtn.classList.toggle('is-added', inCart);
 
-      // 2) pill 중 "담긴 사이즈" 표시 (선택 옵션)
-      const pills = card.querySelectorAll('[data-size-pill]');
-      if (!pills.length) return;
+      // 사이즈 pill이 있는 카드라면 "담긴 사이즈"를 active로 표시
+      const hasPills = Boolean(card.querySelector('[data-size-pill]'));
+      if (!hasPills) return;
 
+      const cartInfo = getCartSizeForProduct(productId);
+
+      if (cartInfo.hasAny && cartInfo.size) {
+         // 담긴 사이즈를 UI에 표시 (리스트에서도 내가 뭘 담았는지 보이게)
+         setCardSelectedSize(card, cartInfo.size);
+      } else {
+         // 기본값 선택 없음
+         setCardSelectedSize(card, '');
+      }
+
+      // (선택) 담긴 사이즈 pill에 추가 표시(원하면 CSS로 점/테두리)
+      const lines = getCartLines(productId);
       const sizesInCart = new Set(
-         inCartLines
+         lines
             .map((it) => String(it?.options?.size || '').trim())
             .filter(Boolean),
       );
 
-      pills.forEach((pill) => {
-         const v = pill.getAttribute('data-size-value') || '';
+      card.querySelectorAll('[data-size-pill]').forEach((pill) => {
+         const v = String(pill.getAttribute('data-size-value') || '').trim();
          pill.classList.toggle('is-in-cart', sizesInCart.has(v));
       });
    });
 }
+
 /* ==============================
    5) 회원가입 후 메인에서 모달 띄우기
    ============================== */
 
-/**
- * ✅ sessionStorage 플래그를 이용해 "메인 이동 후" 모달 띄우기
- * - auth 페이지에서 세션스토리지에 데이터 저장
- * - 홈으로 네비게이션 완료 후(app:render) 모달 실행
- * - 중복 실행 방지 위해 1회성 처리
- */
 let didRunSignupModal = false;
 
 function runAfterSignupModalIfNeeded() {
@@ -215,7 +254,6 @@ function runAfterSignupModalIfNeeded() {
    const raw = sessionStorage.getItem('reve_after_signup_modal');
    if (!raw) return;
 
-   // ✅ 중복 방지: 먼저 제거
    sessionStorage.removeItem('reve_after_signup_modal');
    didRunSignupModal = true;
 
@@ -256,52 +294,44 @@ function runAfterSignupModalIfNeeded() {
    ============================== */
 
 window.addEventListener('app:render', () => {
-   // ✅ 새로 렌더된 DOM 기준으로 UI를 갱신해야 함
+   // 새로 렌더된 DOM 기준으로 갱신
    searchDrawer.refresh();
    updateCartCount();
    authUi.refresh();
 
-   // ✅ 회원가입 후 모달 (메인에서 뜨게)
    runAfterSignupModalIfNeeded();
+
+   // 상품 리스트가 새로 렌더되면 "담김 상태"도 다시 맞춰야 함
    syncProductCardsWithCart();
 });
 
-// 최초 1회도 안전하게 갱신
+// 최초 1회
 updateCartCount();
 authUi.refresh();
 
 /* ==============================
-   7) authStore 구독: 카트 owner 전환 + 환영 토스트
+   7) authStore 구독: 카트 owner 전환 + 토스트
    ============================== */
 
-// 앱 시작 직후 1번: 현재 로그인 유저 기준으로 cart owner 세팅
+// 앱 시작 시 현재 유저 기준 owner 세팅
 {
    const u = authStore.getUser?.();
    cartStore.setOwner(u?.id || null);
 }
 
-/**
- * ✅ authStore 변화가 생기면
- * 1) cartStore ownerKey 스위칭 (로그인/로그아웃 시 장바구니 분리)
- * 2) 로그인 순간 환영 토스트
- * 3) 로그아웃 순간 토스트
- */
 let prevLogin = authStore.isLoggedIn();
 
 authStore.subscribe(() => {
    const nowLogin = authStore.isLoggedIn();
    const u = authStore.getUser?.();
 
-   // 1) 유저별 카트 분리 적용
+   // 유저별 장바구니 분리
    cartStore.setOwner(u?.id || null);
 
-   // 2) 로그인 순간
+   // 로그인/로그아웃 토스트
    if (!prevLogin && nowLogin) {
-      const name = u?.name || '사용자';
-      toast.show(`${name}님 환영합니다 👋`, { duration: 1400 });
+      toast.show(`${u?.name || '사용자'}님 환영합니다 👋`, { duration: 1400 });
    }
-
-   // 3) 로그아웃 순간
    if (prevLogin && !nowLogin) {
       toast.show('로그아웃 완료', { duration: 1400 });
    }
@@ -309,111 +339,156 @@ authStore.subscribe(() => {
    prevLogin = nowLogin;
 });
 
+// 장바구니 변화 시: 카운트 + 리스트 카드 상태 동기화
 cartStore.subscribe(() => {
    updateCartCount();
    syncProductCardsWithCart();
 });
+
 /* ==============================
-   8) 전역 이벤트 위임
-   - (A) 사이즈 칩 선택
-   - (B) 장바구니 담기
+   8) 전역 이벤트 위임 (상품 카드)
+   - (A) 사이즈 pill 클릭
+   - (B) 장바구니 아이콘 클릭 (토글 + 사이즈 변경 모달)
    ============================== */
 
-/**
- * ✅ (A) 사이즈 칩 선택
- * - ProductCard에서 data-size-pill / data-size-value 구조를 쓰는 전제
- * - 클릭하면 카드의 data-selected-size를 갱신하고,
- *   선택 스타일(is-selected) 및 aria-checked를 업데이트
- */
-document.addEventListener('click', (e) => {
-   const pill = e.target.closest('[data-size-pill]');
-   if (!pill) return;
-
-   const card = pill.closest('[data-product-id]');
-   if (!card) return;
-
-   const isAlreadyActive = pill.classList.contains('is-active');
-
-   // ✅ 모두 해제
-   card.querySelectorAll('[data-size-pill]').forEach((btn) => {
-      btn.classList.remove('is-active');
-      btn.setAttribute('aria-pressed', 'false');
-   });
-
-   // ✅ 같은 거 다시 누른 경우: 선택 해제 상태로 종료
-   if (isAlreadyActive) {
-      card.setAttribute('data-selected-size', '');
-      return;
-   }
-
-   // ✅ 새로 선택
-   pill.classList.add('is-active');
-   pill.setAttribute('aria-pressed', 'true');
-
-   const size = String(pill.getAttribute('data-size-value') || '').trim();
-   card.setAttribute('data-selected-size', size);
-});
-/**
- * ✅ (B) 장바구니 담기
- * - 로그인 가드
- * - 사이즈 있는 상품은 "선택 필수" 가드
- * - options: { size } 를 cartStore에 전달
- */
 document.addEventListener('click', async (e) => {
    /* ==============================
-      A) 사이즈 pill 선택
+      A) 사이즈 pill 클릭
+      - 담긴 상태에서 다른 사이즈 클릭하면 "변경 모달" 후 반영
       ============================== */
    const pill = e.target.closest('[data-size-pill]');
    if (pill) {
       const card = pill.closest('[data-product-id]');
       if (!card) return;
 
+      const productId = card.getAttribute('data-product-id');
+      if (!productId) return;
+
       const picked = String(pill.getAttribute('data-size-value') || '').trim();
+      if (!picked) return;
 
-      // 1) 카드에 선택값 저장
-      card.setAttribute('data-selected-size', picked);
+      const currentSelected = String(
+         card.getAttribute('data-selected-size') || '',
+      ).trim();
 
-      // 2) UI 토글 (aria-pressed + 클래스)
-      const pills = card.querySelectorAll('[data-size-pill]');
-      pills.forEach((p) => {
-         const isOn = p === pill;
-         p.setAttribute('aria-pressed', isOn ? 'true' : 'false');
-         p.classList.toggle('is-active', isOn);
-      });
+      // 같은 사이즈를 다시 누르면 "선택 해제" (실수 방지/UX)
+      if (currentSelected === picked) {
+         // 단, 이미 장바구니에 담긴 상태라면 "선택 해제"보다 "담긴 사이즈 유지"가 더 안전함
+         const cartInfo = getCartSizeForProduct(productId);
+         if (cartInfo.hasAny && cartInfo.size) {
+            // 담긴 사이즈는 유지
+            setCardSelectedSize(card, cartInfo.size);
+            return;
+         }
+         // 담긴 게 없으면 선택 해제 허용
+         setCardSelectedSize(card, '');
+         return;
+      }
 
+      // 장바구니에 이미 담긴 상태에서 다른 사이즈를 클릭한 경우 → 변경 모달
+      const cartInfo = getCartSizeForProduct(productId);
+      if (cartInfo.hasAny && cartInfo.size && cartInfo.size !== picked) {
+         const ok = await confirmModal({
+            title: '사이즈 변경',
+            message: `현재 담긴 사이즈는 ${cartInfo.size}예요.\n${picked}로 변경할까요?`,
+            confirmText: '변경',
+            cancelText: '취소',
+         });
+
+         if (!ok) {
+            // 취소면 담긴 사이즈로 되돌림
+            setCardSelectedSize(card, cartInfo.size);
+            return;
+         }
+
+         // ✅ 옵션 변경 + 병합까지 cartStore가 처리
+         cartStore.updateOptions?.(cartInfo.key, { size: picked });
+
+         // UI 동기화
+         setCardSelectedSize(card, picked);
+         syncProductCardsWithCart();
+
+         toast.show('사이즈가 변경됐어요', { duration: 1400 });
+         return;
+      }
+
+      // 장바구니에 없거나(혹은 담긴 사이즈가 비어있으면) 그냥 선택만
+      setCardSelectedSize(card, picked);
       return;
    }
 
    /* ==============================
-      B) 장바구니 담기(아이콘 버튼)
+      B) 장바구니 아이콘 클릭 (토글)
+      - 1회: 담기
+      - 2회: 취소(삭제)
+      - 담긴 상태에서 사이즈 다르면: 변경 모달 후 변경
       ============================== */
    const btn = e.target.closest('[data-add-cart]');
    if (!btn) return;
 
-   // ✅ 로그인 가드
-   const ok = requireAuth({
-      redirectTo: window.location.pathname || '/product',
-   });
-   if (!ok) return;
-
    const card = btn.closest('[data-product-id]');
    const productId = card?.getAttribute('data-product-id');
-   if (!productId) return;
+   if (!card || !productId) return;
 
-   // ✅ 사이즈 필요한 상품이면: 선택 안 했을 때 차단
-   const requiresSize = card?.getAttribute('data-requires-size') === '1';
+   // ✅ 로그인 가드
+   const okAuth = requireAuth({
+      redirectTo: window.location.pathname || '/product',
+   });
+   if (!okAuth) return;
+
+   const hasSizePills = Boolean(card.querySelector('[data-size-pill]'));
    const selectedSize = String(
-      card?.getAttribute('data-selected-size') || '',
+      card.getAttribute('data-selected-size') || '',
    ).trim();
+   const cartInfo = getCartSizeForProduct(productId);
 
-   if (requiresSize && !selectedSize) {
+   // ✅ 이미 담긴 상태 & 선택 사이즈가 비어있으면 → "그냥 취소"를 허용 (요구사항)
+   // (사용자는 굳이 사이즈 선택을 다시 안 해도 취소하고 싶음)
+   if (cartInfo.hasAny && !selectedSize) {
+      cartStore.remove?.(cartInfo.key);
+      syncProductCardsWithCart();
+      toast.show('장바구니에서 제거했어요', { duration: 1400 });
+      return;
+   }
+
+   // ✅ 사이즈가 필요한 상품인데 선택이 없으면 담기 차단
+   if (hasSizePills && !selectedSize) {
       toast.show('사이즈를 선택한 뒤 장바구니에 담아 주세요 👟', {
          duration: 1400,
       });
       return;
    }
 
-   // ✅ 담기
+   // ✅ 이미 담긴 상태에서 같은 사이즈면 → 취소(삭제)
+   if (cartInfo.hasAny && cartInfo.size === selectedSize) {
+      cartStore.remove?.(cartInfo.key);
+      syncProductCardsWithCart();
+      toast.show('장바구니에서 제거했어요', { duration: 1400 });
+      return;
+   }
+
+   // ✅ 이미 담긴 상태에서 사이즈가 다르면 → 변경 모달
+   if (cartInfo.hasAny && cartInfo.size && cartInfo.size !== selectedSize) {
+      const ok = await confirmModal({
+         title: '사이즈 변경',
+         message: `현재 담긴 사이즈는 ${cartInfo.size}예요.\n${selectedSize}로 변경할까요?`,
+         confirmText: '변경',
+         cancelText: '취소',
+      });
+
+      if (!ok) {
+         // 취소면 장바구니 사이즈로 되돌리기
+         setCardSelectedSize(card, cartInfo.size);
+         return;
+      }
+
+      cartStore.updateOptions?.(cartInfo.key, { size: selectedSize });
+      syncProductCardsWithCart();
+      toast.show('사이즈가 변경됐어요', { duration: 1400 });
+      return;
+   }
+
+   // ✅ 장바구니에 없으면 담기
    const result = await cartStore.addById(productId, 1, {
       ...(selectedSize ? { size: selectedSize } : {}),
    });
@@ -425,7 +500,6 @@ document.addEventListener('click', async (e) => {
       return;
    }
 
-   // ✅ UX: 담김 토스트 + 버튼 상태(빨강 유지)
    toast.show(
       selectedSize
          ? `장바구니에 담겼어요 · 사이즈 ${selectedSize}`
@@ -433,10 +507,9 @@ document.addEventListener('click', async (e) => {
       { duration: 1400 },
    );
 
-   // 리스트 상태 즉시 동기화(아이콘 빨강 + 담긴 사이즈 pill 표시)
    syncProductCardsWithCart();
 
-   // 버튼에 잠깐 "펄스" 느낌 클래스(선택)
+   // (선택) 짧은 피드백 애니메이션용 클래스
    btn.classList.add('is-pulse');
    setTimeout(() => btn.classList.remove('is-pulse'), 400);
 });
