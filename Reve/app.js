@@ -314,20 +314,31 @@ authUi.refresh();
    ============================== */
 
 // 앱 시작 시 현재 유저 기준 owner 세팅
+// 1) 초기 owner 세팅
 {
    const u = authStore.getUser?.();
-   cartStore.setOwner(u?.id || null);
+   const owner = u?.id || 'guest';
+   cartStore.setOwner(owner);
+   couponStore.setOwner(owner);
 }
 
 let prevLogin = authStore.isLoggedIn();
+let prevOwner = authStore.getUser?.()?.id || 'guest';
 
 authStore.subscribe(() => {
    const nowLogin = authStore.isLoggedIn();
    const u = authStore.getUser?.();
 
-   cartStore.setOwner(u?.id || 'guest');
-   couponStore.setOwner(u?.id || 'guest'); // ✅ 딱 1번만
+   const owner = u?.id || 'guest';
 
+   // ✅ owner가 바뀔 때만 스토어 스위칭
+   if (owner !== prevOwner) {
+      cartStore.setOwner(owner);
+      couponStore.setOwner(owner);
+      prevOwner = owner;
+   }
+
+   // ✅ 로그인/로그아웃 토스트
    if (!prevLogin && nowLogin) {
       toast.show(`${u?.name || '사용자'}님 환영합니다 👋`, { duration: 1400 });
    }
@@ -337,6 +348,7 @@ authStore.subscribe(() => {
 
    prevLogin = nowLogin;
 });
+
 // 장바구니 변화 시: 카운트 + 리스트 카드 상태 동기화
 cartStore.subscribe(() => {
    updateCartCount();

@@ -297,10 +297,12 @@ function renderCart(detailedItems) {
    // - 적립 기준: "배송비 제외"가 일반적이라 checkoutTotal에 totalAfterCoupon을 사용
    // - 배송비 포함 적립을 원하면 checkoutTotal: total 로 바꾸면 됨
    const user = authStore.getUser?.();
+   // ✅ 변경 (상품금액만: 배송비 제외)
+   const pointsBase = pricingCore.totalAfterCoupon;
+
    const { tierInfo, earnRate, expectedPoints } = getMembershipSnapshot({
       totalSpent: user?.totalSpent ?? 0,
-      checkoutTotal: pricingCore.totalAfterCoupon, // ✅ 적립 기준(배송비 제외)
-      // checkoutTotal: total, // ✅ 배송비 포함 적립 정책이면 이걸 사용
+      checkoutTotal: pointsBase,
    });
 
    return `
@@ -498,9 +500,9 @@ async function handleCheckout({ detailedItems }) {
       pricing: {
          subtotalAfterSale: pricingCore.subtotalAfterSale,
          couponDiscountTotal: pricingCore.couponDiscountTotal,
-         totalAfterCoupon: pricingCore.totalAfterCoupon,
+         totalAfterCoupon: pricingCore.totalAfterCoupon, // ✅ 상품 결제금액(쿠폰 반영)
          shipping,
-         total,
+         total, // ✅ 실제 결제 총액(배송비 포함)
       },
       appliedCoupon,
    });
@@ -514,31 +516,60 @@ async function handleCheckout({ detailedItems }) {
       couponStore.clearApplied?.();
    }
 
-   // ✅ 결제 전 유저 스냅샷(승급 판단용)
+   // ✅ 결제 전 유저 스냅샷
    const userBefore = authStore.getUser?.();
    const prevSpent = Number(userBefore?.totalSpent ?? 0);
+   const prevPoints = Number(userBefore?.points ?? 0);
 
-   // ✅ 누적 구매액 반영(정책: 총 결제금액 기준)
-   const added = Number(payload?.pricing?.total ?? 0);
-   const nextSpent = prevSpent + added;
+   // ✅ 누적 구매액 정책(기존 유지): 총 결제금액(배송비 포함)
+   const addedSpent = Number(payload.pricing.total || 0);
+   const nextSpent = prevSpent + addedSpent;
 
-   // ✅ 먼저 totalSpent 갱신 (이후 UI/등급 계산이 최신 값 기준이 되도록)
-   authStore.updateUser?.({ totalSpent: nextSpent });
+   // ✅ 포인트 정책(새로 확정): 상품금액만(배송비 제외)
+   const pointsBase = Number(payload.pricing.totalAfterCoupon || 0);
+
+   // ✅ 적립률은 “결제 후 등급” 기준으로 계산하고 싶으면 nextSpent로 계산
+   // - 지금은 일관성 있게 nextSpent 기준으로 계산(결제 후 등급 반영)
+   const snap = getMembershipSnapshot({
+      totalSpent: nextSpent,
+      checkoutTotal: pointsBase,
+   });
+
+   const earnedPoints = Number(snap.expectedPoints || 0);
+   const nextPoints = prevPoints + earnedPoints;
+
+   // ✅ 유저 정보 업데이트(누적구매 + 포인트)
+   authStore.updateUser?.({
+      totalSpent: nextSpent,
+      points: nextPoints,
+   });
+
+   // ✅ 장바구니 비우기
+   cartStore.clear?.();
 
    // ✅ 승급 쿠폰 지급
-   // - getUpgradedTiers가 "새로 달성한 등급들"을 Tier[]로 반환
-   // - 그 Tier.name으로 쿠폰 코드 매핑 → register() 지급
-   const grantedUpgradeCoupons = [];
+   // - prevSpent → nextSpent 기준으로 “새로 달성한 등급들”을 모두 계산
+   // - 실버→로얄처럼 2단 점프면 골드/로얄 쿠폰 둘 다 지급(정책)
+   let grantedUpgradeCoupons = [];
 
-   // 로그인 유저만 지급(guest 방지)
    if (userBefore?.id) {
-      const upgraded = getUpgradedTiers({
+      // ✅ (안전) 지급 전에 현재 owner를 로그인 유저로 고정
+      // - setOwner가 "변경 시에만" state를 갈아끼우도록 구현돼 있으면 가장 좋음
+      couponStore.setOwner?.(userBefore.id);
+
+      // ✅ 결제 전/후 누적 구매액 차이로 승급 구간 계산
+      const upgradedTiers = getUpgradedTiers({
          prevTotalSpent: prevSpent,
          nextTotalSpent: nextSpent,
       });
 
-      upgraded.forEach((tier) => {
-         const code = getUpgradeCouponCode(tier?.name);
+      // ✅ 승급한 등급들에 대해 쿠폰 지급
+      // - register가 이미 보유 중이면 fail 처리하므로 중복 지급 방지됨
+      upgradedTiers.forEach((tier) => {
+         const tierName = String(tier?.name || '').trim();
+         if (!tierName) return;
+
+         const code = getUpgradeCouponCode(tierName);
          if (!code) return;
 
          const r = couponStore.register?.(code);
@@ -546,10 +577,13 @@ async function handleCheckout({ detailedItems }) {
       });
    }
 
-   // ✅ 결제 완료 후 장바구니 비우기
-   cartStore.clear?.();
-
-   return { ok: true, payload, receipt: result.data, grantedUpgradeCoupons };
+   return {
+      ok: true,
+      payload,
+      receipt: result.data,
+      earnedPoints,
+      grantedUpgradeCoupons,
+   };
 }
 /* ==============================
    4) Page init
