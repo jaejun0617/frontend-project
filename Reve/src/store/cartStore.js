@@ -14,8 +14,8 @@
  * - remove(key)
  * - getDetailedItems()
  *
- * ✅ 추가 API (이번 작업 포인트)
- * - getItemsByProductId(productId)          // 상품리스트에서 "담김" 표시용
+ * ✅ 추가 API
+ * - getItemsByProductId(productId)          // 상품리스트 "담김" 표시용
  * - hasLine(productId, options?)            // 특정 옵션 라인이 담겼는지
  * - updateOptions(key, nextOptions)         // 장바구니에서 사이즈 변경 + 라인 병합
  * =============================================
@@ -65,7 +65,7 @@ function normalizeOptions(options) {
 /**
  * ✅ 라인 키 생성 규칙
  * - 같은 상품 + 같은 옵션이면 같은 key
- * - 옵션 순서/형태가 달라도 normalizeOptions로 동일하게 됨
+ * - 옵션 순서/형태가 달라도 normalizeOptions로 동일 key 보장
  */
 function buildLineKey(productId, options) {
    const id = String(productId || '').trim();
@@ -75,6 +75,12 @@ function buildLineKey(productId, options) {
    const size = String(o.size || '');
 
    return `${id}::color=${color}::size=${size}`;
+}
+
+function clampQty(n) {
+   const v = Number(n);
+   if (!Number.isFinite(v)) return 1;
+   return Math.max(1, Math.min(99, v));
 }
 
 function normalizeItems(items) {
@@ -88,8 +94,7 @@ function normalizeItems(items) {
          const options = normalizeOptions(it?.options);
          const key = String(it?.key || '').trim() || buildLineKey(id, options);
 
-         const qtyRaw = Number(it?.qty ?? 1);
-         const qty = Number.isFinite(qtyRaw) ? Math.max(1, qtyRaw) : 1;
+         const qty = clampQty(it?.qty ?? 1);
 
          return { key, id, qty, options };
       })
@@ -100,7 +105,7 @@ function readStateByOwner(ownerKey) {
    const raw = localStorage.getItem(storageKey(ownerKey));
    const parsed = raw ? safeParse(raw) : null;
 
-   // ✅ 레거시 마이그레이션(예전 단일 키 STORAGE_BASE -> guest로 1회 이동)
+   // ✅ 레거시 마이그레이션: reve_cart_v1(단일키) → guest로 1회 이동
    if (!raw) {
       const legacyRaw = localStorage.getItem(STORAGE_BASE);
       const legacyParsed = legacyRaw ? safeParse(legacyRaw) : null;
@@ -129,7 +134,7 @@ function writeStateByOwner(ownerKey, next) {
    1) Store core
    ============================== */
 
-let ownerKey = makeOwnerKey(null); // 기본 guest
+let ownerKey = makeOwnerKey(null);
 let state = readStateByOwner(ownerKey);
 
 /** @type {Set<(state:any)=>void>} */
@@ -152,12 +157,6 @@ function findIndexBySameLine(productId, options) {
    return state.items.findIndex((it) => it.key === key);
 }
 
-function clampQty(n) {
-   const v = Number(n);
-   if (!Number.isFinite(v)) return 1;
-   return Math.max(1, Math.min(99, v));
-}
-
 /* ==============================
    2) Public API
    ============================== */
@@ -174,23 +173,21 @@ export const cartStore = {
    },
 
    /**
-    * ✅ 로그인/로그아웃 때 owner 스위칭 (app.js에서 호출)
-    * - owner가 바뀌면 장바구니도 다른 localStorage로 스위치됨
+    * ✅ owner 스위칭 (로그인/로그아웃 시)
+    * - userId가 바뀌면 storageKey도 바뀜
     */
    setOwner(userId) {
       const nextOwnerKey = makeOwnerKey(userId);
       if (nextOwnerKey === ownerKey) return;
 
-      // 1) 현재 owner 상태 저장
+      // 현재 owner 저장
       writeStateByOwner(ownerKey, state);
 
-      // 2) owner 스위치
+      // owner 변경
       ownerKey = nextOwnerKey;
-
-      // 3) 새 owner state 로드
       state = readStateByOwner(ownerKey);
 
-      // 4) 구독자 알림 (UI 즉시 반영)
+      // 구독자 갱신
       listeners.forEach((fn) => fn(state));
    },
 
@@ -206,8 +203,8 @@ export const cartStore = {
    },
 
    /**
-    * ✅ (추가) 특정 productId가 장바구니에 담겨있는 라인들 반환
-    * - 상품 리스트에서 "담김 상태" 표시할 때 사용
+    * ✅ (추가) 특정 productId 라인 목록
+    * - 상품 리스트에서 "담김" 표시
     */
    getItemsByProductId(productId) {
       const id = String(productId || '').trim();
@@ -216,8 +213,9 @@ export const cartStore = {
    },
 
    /**
-    * ✅ (추가) 특정 옵션 라인이 담겨있는지 체크
-    * - options 미지정이면 "해당 상품이 1개라도 담겼는지"로 동작
+    * ✅ (추가) 담김 여부
+    * - options 없으면: 해당 상품이 1개라도 담겼는지
+    * - options 있으면: 동일 라인(key) 존재 여부
     */
    hasLine(productId, options) {
       const id = String(productId || '').trim();
@@ -232,35 +230,34 @@ export const cartStore = {
    /**
     * ✅ 상품 담기
     * - 같은 상품 + 같은 옵션이면 qty 누적
-    * - options: { color?, size? }
     */
    async addById(productId, qty = 1, options = {}) {
       const id = String(productId || '').trim();
       if (!id) return { ok: false, message: '상품 id가 없습니다.' };
 
-      // (선택) 존재 검증: 상세/장바구니에서 product 접근하니까 안전하게 확인
+      // ✅ 존재 검증 (Cart/Detail에서 product 결합하니까 안전)
       const product = await getProductById(id);
       if (!product) return { ok: false, message: '상품을 찾을 수 없습니다.' };
 
       const addQty = clampQty(qty);
-
       const normalizedOptions = normalizeOptions(options);
-      const key = buildLineKey(id, normalizedOptions);
 
       const idx = findIndexBySameLine(id, normalizedOptions);
-
       if (idx >= 0) {
          const current = state.items[idx];
-         const nextItem = { ...current, qty: clampQty(current.qty + addQty) };
-
          const nextItems = [...state.items];
-         nextItems[idx] = nextItem;
+         nextItems[idx] = { ...current, qty: clampQty(current.qty + addQty) };
 
          state = { ...state, items: nextItems };
          notify();
-         return { ok: true, message: '수량이 추가되었습니다.', key };
+         return {
+            ok: true,
+            message: '수량이 추가되었습니다.',
+            key: nextItems[idx].key,
+         };
       }
 
+      const key = buildLineKey(id, normalizedOptions);
       const next = { key, id, qty: addQty, options: normalizedOptions };
 
       state = { ...state, items: [next, ...state.items] };
@@ -270,14 +267,14 @@ export const cartStore = {
 
    /**
     * ✅ 수량 변경
-    * - 0 이하로 내려가면 remove 처리
+    * - 0 이하로 내려가면 remove
     */
    updateQty(key, nextQty) {
       const idx = findIndexByKey(key);
       if (idx < 0) return;
 
-      const qRaw = Number(nextQty);
-      const q = Number.isFinite(qRaw) ? qRaw : 1;
+      const q = Number(nextQty);
+      if (!Number.isFinite(q)) return;
 
       if (q <= 0) {
          this.remove(key);
@@ -300,20 +297,18 @@ export const cartStore = {
    },
 
    /**
-    * ✅ (추가) 옵션 변경 (예: 장바구니에서 사이즈 변경)
-    *
-    * 핵심:
-    * - key는 옵션에 의해 결정됨 → 옵션이 바뀌면 key도 바뀜
-    * - 바뀐 key 라인이 이미 존재하면 qty 병합(중복 라인 방지)
-    *
-    * @returns {{ok:boolean, message:string, key?:string}}
+    * ✅ (추가) 옵션 변경 (예: 사이즈 변경)
+    * - 옵션이 바뀌면 key도 바뀜
+    * - 바뀐 key 라인이 이미 존재하면 qty 병합
     */
    updateOptions(key, nextOptions = {}) {
       const idx = findIndexByKey(key);
-      if (idx < 0)
+      if (idx < 0) {
          return { ok: false, message: '대상 라인을 찾지 못했습니다.' };
+      }
 
       const current = state.items[idx];
+
       const mergedOptions = normalizeOptions({
          ...(current.options || {}),
          ...(nextOptions || {}),
@@ -321,21 +316,20 @@ export const cartStore = {
 
       const nextKey = buildLineKey(current.id, mergedOptions);
 
-      // 옵션은 바뀌었지만 key가 동일(사실상 변화 없음)
+      // 변화 없음(하지만 options normalize 결과를 반영)
       if (nextKey === current.key) {
          const nextItems = [...state.items];
          nextItems[idx] = { ...current, options: mergedOptions };
+
          state = { ...state, items: nextItems };
          notify();
          return { ok: true, message: '옵션이 변경되었습니다.', key: nextKey };
       }
 
+      // ✅ 이미 동일 라인이 있으면 병합
       const existsIdx = findIndexByKey(nextKey);
-
-      // ✅ 이미 같은 라인이 존재하면 qty 병합하고 기존 라인은 제거
       if (existsIdx >= 0) {
          const exists = state.items[existsIdx];
-
          const mergedQty = clampQty((exists.qty || 0) + (current.qty || 0));
 
          const nextItems = state.items
@@ -355,20 +349,17 @@ export const cartStore = {
          };
       }
 
-      // ✅ 새 라인으로 교체(기존 라인의 key/options만 업데이트)
-      const replaced = { ...current, key: nextKey, options: mergedOptions };
-
+      // ✅ 그냥 교체
       const nextItems = [...state.items];
-      nextItems[idx] = replaced;
+      nextItems[idx] = { ...current, key: nextKey, options: mergedOptions };
 
       state = { ...state, items: nextItems };
       notify();
-
       return { ok: true, message: '옵션이 변경되었습니다.', key: nextKey };
    },
 
    /**
-    * ✅ CartPage에서 쓰는 "상세 결합"
+    * ✅ CartPage에서 사용하는 "상세 결합"
     * return: [{ key, product, qty, options }]
     */
    async getDetailedItems() {
@@ -378,7 +369,7 @@ export const cartStore = {
          items.map((it) => getProductById(it.id)),
       );
 
-      const detailed = items
+      return items
          .map((it, i) => ({
             key: it.key,
             product: products[i] ?? null,
@@ -386,7 +377,5 @@ export const cartStore = {
             options: it.options ?? {},
          }))
          .filter((row) => Boolean(row.product));
-
-      return detailed;
    },
 };

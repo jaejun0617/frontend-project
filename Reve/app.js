@@ -161,7 +161,42 @@ function updateCartCount() {
       el.textContent = String(count);
    });
 }
+/**
+ * ✅ 상품 리스트에서 "담김 상태" 표시 동기화
+ * - productId 기준으로 장바구니에 1개라도 있으면 아이콘 빨강(클래스) 유지
+ * - 사이즈가 있는 상품은, 담긴 사이즈 pill도 표시(옵션)
+ */
+function syncProductCardsWithCart() {
+   const cards = document.querySelectorAll('[data-product-id]');
+   if (!cards.length) return;
 
+   cards.forEach((card) => {
+      const productId = card.getAttribute('data-product-id');
+      if (!productId) return;
+
+      const inCartLines = cartStore.getItemsByProductId?.(productId) ?? [];
+      const inCart = inCartLines.length > 0;
+
+      // 1) 아이콘 상태
+      const favBtn = card.querySelector('[data-add-cart]');
+      if (favBtn) favBtn.classList.toggle('is-added', inCart);
+
+      // 2) pill 중 "담긴 사이즈" 표시 (선택 옵션)
+      const pills = card.querySelectorAll('[data-size-pill]');
+      if (!pills.length) return;
+
+      const sizesInCart = new Set(
+         inCartLines
+            .map((it) => String(it?.options?.size || '').trim())
+            .filter(Boolean),
+      );
+
+      pills.forEach((pill) => {
+         const v = pill.getAttribute('data-size-value') || '';
+         pill.classList.toggle('is-in-cart', sizesInCart.has(v));
+      });
+   });
+}
 /* ==============================
    5) 회원가입 후 메인에서 모달 띄우기
    ============================== */
@@ -228,6 +263,7 @@ window.addEventListener('app:render', () => {
 
    // ✅ 회원가입 후 모달 (메인에서 뜨게)
    runAfterSignupModalIfNeeded();
+   syncProductCardsWithCart();
 });
 
 // 최초 1회도 안전하게 갱신
@@ -273,9 +309,10 @@ authStore.subscribe(() => {
    prevLogin = nowLogin;
 });
 
-// cartStore가 바뀌면 카운트 갱신
-cartStore.subscribe(() => updateCartCount());
-
+cartStore.subscribe(() => {
+   updateCartCount();
+   syncProductCardsWithCart();
+});
 /* ==============================
    8) 전역 이벤트 위임
    - (A) 사이즈 칩 선택
@@ -323,10 +360,37 @@ document.addEventListener('click', (e) => {
  * - options: { size } 를 cartStore에 전달
  */
 document.addEventListener('click', async (e) => {
+   /* ==============================
+      A) 사이즈 pill 선택
+      ============================== */
+   const pill = e.target.closest('[data-size-pill]');
+   if (pill) {
+      const card = pill.closest('[data-product-id]');
+      if (!card) return;
+
+      const picked = String(pill.getAttribute('data-size-value') || '').trim();
+
+      // 1) 카드에 선택값 저장
+      card.setAttribute('data-selected-size', picked);
+
+      // 2) UI 토글 (aria-pressed + 클래스)
+      const pills = card.querySelectorAll('[data-size-pill]');
+      pills.forEach((p) => {
+         const isOn = p === pill;
+         p.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+         p.classList.toggle('is-active', isOn);
+      });
+
+      return;
+   }
+
+   /* ==============================
+      B) 장바구니 담기(아이콘 버튼)
+      ============================== */
    const btn = e.target.closest('[data-add-cart]');
    if (!btn) return;
 
-   // ✅ 로그인 가드: 비로그인이면 /auth로 이동
+   // ✅ 로그인 가드
    const ok = requireAuth({
       redirectTo: window.location.pathname || '/product',
    });
@@ -336,28 +400,43 @@ document.addEventListener('click', async (e) => {
    const productId = card?.getAttribute('data-product-id');
    if (!productId) return;
 
-   // ✅ 사이즈 선택 필요 상품: 선택 안 했으면 토스트 후 중단
-   const selectedSize =
-      card?.getAttribute('data-selected-size') ||
-      card
-         ?.querySelector('.size-pill.is-active')
-         ?.getAttribute('data-size-value') ||
-      '';
+   // ✅ 사이즈 필요한 상품이면: 선택 안 했을 때 차단
+   const requiresSize = card?.getAttribute('data-requires-size') === '1';
+   const selectedSize = String(
+      card?.getAttribute('data-selected-size') || '',
+   ).trim();
 
-   const hasSizes = Boolean(card?.querySelector('[data-size-pills]'));
-   if (hasSizes && !selectedSize) {
-      toast.show('사이즈를 선택해야 장바구니에 담을 수 있어요.');
+   if (requiresSize && !selectedSize) {
+      toast.show('사이즈를 선택한 뒤 장바구니에 담아 주세요 👟', {
+         duration: 1400,
+      });
       return;
    }
 
-   await cartStore.addById(productId, 1, { size: selectedSize });
+   // ✅ 담기
+   const result = await cartStore.addById(productId, 1, {
+      ...(selectedSize ? { size: selectedSize } : {}),
+   });
 
-   // ✅ 담김 UI: 아이콘 빨간 배경 + 토스트
-   btn.classList.add('is-added');
-   toast.show('장바구니에 담겼어요');
+   if (!result?.ok) {
+      toast.show(result?.message || '장바구니 담기에 실패했어요.', {
+         duration: 1400,
+      });
+      return;
+   }
 
-   // 원하면 1.4초 뒤 원복(원복 싫으면 이 부분 삭제)
-   setTimeout(() => {
-      btn.classList.remove('is-added');
-   }, 1400);
+   // ✅ UX: 담김 토스트 + 버튼 상태(빨강 유지)
+   toast.show(
+      selectedSize
+         ? `장바구니에 담겼어요 · 사이즈 ${selectedSize}`
+         : '장바구니에 담겼어요',
+      { duration: 1400 },
+   );
+
+   // 리스트 상태 즉시 동기화(아이콘 빨강 + 담긴 사이즈 pill 표시)
+   syncProductCardsWithCart();
+
+   // 버튼에 잠깐 "펄스" 느낌 클래스(선택)
+   btn.classList.add('is-pulse');
+   setTimeout(() => btn.classList.remove('is-pulse'), 400);
 });

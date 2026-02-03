@@ -1,6 +1,6 @@
 /* =====================================================================
-      Product Grid + Product Card
-      ===================================================================== */
+   Product Grid + Product Card
+   ===================================================================== */
 
 .product-grid {
    display: grid;
@@ -21,6 +21,10 @@
    }
 }
 
+/* ==============================
+      Card shell
+      ============================== */
+
 .product-card {
    border: 1px solid rgba(0, 0, 0, 0.08);
    border-radius: 16px;
@@ -38,14 +42,16 @@
    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
 }
 
+/* ==============================
+      Thumb
+      ============================== */
+
 .product-card__thumb {
-   display: block; /* a 태그라서 안전하게 block */
+   display: block;
    width: 100%;
-   aspect-ratio: 1 / 1; /* 원하는 비율로 (지금은 정사각) */
-   border-radius: 0;
+   aspect-ratio: 1 / 1;
    overflow: hidden;
 
-   /* ✅ 이미지 + 유리그라데이션 레이어 */
    background-image:
       url('https://placehold.co/800x800/png'),
       radial-gradient(
@@ -60,6 +66,10 @@
    background-position: center, center, center;
    background-repeat: no-repeat, no-repeat, no-repeat;
 }
+
+/* ==============================
+      Badges
+      ============================== */
 
 .product-badge {
    position: absolute;
@@ -80,24 +90,23 @@
    background: rgba(0, 0, 0, 0.7);
 }
 
-/* Price box (discount) */
-.product-card__pricebox {
-   display: flex;
-   align-items: baseline;
-   gap: 8px;
-}
+/* ==============================
+      Body layout
+      - floating 버튼(44px) + 여백(12px) 만큼 하단 공간 확보
+      ============================== */
 
-.product-card__base {
-   margin: 0;
-   font-size: 12px;
-   opacity: 0.55;
-   text-decoration: line-through;
-}
 .product-card__body {
    padding: 12px;
    display: grid;
    gap: 8px;
+
+   /* ✅ floating 버튼이 본문을 가리지 않게 */
+   padding-bottom: 68px;
 }
+
+/* ==============================
+      Name / Price
+      ============================== */
 
 .product-card__name {
    font-size: 14px;
@@ -111,12 +120,29 @@
    overflow: hidden;
 }
 
+.product-card__pricebox {
+   display: flex;
+   align-items: baseline;
+   gap: 8px;
+}
+
+.product-card__base {
+   margin: 0;
+   font-size: 12px;
+   opacity: 0.55;
+   text-decoration: line-through;
+}
+
 .product-card__price {
    margin: 0;
    font-size: 14px;
    font-weight: 700;
    letter-spacing: -0.01em;
 }
+
+/* ==============================
+      Tags
+      ============================== */
 
 .product-card__tags {
    display: flex;
@@ -137,70 +163,64 @@
    color: rgba(0, 0, 0, 0.72);
 }
 
-.product-card__actions {
-   margin-top: 4px;
-}
+/* ==============================
+      Size pills
+      ============================== */
 
-.btn-add-cart {
-   width: 100%;
-   height: 40px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(0, 0, 0, 0.04);
-   cursor: pointer;
-   font-weight: 600;
-   transition:
-      background-color 150ms ease,
-      transform 80ms ease;
-}
-
-.btn-add-cart:hover {
-   background: rgba(0, 0, 0, 0.07);
-}
-
-.btn-add-cart:active {
-   transform: translateY(1px);
-}
-
-.btn-add-cart:focus-visible {
-   outline: 2px solid rgba(0, 0, 0, 0.35);
-   outline-offset: 2px;
-}
-
-/* 사이즈 pills (원하는 스타일 느낌) */
 .product-card__sizes {
    display: flex;
+   flex-wrap: wrap;
    gap: 10px;
    padding-top: 10px;
-   /* border: 1px solid red; */
 }
 
-/* 둥근 테두리 pill */
 .size-pill {
-   width: 44px;
-   height: 44px;
+   width: 34px;
+   height: 34px;
    border-radius: 999px;
    border: 1px solid rgba(0, 0, 0, 0.14);
    background: #fff;
    cursor: pointer;
    font-weight: 600;
+   opacity: 0.94;
+
    transition:
       transform 120ms ease,
       background-color 120ms ease,
-      border-color 120ms ease;
-   opacity: 0.92;
+      border-color 120ms ease,
+      box-shadow 120ms ease;
 }
 
 .size-pill:hover {
    transform: translateY(-1px);
 }
 
+/* ✅ 선택됨 */
 .size-pill.is-active {
    border-color: rgba(0, 0, 0, 0.55);
+   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+   background-color: #000;
+   color: #fff;
    opacity: 1;
 }
 
-/* ✅ 하단 고정 액션 영역 */
+/* ✅ 담김(장바구니에 해당 사이즈 라인이 존재) */
+.size-pill.is-in-cart {
+   background: rgba(0, 0, 0, 0.86);
+   border-color: rgba(0, 0, 0, 0.86);
+   color: #fff;
+   opacity: 1;
+}
+
+/* (선택) 담김 + 선택이 동시에 오면 살짝 더 강조 */
+.size-pill.is-in-cart.is-active {
+   box-shadow: 0 10px 18px rgba(0, 0, 0, 0.14);
+}
+
+/* ==============================
+      Floating cart icon button
+      ============================== */
+
 .product-card__floating {
    position: absolute;
    right: 12px;
@@ -219,10 +239,12 @@
    align-items: center;
    justify-content: center;
    cursor: pointer;
+
    transition:
       background-color 150ms ease,
       border-color 150ms ease,
-      transform 120ms ease;
+      transform 120ms ease,
+      box-shadow 150ms ease;
 }
 
 .cart-fav-btn:hover {
@@ -235,16 +257,18 @@
    display: block;
 }
 
-/* ✅ 담김 상태: 빨간 배경 */
+/* ✅ 담김 상태: 빨간 배경 + 살짝 글로우 */
 .cart-fav-btn.is-added {
    background: #ff3b30;
    border-color: #ff3b30;
+   box-shadow: 0 10px 22px rgba(255, 59, 48, 0.22);
 }
 
 .cart-fav-btn.is-added img {
    filter: brightness(0) invert(1);
 }
 
-.br {
-   padding-top: 35px;
+/* ✅ 클릭 피드백(선택) */
+.cart-fav-btn.is-pulse {
+   transform: scale(1.06);
 }
