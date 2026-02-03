@@ -29,7 +29,7 @@ import { calcLinePrice } from '../../utils/pricing.js';
 
 import { initToast } from '../../components/Toast.js';
 import { confirmModal } from '../../components/ConfirmModal.js';
-
+import { orderStore } from '../../store/orderStore.js';
 import {
    getMembershipSnapshot,
    formatPercent,
@@ -509,6 +509,18 @@ async function handleCheckout({ detailedItems }) {
 
    const result = await checkout(payload);
    if (!result?.ok) return { ok: false };
+
+   /* =========================================
+     ✅ [여기] 주문 저장 (결제 성공 확정 직후)
+     - owner는 app.js에서 이미 스위칭됨
+     - 그래도 안전하게 userId 체크
+  ========================================= */
+   if (payload?.userId) {
+      orderStore.createOrder({
+         ...payload,
+         status: 'PAID', // ✅ orderStore가 normalizeStatus 해줌
+      });
+   }
 
    // ✅ 쿠폰 사용 처리 + 적용 해제
    if (appliedCoupon?.code) {

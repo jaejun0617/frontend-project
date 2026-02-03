@@ -21,7 +21,7 @@ import { authStore } from '../../store/authStore.js';
 
 import { confirmModal } from '../../components/ConfirmModal.js';
 import { initToast } from '../../components/Toast.js';
-
+import { orderStore } from '../../store/orderStore.js';
 import {
    getMembershipSnapshot,
    formatPercent,
@@ -33,8 +33,9 @@ import {
 
 const TABS = [
    { key: 'profile', label: '내 정보', enabled: true },
-   { key: 'address', label: '배송지', enabled: false },
-   { key: 'orders', label: '주문/배송', enabled: false },
+   { key: 'address', label: '배송지', enabled: true },
+   { key: 'orders', label: '주문내역', enabled: true },
+   { key: 'delivery', label: '주문/배송', enabled: true },
    { key: 'grade', label: '회원등급', enabled: true },
    { key: 'coupon', label: '쿠폰/혜택', enabled: true },
 ];
@@ -65,17 +66,9 @@ export const MyPage = () => {
           <div class="mypage__main">
             ${renderPanelCoupon()}
             ${renderPanelProfile()}
+              ${renderPanelOrders()}     <!-- ✅ 추가 -->
+              ${renderPanelDelivery()}   <!-- ✅ 추가 -->
             ${renderPanelGrade()}
-            ${renderPanelPlaceholder(
-               'address',
-               '배송지 관리',
-               '기본 배송지/목록 CRUD (localStorage → 서버 연동)',
-            )}
-            ${renderPanelPlaceholder(
-               'orders',
-               '주문/배송',
-               '주문 내역/상태(결제 붙을 때 확장)',
-            )}
           </div>
         </div>
       </div>
@@ -215,7 +208,35 @@ function renderPanelPlaceholder(key, title, desc) {
     </section>
   `;
 }
+function renderPanelOrders() {
+   return `
+    <section class="mypage__panel" id="panel-orders" role="tabpanel" data-panel="orders" aria-hidden="true">
+      <div class="mypage__section">
+        <h2 class="mypage__sectionTitle">주문내역</h2>
+        <p class="mypage__sectionDesc">결제 완료된 주문이 여기 쌓입니다.</p>
 
+        <div class="orders" data-orders-wrap>
+          <p class="loading">불러오는 중...</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderPanelDelivery() {
+   return `
+    <section class="mypage__panel" id="panel-delivery" role="tabpanel" data-panel="delivery" aria-hidden="true">
+      <div class="mypage__section">
+        <h2 class="mypage__sectionTitle">주문/배송</h2>
+        <p class="mypage__sectionDesc">배송 상태를 확인합니다.</p>
+
+        <div class="delivery" data-delivery-wrap>
+          <p class="loading">불러오는 중...</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
 /* ==============================
    5) Coupon helpers
    ============================== */
@@ -226,6 +247,98 @@ function getCouponStateSafe() {
    const owned = Array.isArray(s.owned) ? s.owned : [];
    const appliedCode = String(s.appliedCode ?? '').trim();
    return { owned, appliedCode };
+}
+
+function formatDateTime(ts) {
+   const d = new Date(Number(ts || 0));
+   if (Number.isNaN(d.getTime())) return '-';
+   return new Intl.DateTimeFormat('ko-KR', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+   }).format(d);
+}
+
+function formatStatusLabel(status) {
+   const s = String(status || '').toUpperCase();
+   if (s === 'PAID') return '결제완료';
+   if (s === 'SHIPPING') return '배송중';
+   if (s === 'DELIVERED') return '배송완료';
+   if (s === 'CANCELED') return '취소';
+   return '결제완료';
+}
+
+function renderOrdersList(orders = []) {
+   const list = Array.isArray(orders) ? orders : [];
+
+   if (!list.length) {
+      return `
+      <div class="empty">
+        <p class="empty__title">주문내역이 없어요.</p>
+        <p class="empty__desc">상품을 결제하면 주문이 생성됩니다.</p>
+        <button type="button" class="btn subtle" data-go-product>상품 보러가기</button>
+      </div>
+    `;
+   }
+
+   return `
+    <ul class="order-list" aria-label="Order List">
+      ${list
+         .map((o) => {
+            const orderId = String(o?.orderId || '').trim();
+            const createdAt = formatDateTime(o?.createdAt);
+            const statusLabel = formatStatusLabel(o?.status);
+
+            const itemCount = Array.isArray(o?.items) ? o.items.length : 0;
+            const total = Number(o?.pricing?.total || 0);
+            const couponCode = String(o?.coupon?.code || '').trim();
+
+            return `
+            <li class="order-card">
+              <div class="order-card__top">
+                <div class="order-card__meta">
+                  <p class="order-card__id"><strong>${escapeHtml(orderId)}</strong></p>
+                  <p class="order-card__time">${escapeHtml(createdAt)}</p>
+                </div>
+
+                <span class="pill">${escapeHtml(statusLabel)}</span>
+              </div>
+
+              <div class="order-card__body">
+                <p class="order-card__line">
+                  <span>상품</span>
+                  <strong>${itemCount}개</strong>
+                </p>
+
+                <p class="order-card__line">
+                  <span>총 결제</span>
+                  <strong>₩ ${formatKRW(total)}</strong>
+                </p>
+
+                <p class="order-card__line">
+                  <span>쿠폰</span>
+                  <strong>${couponCode ? escapeHtml(couponCode) : '없음'}</strong>
+                </p>
+              </div>
+
+              <div class="order-card__actions">
+                <button type="button" class="btn subtle" data-order-detail="${escapeHtml(orderId)}">
+                  상세 보기
+                </button>
+
+                ${
+                   String(o?.status || '').toUpperCase() === 'PAID'
+                      ? `<button type="button" class="btn" data-order-status="${escapeHtml(orderId)}" data-next-status="SHIPPING">배송 시작(테스트)</button>`
+                      : String(o?.status || '').toUpperCase() === 'SHIPPING'
+                        ? `<button type="button" class="btn" data-order-status="${escapeHtml(orderId)}" data-next-status="DELIVERED">배송 완료(테스트)</button>`
+                        : `<button type="button" class="btn" disabled>상태 변경</button>`
+                }
+              </div>
+            </li>
+          `;
+         })
+         .join('')}
+    </ul>
+  `;
 }
 
 /**
@@ -546,7 +659,7 @@ export function initMyPage() {
 
    const profileWrap = root.querySelector('[data-profile-wrap]');
    const gradeWrap = root.querySelector('[data-grade-wrap]');
-
+   const ordersWrap = root.querySelector('[data-orders-wrap]');
    const paintOwned = () => {
       if (!ownedWrap) return;
       const { owned, appliedCode } = getCouponStateSafe();
@@ -568,7 +681,11 @@ export function initMyPage() {
          ? renderGrade(user)
          : `<p class="empty__desc">유저 정보를 찾지 못했어요.</p>`;
    };
-
+   const paintOrders = () => {
+      if (!ordersWrap) return;
+      const orders = orderStore.getOrders?.() ?? [];
+      ordersWrap.innerHTML = renderOrdersList(orders);
+   };
    const setActiveTab = (tabKey) => {
       root.querySelectorAll('[data-tab]').forEach((btn) => {
          const key = btn.getAttribute('data-tab');
@@ -589,14 +706,16 @@ export function initMyPage() {
    paintOwned();
    paintProfile();
    paintGrade();
-
+   paintOrders();
    // ✅ store 변화 반영
    couponStore.subscribe?.(() => paintOwned());
    authStore.subscribe?.(() => {
       paintProfile();
       paintGrade();
    });
-
+   orderStore.subscribe?.(() => {
+      paintOrders();
+   });
    root.addEventListener('click', async (e) => {
       /* ------------------------------
        A) 탭 변경
@@ -698,7 +817,69 @@ export function initMyPage() {
          );
          return;
       }
+      // 상품 보러가기
+      if (e.target.closest('[data-go-product]')) {
+         window.dispatchEvent(
+            new CustomEvent('app:navigate', { detail: { href: '/product' } }),
+         );
+         return;
+      }
 
+      // 주문 상세 보기 (일단은 모달로 요약)
+      const detailBtn = e.target.closest('[data-order-detail]');
+      if (detailBtn) {
+         const orderId = String(
+            detailBtn.getAttribute('data-order-detail') || '',
+         ).trim();
+         if (!orderId) return;
+
+         const order = orderStore.getOrder?.(orderId);
+         if (!order) {
+            toast.show('주문을 찾지 못했어요.', { duration: 1200 });
+            return;
+         }
+
+         const lines = [
+            `🧾 주문번호: ${order.orderId}`,
+            `📦 상태: ${formatStatusLabel(order.status)}`,
+            `💳 결제: ₩ ${formatKRW(order?.pricing?.total || 0)}`,
+            `🚚 배송비: ₩ ${formatKRW(order?.pricing?.shipping || 0)}`,
+            `🎫 쿠폰: ${order?.coupon?.code ? order.coupon.code : '없음'}`,
+         ].join('\n');
+
+         await confirmModal({
+            title: '주문 상세',
+            message: lines,
+            confirmText: '확인',
+            cancelText: '닫기',
+         });
+         return;
+      }
+
+      // 주문 상태 변경(테스트)
+      const statusBtn = e.target.closest('[data-order-status]');
+      if (statusBtn) {
+         const orderId = String(
+            statusBtn.getAttribute('data-order-status') || '',
+         ).trim();
+         const next = String(
+            statusBtn.getAttribute('data-next-status') || '',
+         ).trim();
+
+         const ok = await confirmModal({
+            title: '주문 상태 변경',
+            message: `상태를 ${formatStatusLabel(next)}(으)로 변경할까요?`,
+            confirmText: '변경',
+            cancelText: '취소',
+         });
+         if (!ok) return;
+
+         const r = orderStore.updateOrderStatus?.(orderId, next);
+         if (r?.ok) toast.show('주문 상태가 변경됐어요.', { duration: 1200 });
+         else toast.show(r?.message || '변경 실패', { duration: 1200 });
+
+         return;
+      }
       /* ------------------------------
        F) 사용 완료 쿠폰 토글
     ------------------------------ */

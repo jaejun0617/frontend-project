@@ -37,6 +37,7 @@ import { authStore } from './src/store/authStore.js';
 import { initToast } from './src/components/Toast.js';
 import { confirmModal } from './src/components/ConfirmModal.js';
 import { couponStore } from './src/store/couponStore.js';
+import { orderStore } from './src/store/orderStore.js';
 /* ==============================
    0) DOM 마운트 유틸
    ============================== */
@@ -320,6 +321,7 @@ authUi.refresh();
    const owner = u?.id || 'guest';
    cartStore.setOwner(owner);
    couponStore.setOwner(owner);
+   orderStore.setOwner(owner);
 }
 
 let prevLogin = authStore.isLoggedIn();
@@ -335,6 +337,7 @@ authStore.subscribe(() => {
    if (owner !== prevOwner) {
       cartStore.setOwner(owner);
       couponStore.setOwner(owner);
+      orderStore.setOwner(owner);
       prevOwner = owner;
    }
 

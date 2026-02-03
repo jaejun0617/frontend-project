@@ -229,3 +229,60 @@
    margin: 6px 0 0;
    opacity: 0.7;
 }
+
+/* Orders */
+.order-list {
+   list-style: none;
+   padding: 0;
+   margin: 0;
+   display: grid;
+   gap: 12px;
+}
+
+.order-card {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   padding: 14px;
+   background: rgba(255, 255, 255, 0.95);
+   display: grid;
+   gap: 12px;
+}
+
+.order-card__top {
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: 12px;
+}
+
+.order-card__id {
+   margin: 0;
+   font-size: 13px;
+}
+.order-card__time {
+   margin: 4px 0 0;
+   font-size: 12px;
+   opacity: 0.7;
+}
+
+.order-card__body {
+   display: grid;
+   gap: 8px;
+}
+
+.order-card__line {
+   margin: 0;
+   display: flex;
+   justify-content: space-between;
+   gap: 10px;
+   padding: 10px 12px;
+   border-radius: 14px;
+   background: rgba(0, 0, 0, 0.02);
+   border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.order-card__actions {
+   display: flex;
+   gap: 10px;
+   flex-wrap: wrap;
+}
