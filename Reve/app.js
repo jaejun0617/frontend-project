@@ -112,8 +112,8 @@ const routes = {
    '/mypage': {
       render: () => MyPage(),
       afterRender: () => {
-         // ✅ 마이페이지는 로그인 필수
-         const ok = requireAuth({ redirectTo: '/mypage' });
+         const redirectTo = window.location.pathname + window.location.search;
+         const ok = requireAuth({ redirectTo });
          if (!ok) return;
          initMyPage();
       },

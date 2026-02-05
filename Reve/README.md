@@ -346,27 +346,21 @@
 - `orderStore.getOrders()`로 렌더
 - 상태 변경(테스트) 버튼 유지
 
-### 딥링크(탭/자동 액션)
+### 딥링크(탭/자동 액션) + 1회성 소비(consume)
 
-마이페이지는 URL 쿼리를 통해 탭을 직접 열고, 특정 동작을 1회성으로 트리거할 수 있다.
+마이페이지는 URL 쿼리로 특정 탭을 직접 열고, 특정 동작을 1회성으로 트리거할 수 있다.
 
 - `/mypage?tab=address&open=add`  
-  배송지 탭으로 진입 후 “배송지 추가” 입력 모달을 자동 오픈한다(1회 실행).  
-  open 파라미터는 실행 후 소비(consume)되어 뒤로가기/새로고침 시 반복 트리거를 방지한다.
+  배송지 탭으로 진입 후 “배송지 추가” 입력 모달을 자동 오픈한다.
 
 - `/mypage?tab=orders&open=detail&orderId=...`  
-  주문내역 탭으로 진입 후 해당 주문의 상세 모달을 자동 오픈한다(1회 실행).  
-  open 파라미터는 실행 후 소비(consume)된다.
+  주문내역 탭으로 진입 후 해당 주문의 상세 모달을 자동 오픈한다.
 
 - `/mypage?tab=coupon&focus=register`  
-  쿠폰 탭으로 진입 후 쿠폰 입력창을 자동 포커스한다(1회 실행).  
-  focus 파라미터는 실행 후 소비(consume)된다.
+  쿠폰 탭으로 진입 후 쿠폰 입력창을 자동 포커스한다.
 
-탭 클릭 시 URL의 `tab` 값이 `history.pushState()`로 동기화되며, 브라우저 뒤로/앞으로가기(`popstate`)에서도 동일하게 탭 상태가 복원된다.
-
-추가로 결제 완료 페이지의 “주문내역 보기”는 아래 딥링크로 이동하여 주문 상세가 즉시 열리도록 구성한다.
-
-- `/mypage?tab=orders&open=detail&orderId=...`
+또한 `open / focus / orderId`는 실행 직후 URL에서 제거(consume)되어,
+새로고침/뒤로가기에서도 반복 트리거되지 않는다. (`replaceState` 기반)
 
 ---
 
@@ -420,8 +414,6 @@
 
 ## 17) 다음 작업 후보(TODO)
 
-- 마이페이지 탭 딥링크 완성도 강화
-- `/mypage?tab=address` 및 `/mypage?tab=orders` 진입 처리 안정화
 - 주문/배송 탭 실 구현
    - 상태 타임라인, 필터, 배송 추적 UI
 - 검색 `/search?q=` 연동 + 결과 렌더(ProductGrid)

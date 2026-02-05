@@ -271,21 +271,19 @@ export function initCheckoutSuccessPage() {
    root.innerHTML = order ? renderSuccess({ order, user }) : renderEmpty();
 
    root.addEventListener('click', (e) => {
-      if (!e.target.closest('[data-go-orders]')) return;
-
       /**
        * 주문내역 딥링크
        * - /mypage?tab=orders 로 탭을 강제한다.
        * - open=detail&orderId=... 로 상세 모달을 자동 오픈한다(마이페이지 구현 전제).
        */
-      const href = orderId
-         ? `/mypage?tab=orders&open=detail&orderId=${encodeURIComponent(
-              orderId,
-           )}`
-         : `/mypage?tab=orders`;
+      if (e.target.closest('[data-go-orders]')) {
+         const href = orderId
+            ? `/mypage?tab=orders&open=detail&orderId=${encodeURIComponent(orderId)}`
+            : `/mypage?tab=orders`;
 
-      window.dispatchEvent(
-         new CustomEvent('app:navigate', { detail: { href } }),
-      );
+         window.dispatchEvent(
+            new CustomEvent('app:navigate', { detail: { href } }),
+         );
+      }
    });
 }

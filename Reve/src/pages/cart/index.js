@@ -710,6 +710,12 @@ export async function initCartPage() {
          return;
       }
 
+      /* ==============================
+         Address: deep link routing
+         - 등록 버튼: open=add 로 입력 모달까지 1회 오픈
+         - 변경 버튼: address 탭만 이동
+         ============================== */
+
       if (e.target.closest('[data-address-open]')) {
          const btn = e.target.closest('[data-address-open]');
          const mode = String(

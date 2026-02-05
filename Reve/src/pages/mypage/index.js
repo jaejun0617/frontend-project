@@ -5,9 +5,14 @@
  * 경로: /mypage
  *
  * 딥링크 지원
- * - /mypage?tab=address&open=add                : 배송지 추가 모달 자동 오픈
- * - /mypage?tab=orders&open=detail&orderId=...  : 주문 상세 모달 자동 오픈
- * - /mypage?tab=coupon&focus=register           : 쿠폰 입력창 자동 포커스
+ * - /mypage?tab=address&open=add                : 배송지 추가 모달 자동 오픈(1회)
+ * - /mypage?tab=orders&open=detail&orderId=...  : 주문 상세 모달 자동 오픈(1회)
+ * - /mypage?tab=coupon&focus=register           : 쿠폰 입력창 자동 포커스(1회)
+ *
+ * UX 규칙
+ * - 탭 클릭 시 URL의 tab 쿼리를 pushState로 동기화
+ * - popstate(뒤로/앞으로가기)에서도 tab + (남아있다면) open/focus 복원
+ * - open/focus는 "1회 실행" 후 URL에서 소비(consume)하여 반복 트리거 방지
  *
  * 설계 포인트
  * - 탭 구조 확장 가능
@@ -102,6 +107,10 @@ function formatKRW(n) {
    return new Intl.NumberFormat('ko-KR').format(Math.max(0, safe));
 }
 
+/**
+ * ✅ 현재 URL 쿼리 읽기
+ * - tab/open/focus/orderId는 딥링크 트리거로 사용
+ */
 function readQuery() {
    const params = new URLSearchParams(window.location.search);
    return {
@@ -112,15 +121,72 @@ function readQuery() {
    };
 }
 
+/**
+ * ✅ 유효한 탭인지 검증 후 반환
+ */
+function normalizeTab(tabKey) {
+   const allowed = new Set(TABS.filter((t) => t.enabled).map((t) => t.key));
+   return allowed.has(tabKey) ? tabKey : DEFAULT_TAB;
+}
+
+/**
+ * ✅ 초기 탭 결정 (URL tab 기반)
+ */
 function getInitialTabKey() {
    const q = readQuery();
    const tab = q.tab;
    if (!tab) return DEFAULT_TAB;
-
-   const allowed = new Set(TABS.filter((t) => t.enabled).map((t) => t.key));
-   return allowed.has(tab) ? tab : DEFAULT_TAB;
+   return normalizeTab(tab);
 }
 
+/**
+ * ✅ URL 쿼리 업데이트 (pushState / replaceState)
+ * - 탭 클릭 시: pushState 권장
+ * - open/focus 소비 시: replaceState 권장(히스토리 오염 방지)
+ */
+function setQuery(paramsPatch, { replace = false } = {}) {
+   const url = new URL(window.location.href);
+   const sp = url.searchParams;
+
+   Object.entries(paramsPatch).forEach(([k, v]) => {
+      if (v === null || v === undefined || String(v).trim() === '') {
+         sp.delete(k);
+         return;
+      }
+      sp.set(k, String(v));
+   });
+
+   const next = url.pathname + (sp.toString() ? `?${sp.toString()}` : '');
+   if (replace) window.history.replaceState({}, '', next);
+   else window.history.pushState({}, '', next);
+}
+
+/**
+ * ✅ open/focus 파라미터 소비(consume)
+ * - 1회 실행 후 URL에서 제거
+ * - 새로고침/뒤로가기에서 반복 트리거를 줄임
+ */
+function consumeDeepLinkParams({
+   consumeOpen = false,
+   consumeFocus = false,
+} = {}) {
+   const q = readQuery();
+   const patch = {};
+
+   if (consumeOpen && q.open) patch.open = '';
+   if (consumeOpen && q.orderId) patch.orderId = '';
+   if (consumeFocus && q.focus) patch.focus = '';
+
+   // 아무것도 소비할 게 없으면 noop
+   if (!Object.keys(patch).length) return;
+
+   setQuery(patch, { replace: true });
+}
+
+/**
+ * ✅ 탭 렌더
+ * - 실제 활성탭은 initMyPage의 setActiveTab에서 반영
+ */
 function renderTabs(activeKey = DEFAULT_TAB) {
    return `
     <ul class="mypage__tabs" role="tablist" aria-label="MyPage Menu">
@@ -672,6 +738,25 @@ function renderGrade(user) {
 }
 
 /* ==============================
+   DeepLink: consume helpers
+   - open/focus/orderId 같은 "1회성 트리거"를 실행 후 URL에서 제거한다.
+   - tab은 유지해서 현재 탭 상태는 그대로 남긴다.
+============================== */
+
+function consumeQuery({ remove = ['open', 'focus', 'orderId'] } = {}) {
+   const url = new URL(window.location.href);
+   const params = url.searchParams;
+
+   // ✅ 제거 대상만 삭제
+   remove.forEach((k) => params.delete(k));
+
+   // ✅ URL 반영 (라우터 렌더 재호출 없이, 히스토리 스택 오염 없이)
+   const next =
+      url.pathname + (params.toString() ? `?${params.toString()}` : '');
+   window.history.replaceState({}, '', next);
+}
+
+/* ==============================
    8) Address Form Modal
 ============================== */
 
@@ -804,11 +889,13 @@ export function initMyPage() {
    const root = document.querySelector('[data-mypage]');
    if (!root) return;
 
+   // ✅ 중복 바인딩 방지
    if (root.dataset.bound === '1') return;
    root.dataset.bound = '1';
 
    const toast = initToast();
 
+   // ✅ 패널별 DOM 핸들
    const ownedWrap = root.querySelector('[data-owned-wrap]');
    const msgEl = root.querySelector('[data-coupon-register-msg]');
    const inputEl = root.querySelector('[data-coupon-register-input]');
@@ -819,27 +906,33 @@ export function initMyPage() {
    const addressWrap = root.querySelector('[data-address-wrap]');
 
    /* ------------------------------
-      Tab control
+      A) Tab control
+      - UI 반영만 담당(데이터 로딩은 paint에서)
    ------------------------------ */
 
    const setActiveTab = (tabKey) => {
+      const next = normalizeTab(String(tabKey || '').trim());
+
       root.querySelectorAll('[data-tab]').forEach((btn) => {
          const key = btn.getAttribute('data-tab');
-         const isOn = key === tabKey;
+         const isOn = key === next;
          btn.classList.toggle('is-active', isOn);
          btn.setAttribute('aria-selected', isOn ? 'true' : 'false');
       });
 
       root.querySelectorAll('[data-panel]').forEach((panel) => {
          const key = panel.getAttribute('data-panel');
-         const isOn = key === tabKey;
+         const isOn = key === next;
          panel.classList.toggle('is-active', isOn);
          panel.setAttribute('aria-hidden', isOn ? 'false' : 'true');
       });
+
+      return next;
    };
 
    /* ------------------------------
-      Paint functions
+      B) Paint functions
+      - 스토어 상태를 읽어 패널 내부를 갱신
    ------------------------------ */
 
    const paintOwned = () => {
@@ -875,8 +968,22 @@ export function initMyPage() {
       addressWrap.innerHTML = renderAddressPanelInner();
    };
 
+   /**
+    * ✅ 탭별 최소 paint만 수행
+    * - 과한 렌더를 줄이고, UX 반응성을 올림
+    */
+   const paintByTab = (tabKey) => {
+      if (tabKey === 'coupon') paintOwned();
+      if (tabKey === 'profile') paintProfile();
+      if (tabKey === 'grade') paintGrade();
+      if (tabKey === 'orders') paintOrders();
+      if (tabKey === 'address') paintAddress();
+   };
+
    /* ------------------------------
-      Deep link actions
+      C) Deep link actions
+      - tab/open/focus/orderId에 따라 1회성 액션 실행
+      - 실행 후 open/focus를 consume하여 반복 방지
    ------------------------------ */
 
    const runDeepLink = async () => {
@@ -885,9 +992,14 @@ export function initMyPage() {
 
       setActiveTab(tab);
 
+      // ✅ 1회성 트리거가 실행됐는지 추적
+      let didConsume = false;
+
       if (tab === 'coupon') {
          paintOwned();
+
          if (q.focus === 'register') {
+            didConsume = true;
             setTimeout(() => {
                root.querySelector('[data-coupon-register-input]')?.focus?.();
             }, 0);
@@ -901,8 +1013,11 @@ export function initMyPage() {
          paintOrders();
 
          if (q.open === 'detail' && q.orderId) {
+            didConsume = true;
+
             setTimeout(async () => {
                const order = orderStore.getOrder?.(q.orderId);
+
                if (!order) {
                   toast.show('주문을 찾을 수 없습니다.', { duration: 1300 });
                   return;
@@ -922,19 +1037,23 @@ export function initMyPage() {
          paintAddress();
 
          if (q.open === 'add') {
+            didConsume = true;
             setTimeout(() => {
                root.querySelector('[data-address-add]')?.click?.();
             }, 0);
          }
       }
 
-      if (tab === 'delivery') {
-         /* delivery는 정적 패널이라 별도 처리 불필요 */
+      // ✅ 트리거 실행 후 URL 파라미터 소비(1회성)
+      if (didConsume) {
+         consumeQuery({ remove: ['open', 'focus', 'orderId'] });
       }
    };
 
    /* ------------------------------
-      Initial render
+      D) Initial render
+      - 전체 paint 1회(초기 로딩)
+      - 이후 딥링크 액션 실행
    ------------------------------ */
 
    paintOwned();
@@ -946,7 +1065,8 @@ export function initMyPage() {
    runDeepLink();
 
    /* ------------------------------
-      Store subscriptions
+      E) Store subscriptions
+      - 데이터 변경 시 UI 갱신
    ------------------------------ */
 
    couponStore.subscribe?.(() => paintOwned());
@@ -960,28 +1080,56 @@ export function initMyPage() {
    addressStore.subscribe?.(() => paintAddress());
 
    /* ------------------------------
-      Events (root delegation)
+      F) popstate
+      - 뒤로/앞으로가기 시 URL 상태를 탭/UI에 반영
+      - 딥링크 트리거(open/focus)가 남아있다면 재실행 가능
+   ------------------------------ */
+
+   const onPopState = () => {
+      const tab = setActiveTab(getInitialTabKey());
+      paintByTab(tab);
+      runDeepLink();
+   };
+
+   window.addEventListener('popstate', onPopState);
+
+   /* ------------------------------
+      G) Events (root delegation)
    ------------------------------ */
 
    root.addEventListener('click', async (e) => {
-      /* A) Tab change */
+      /* ==============================
+         1) Tab change
+         - 탭 클릭 시 URL의 tab을 pushState로 동기화
+         ============================== */
       const tabBtn = e.target.closest('[data-tab]');
       if (tabBtn) {
-         const tabKey = String(tabBtn.getAttribute('data-tab') || '').trim();
-         if (!tabKey) return;
+         const tabKey = normalizeTab(
+            String(tabBtn.getAttribute('data-tab') || '').trim(),
+         );
 
+         // ✅ UI 반영
          setActiveTab(tabKey);
+         paintByTab(tabKey);
 
-         if (tabKey === 'coupon') paintOwned();
-         if (tabKey === 'profile') paintProfile();
-         if (tabKey === 'grade') paintGrade();
-         if (tabKey === 'orders') paintOrders();
-         if (tabKey === 'address') paintAddress();
+         // ✅ URL 동기화(tab)
+         // - open/focus는 탭 이동 시 제거(의도치 않은 반복 트리거 방지)
+         setQuery(
+            {
+               tab: tabKey,
+               open: '',
+               focus: '',
+               orderId: '',
+            },
+            { replace: false },
+         );
 
          return;
       }
 
-      /* B) Coupon register */
+      /* ==============================
+         2) Coupon register
+         ============================== */
       if (e.target.closest('[data-coupon-register]')) {
          const raw = String(inputEl?.value || '').trim();
 
@@ -1006,7 +1154,9 @@ export function initMyPage() {
          return;
       }
 
-      /* C) Coupon apply */
+      /* ==============================
+         3) Coupon apply
+         ============================== */
       const applyBtn = e.target.closest('[data-coupon-apply]');
       if (applyBtn) {
          const code = String(applyBtn.getAttribute('data-coupon-apply') || '')
@@ -1038,11 +1188,12 @@ export function initMyPage() {
                duration: 1400,
             });
          }
-
          return;
       }
 
-      /* D) Coupon clear */
+      /* ==============================
+         4) Coupon clear
+         ============================== */
       if (e.target.closest('[data-coupon-clear]')) {
          const applied = String(couponStore.getState?.()?.appliedCode || '');
          const ok = await confirmModal({
@@ -1061,7 +1212,9 @@ export function initMyPage() {
          return;
       }
 
-      /* E) Used coupons toggle */
+      /* ==============================
+         5) Used coupons toggle
+         ============================== */
       const toggleUsedBtn = e.target.closest('[data-toggle-used]');
       if (toggleUsedBtn) {
          const wrap = root.querySelector('[data-used-wrap]');
@@ -1073,7 +1226,9 @@ export function initMyPage() {
          return;
       }
 
-      /* F) Navigate */
+      /* ==============================
+         6) Navigate
+         ============================== */
       if (e.target.closest('[data-go-cart]')) {
          window.dispatchEvent(
             new CustomEvent('app:navigate', { detail: { href: '/cart' } }),
@@ -1089,9 +1244,10 @@ export function initMyPage() {
       }
 
       /* ==============================
-         G) Address CRUD
-      ============================== */
+         7) Address CRUD
+         ============================== */
 
+      // (A) Add
       if (e.target.closest('[data-address-add]')) {
          const first = (addressStore.getAddresses?.() ?? []).length === 0;
 
@@ -1118,7 +1274,6 @@ export function initMyPage() {
          if (!ok) return;
 
          const r = addressStore.createAddress?.(form);
-
          if (!r?.ok) {
             toast.show(r?.message || '배송지 추가에 실패했습니다.', {
                duration: 1400,
@@ -1130,10 +1285,12 @@ export function initMyPage() {
          return;
       }
 
+      // (B) Card actions
       const card = e.target.closest('[data-address-id]');
       const id = String(card?.getAttribute('data-address-id') || '').trim();
 
       if (id) {
+         // Default
          if (e.target.closest('[data-address-set-default]')) {
             const ok = await confirmModal({
                title: '기본 배송지 설정',
@@ -1145,7 +1302,6 @@ export function initMyPage() {
             if (!ok) return;
 
             const r = addressStore.setDefault?.(id);
-
             if (!r?.ok) {
                toast.show(r?.message || '설정에 실패했습니다.', {
                   duration: 1400,
@@ -1157,6 +1313,7 @@ export function initMyPage() {
             return;
          }
 
+         // Edit
          if (e.target.closest('[data-address-edit]')) {
             const current = addressStore.getAddress?.(id);
 
@@ -1188,7 +1345,6 @@ export function initMyPage() {
             if (!ok) return;
 
             const r = addressStore.updateAddress?.(id, form);
-
             if (!r?.ok) {
                toast.show(r?.message || '배송지 수정에 실패했습니다.', {
                   duration: 1400,
@@ -1200,6 +1356,7 @@ export function initMyPage() {
             return;
          }
 
+         // Delete
          if (e.target.closest('[data-address-delete]')) {
             const ok = await confirmModal({
                title: '배송지 삭제',
@@ -1211,7 +1368,6 @@ export function initMyPage() {
             if (!ok) return;
 
             const r = addressStore.deleteAddress?.(id);
-
             if (!r?.ok) {
                toast.show(r?.message || '배송지 삭제에 실패했습니다.', {
                   duration: 1400,
@@ -1225,8 +1381,8 @@ export function initMyPage() {
       }
 
       /* ==============================
-         H) Order detail / status update
-      ============================== */
+         8) Order detail / status update
+         ============================== */
 
       const detailBtn = e.target.closest('[data-order-detail]');
       if (detailBtn) {
@@ -1236,7 +1392,6 @@ export function initMyPage() {
          if (!orderId) return;
 
          const order = orderStore.getOrder?.(orderId);
-
          if (!order) {
             toast.show('주문을 찾을 수 없습니다.', { duration: 1200 });
             return;
@@ -1272,20 +1427,19 @@ export function initMyPage() {
 
          const r = orderStore.updateOrderStatus?.(orderId, next);
 
-         if (r?.ok) {
+         if (r?.ok)
             toast.show('주문 상태가 변경되었습니다.', { duration: 1200 });
-         } else {
+         else
             toast.show(r?.message || '변경에 실패했습니다.', {
                duration: 1200,
             });
-         }
 
          return;
       }
    });
 
    /* ------------------------------
-      Coupon: Enter to register
+      H) Coupon: Enter to register
    ------------------------------ */
 
    inputEl?.addEventListener('keydown', (e) => {
