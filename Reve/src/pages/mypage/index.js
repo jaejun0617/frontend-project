@@ -304,12 +304,19 @@ function renderPanelDelivery() {
     <section class="mypage__panel" id="panel-delivery" role="tabpanel" data-panel="delivery" aria-hidden="true">
       <div class="mypage__section">
         <h2 class="mypage__sectionTitle">주문/배송</h2>
-        <p class="mypage__sectionDesc">배송 상태를 확인합니다.</p>
+        <p class="mypage__sectionDesc">배송 상태 타임라인과 배송지 정보를 확인합니다.</p>
 
         <div class="delivery" data-delivery-wrap>
-          <div class="empty">
-            <p class="empty__title">배송 추적 UI는 확장 예정입니다.</p>
-            <p class="empty__desc">주문내역에서 상태 변경(PAID/SHIPPING/DELIVERED)을 테스트할 수 있습니다.</p>
+          <div class="delivery__toolbar" aria-label="Delivery Filters">
+            <button type="button" class="chip is-active" data-delivery-filter="ALL" aria-pressed="true">전체</button>
+            <button type="button" class="chip" data-delivery-filter="PAID" aria-pressed="false">결제완료</button>
+            <button type="button" class="chip" data-delivery-filter="SHIPPING" aria-pressed="false">배송중</button>
+            <button type="button" class="chip" data-delivery-filter="DELIVERED" aria-pressed="false">배송완료</button>
+            <button type="button" class="chip" data-delivery-filter="CANCELED" aria-pressed="false">취소</button>
+          </div>
+
+          <div class="delivery__list" data-delivery-list>
+            <p class="loading">불러오는 중...</p>
           </div>
         </div>
       </div>
@@ -634,6 +641,150 @@ function renderOrdersList(orders = []) {
 }
 
 /* ==============================
+   6-1) Delivery helpers
+============================== */
+
+function normalizeOrderStatus(status) {
+   const s = String(status || '').toUpperCase();
+   if (
+      s === 'PAID' ||
+      s === 'SHIPPING' ||
+      s === 'DELIVERED' ||
+      s === 'CANCELED'
+   )
+      return s;
+   return 'PAID';
+}
+
+function getTrackingCode(order) {
+   const id = String(order?.orderId || '').trim();
+   const tail = id ? id.slice(-6) : String(Date.now()).slice(-6);
+   return `REVE-${tail.toUpperCase()}`;
+}
+
+function renderShippingSnapshot(order) {
+   const a = order?.shippingAddress;
+   if (!a) return `<p class="muted">배송지 정보 없음</p>`;
+
+   const label = a.label ? `(${escapeHtml(a.label)})` : '';
+   const line = `(${escapeHtml(a.zip)}) ${escapeHtml(a.address1)}${
+      a.address2 ? ` ${escapeHtml(a.address2)}` : ''
+   }`;
+
+   return `
+    <div class="ship">
+      <p class="ship__to"><strong>${escapeHtml(a.receiver)}</strong> ${label} · ${escapeHtml(a.phone)}</p>
+      <p class="ship__addr muted">${line}</p>
+    </div>
+  `;
+}
+
+function renderTimeline(status) {
+   const s = normalizeOrderStatus(status);
+
+   const steps = [
+      { key: 'PAID', label: '결제완료' },
+      { key: 'SHIPPING', label: '배송중' },
+      { key: 'DELIVERED', label: '배송완료' },
+   ];
+
+   const idx = steps.findIndex((x) => x.key === s);
+   const activeIndex = idx >= 0 ? idx : 0;
+
+   // 취소는 타임라인을 멈춘 상태로 표시
+   const isCanceled = s === 'CANCELED';
+
+   return `
+    <div class="timeline ${isCanceled ? 'is-canceled' : ''}" aria-label="Delivery Timeline">
+      ${steps
+         .map((step, i) => {
+            const done = !isCanceled && i < activeIndex;
+            const on = !isCanceled && i === activeIndex;
+
+            return `
+              <div class="timeline__step ${done ? 'is-done' : ''} ${on ? 'is-active' : ''}">
+                <span class="timeline__dot" aria-hidden="true"></span>
+                <span class="timeline__label">${escapeHtml(step.label)}</span>
+              </div>
+            `;
+         })
+         .join('')}
+      ${isCanceled ? `<p class="timeline__canceled pill">취소됨</p>` : ''}
+    </div>
+  `;
+}
+
+function filterOrdersByStatus(orders, filterKey) {
+   const key = String(filterKey || 'ALL').toUpperCase();
+   if (key === 'ALL') return orders;
+
+   return orders.filter((o) => normalizeOrderStatus(o?.status) === key);
+}
+
+function renderDeliveryList(orders, { filterKey = 'ALL' } = {}) {
+   const list = Array.isArray(orders) ? orders : [];
+   const filtered = filterOrdersByStatus(list, filterKey);
+
+   if (!filtered.length) {
+      return `
+        <div class="empty">
+          <p class="empty__title">해당 상태의 주문이 없습니다.</p>
+          <p class="empty__desc">주문내역 탭에서 주문을 확인할 수 있습니다.</p>
+          <button type="button" class="btn subtle" data-go-orders-tab>주문내역으로</button>
+        </div>
+      `;
+   }
+
+   return `
+     <ul class="delivery-cards" aria-label="Delivery Orders">
+       ${filtered
+          .map((o) => {
+             const orderId = String(o?.orderId || '').trim();
+             const status = normalizeOrderStatus(o?.status);
+             const statusLabel = formatStatusLabel(status);
+             const createdAt = formatDateTime(o?.createdAt);
+             const total = Number(o?.pricing?.total || 0);
+             const track = getTrackingCode(o);
+
+             return `
+               <li class="delivery-card">
+                 <div class="delivery-card__top">
+                   <div>
+                     <p class="delivery-card__id"><strong>${escapeHtml(orderId)}</strong></p>
+                     <p class="muted">${escapeHtml(createdAt)} · <span class="pill">${escapeHtml(statusLabel)}</span></p>
+                   </div>
+                   <div class="delivery-card__sum">
+                     <span class="muted">총 결제</span>
+                     <strong>₩ ${formatKRW(total)}</strong>
+                   </div>
+                 </div>
+
+                 ${renderTimeline(status)}
+
+                 <div class="delivery-card__mid">
+                   <div class="delivery-card__track">
+                     <span class="muted">운송장</span>
+                     <strong>${escapeHtml(track)}</strong>
+                   </div>
+
+                   <div class="delivery-card__actions">
+                     <button type="button" class="btn subtle" data-delivery-detail="${escapeHtml(orderId)}">상세</button>
+                     <button type="button" class="btn" data-delivery-track="${escapeHtml(orderId)}">배송조회</button>
+                   </div>
+                 </div>
+
+                 <div class="delivery-card__bottom">
+                   ${renderShippingSnapshot(o)}
+                 </div>
+               </li>
+             `;
+          })
+          .join('')}
+     </ul>
+   `;
+}
+
+/* ==============================
    7) Profile / Grade helpers
 ============================== */
 
@@ -905,6 +1056,8 @@ export function initMyPage() {
    const ordersWrap = root.querySelector('[data-orders-wrap]');
    const addressWrap = root.querySelector('[data-address-wrap]');
 
+   const deliveryWrap = root.querySelector('[data-delivery-wrap]');
+   const deliveryListEl = root.querySelector('[data-delivery-list]');
    /* ------------------------------
       A) Tab control
       - UI 반영만 담당(데이터 로딩은 paint에서)
@@ -963,6 +1116,19 @@ export function initMyPage() {
       ordersWrap.innerHTML = renderOrdersList(orders);
    };
 
+   const deliveryState = {
+      filterKey: 'ALL',
+   };
+
+   const paintDelivery = () => {
+      if (!deliveryListEl) return;
+
+      const orders = orderStore.getOrders?.() ?? [];
+      deliveryListEl.innerHTML = renderDeliveryList(orders, {
+         filterKey: deliveryState.filterKey,
+      });
+   };
+
    const paintAddress = () => {
       if (!addressWrap) return;
       addressWrap.innerHTML = renderAddressPanelInner();
@@ -977,6 +1143,7 @@ export function initMyPage() {
       if (tabKey === 'profile') paintProfile();
       if (tabKey === 'grade') paintGrade();
       if (tabKey === 'orders') paintOrders();
+      if (tabKey === 'delivery') paintDelivery();
       if (tabKey === 'address') paintAddress();
    };
 
@@ -1060,6 +1227,7 @@ export function initMyPage() {
    paintProfile();
    paintGrade();
    paintOrders();
+   paintDelivery();
    paintAddress();
 
    runDeepLink();
@@ -1076,7 +1244,10 @@ export function initMyPage() {
       paintGrade();
    });
 
-   orderStore.subscribe?.(() => paintOrders());
+   orderStore.subscribe?.(() => {
+      paintOrders();
+      paintDelivery();
+   });
    addressStore.subscribe?.(() => paintAddress());
 
    /* ------------------------------
@@ -1242,7 +1413,98 @@ export function initMyPage() {
          );
          return;
       }
+      /* ==============================
+   X) Delivery: filter / actions
+============================== */
 
+      // (1) 필터 칩
+      const filterBtn = e.target.closest('[data-delivery-filter]');
+      if (filterBtn) {
+         const next = String(
+            filterBtn.getAttribute('data-delivery-filter') || 'ALL',
+         ).toUpperCase();
+         deliveryState.filterKey = next;
+
+         // 칩 UI 토글
+         root.querySelectorAll('[data-delivery-filter]').forEach((btn) => {
+            const k = String(
+               btn.getAttribute('data-delivery-filter') || 'ALL',
+            ).toUpperCase();
+            const on = k === next;
+            btn.classList.toggle('is-active', on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+         });
+
+         paintDelivery();
+         return;
+      }
+
+      // (2) "주문내역으로" 버튼
+      if (e.target.closest('[data-go-orders-tab]')) {
+         const tabKey = 'orders';
+         setActiveTab(tabKey);
+         paintByTab(tabKey);
+
+         setQuery(
+            { tab: tabKey, open: '', focus: '', orderId: '' },
+            { replace: false },
+         );
+         return;
+      }
+
+      // (3) 배송 상세: 기존 주문 상세 모달 재사용
+      const dDetail = e.target.closest('[data-delivery-detail]');
+      if (dDetail) {
+         const orderId = String(
+            dDetail.getAttribute('data-delivery-detail') || '',
+         ).trim();
+         if (!orderId) return;
+
+         const order = orderStore.getOrder?.(orderId);
+         if (!order) {
+            toast.show('주문을 찾을 수 없습니다.', { duration: 1200 });
+            return;
+         }
+
+         await confirmModal({
+            title: '배송 상세',
+            message: buildOrderDetailLines(order),
+            confirmText: '확인',
+            cancelText: '닫기',
+         });
+         return;
+      }
+
+      // (4) 배송조회: “추적 정보” 모달 (MVP)
+      const dTrack = e.target.closest('[data-delivery-track]');
+      if (dTrack) {
+         const orderId = String(
+            dTrack.getAttribute('data-delivery-track') || '',
+         ).trim();
+         if (!orderId) return;
+
+         const order = orderStore.getOrder?.(orderId);
+         if (!order) {
+            toast.show('주문을 찾을 수 없습니다.', { duration: 1200 });
+            return;
+         }
+
+         const track = getTrackingCode(order);
+         const statusLabel = formatStatusLabel(order.status);
+
+         await confirmModal({
+            title: '배송 조회',
+            message: [
+               `운송장: ${track}`,
+               `현재 상태: ${statusLabel}`,
+               '',
+               '※ MVP에서는 실제 택배사 연동 없이 UI만 제공합니다.',
+            ].join('\n'),
+            confirmText: '확인',
+            cancelText: '닫기',
+         });
+         return;
+      }
       /* ==============================
          7) Address CRUD
          ============================== */

@@ -362,6 +362,13 @@
 또한 `open / focus / orderId`는 실행 직후 URL에서 제거(consume)되어,
 새로고침/뒤로가기에서도 반복 트리거되지 않는다. (`replaceState` 기반)
 
+### 주문/배송 탭(Delivery)
+
+- 주문 상태 필터(전체/결제완료/배송중/배송완료/취소) 제공
+- 주문 카드에서 배송 타임라인(PAID → SHIPPING → DELIVERED) 시각화
+- 주문별 배송지 스냅샷(주문 당시 주소) 노출
+- 상세/배송조회 모달로 MVP 확인 흐름 제공
+
 ---
 
 ## 14) 승급 쿠폰 지급(Upgrade Reward)
