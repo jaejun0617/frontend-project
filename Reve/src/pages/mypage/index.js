@@ -1,15 +1,13 @@
 /**
  * =============================================
  * 📍 위치: src/pages/mypage/index.js
- * 역할: 마이페이지(MVP)
+ * 역할: 마이페이지(MVP) + 딥링크(탭/오픈/포커스)
  * 경로: /mypage
  *
- * 포함 기능
- * - 쿠폰 등록/보유/적용/해제
- * - 내 정보 + 멤버십 요약(membership.js 단일 소스)
- * - 회원등급 진행률
- * - 주문내역 조회 + 상태 변경(테스트)
- * - 배송지 CRUD + 기본 배송지 + 입력 모달(커스텀)
+ * 딥링크 지원
+ * - /mypage?tab=address&open=add                : 배송지 추가 모달 자동 오픈
+ * - /mypage?tab=orders&open=detail&orderId=...  : 주문 상세 모달 자동 오픈
+ * - /mypage?tab=coupon&focus=register           : 쿠폰 입력창 자동 포커스
  *
  * 설계 포인트
  * - 탭 구조 확장 가능
@@ -47,12 +45,14 @@ const TABS = [
 ];
 
 const DEFAULT_REGISTER_MSG =
-   '쿠폰을 등록하면 “보유 쿠폰”에 쌓이고, 장바구니에서 적용돼요.';
+   '쿠폰을 등록하면 “보유 쿠폰”에 쌓이고, 장바구니에서 적용됩니다.';
 
 const DEFAULT_TAB = 'coupon';
 
 /* ==============================
    2) Page Template
+   - 패널 is-active 고정하지 않는다.
+   - 초기 탭은 initMyPage에서 URL 기반으로 결정한다.
 ============================== */
 
 export const MyPage = () => {
@@ -87,7 +87,6 @@ export const MyPage = () => {
    3) Shared helpers
 ============================== */
 
-/** XSS 방지용 escape */
 function escapeHtml(value) {
    return String(value ?? '')
       .replaceAll('&', '&amp;')
@@ -97,24 +96,31 @@ function escapeHtml(value) {
       .replaceAll("'", '&#39;');
 }
 
-/** KRW 포맷 */
 function formatKRW(n) {
    const v = Number(n || 0);
    const safe = Number.isFinite(v) ? v : 0;
    return new Intl.NumberFormat('ko-KR').format(Math.max(0, safe));
 }
 
-/** URL 쿼리에서 탭을 읽어서 초기 탭 선택에 반영 */
-function getInitialTabKey() {
+function readQuery() {
    const params = new URLSearchParams(window.location.search);
-   const tab = String(params.get('tab') || '').trim();
+   return {
+      tab: String(params.get('tab') || '').trim(),
+      open: String(params.get('open') || '').trim(),
+      focus: String(params.get('focus') || '').trim(),
+      orderId: String(params.get('orderId') || '').trim(),
+   };
+}
+
+function getInitialTabKey() {
+   const q = readQuery();
+   const tab = q.tab;
    if (!tab) return DEFAULT_TAB;
 
    const allowed = new Set(TABS.filter((t) => t.enabled).map((t) => t.key));
    return allowed.has(tab) ? tab : DEFAULT_TAB;
 }
 
-/** 탭 렌더 */
 function renderTabs(activeKey = DEFAULT_TAB) {
    return `
     <ul class="mypage__tabs" role="tablist" aria-label="MyPage Menu">
@@ -149,10 +155,10 @@ function renderTabs(activeKey = DEFAULT_TAB) {
 
 function renderPanelCoupon() {
    return `
-    <section class="mypage__panel is-active" id="panel-coupon" role="tabpanel" data-panel="coupon">
+    <section class="mypage__panel" id="panel-coupon" role="tabpanel" data-panel="coupon" aria-hidden="true">
       <div class="mypage__section">
         <h2 class="mypage__sectionTitle">쿠폰 등록</h2>
-        <p class="mypage__sectionDesc">코드를 등록해서 보유 쿠폰으로 추가하세요.</p>
+        <p class="mypage__sectionDesc">코드를 등록해서 보유 쿠폰으로 추가합니다.</p>
 
         <div class="coupon-box">
           <div class="coupon-box__row">
@@ -245,10 +251,6 @@ function renderPanelDelivery() {
   `;
 }
 
-/* ==============================
-   4-1) Address Panel
-============================== */
-
 function renderPanelAddress() {
    return `
     <section class="mypage__panel" id="panel-address" role="tabpanel" data-panel="address" aria-hidden="true">
@@ -258,6 +260,10 @@ function renderPanelAddress() {
     </section>
   `;
 }
+
+/* ==============================
+   4-1) Address panel content
+============================== */
 
 function renderAddressEmpty() {
    return `
@@ -489,6 +495,17 @@ function formatStatusLabel(status) {
    return '결제완료';
 }
 
+function buildOrderDetailLines(order) {
+   if (!order) return '';
+   return [
+      `주문번호: ${order.orderId}`,
+      `상태: ${formatStatusLabel(order.status)}`,
+      `결제: ₩ ${formatKRW(order?.pricing?.total || 0)}`,
+      `배송비: ₩ ${formatKRW(order?.pricing?.shipping || 0)}`,
+      `쿠폰: ${order?.coupon?.code ? order.coupon.code : '없음'}`,
+   ].join('\n');
+}
+
 function renderOrdersList(orders = []) {
    const list = Array.isArray(orders) ? orders : [];
 
@@ -656,8 +673,6 @@ function renderGrade(user) {
 
 /* ==============================
    8) Address Form Modal
-   - 입력 폼은 confirmModal로 처리하지 않는다.
-   - 이 모달은 입력 -> payload 반환, 취소 -> null 반환
 ============================== */
 
 function openAddressFormModal({ title, initial = {} }) {
@@ -767,7 +782,6 @@ function openAddressFormModal({ title, initial = {} }) {
    });
 }
 
-/** 배송지 입력값 검증 */
 function validateAddressForm(form) {
    const receiver = String(form?.receiver || '').trim();
    const phone = String(form?.phone || '').trim();
@@ -811,8 +825,9 @@ export function initMyPage() {
    const setActiveTab = (tabKey) => {
       root.querySelectorAll('[data-tab]').forEach((btn) => {
          const key = btn.getAttribute('data-tab');
-         btn.classList.toggle('is-active', key === tabKey);
-         btn.setAttribute('aria-selected', key === tabKey ? 'true' : 'false');
+         const isOn = key === tabKey;
+         btn.classList.toggle('is-active', isOn);
+         btn.setAttribute('aria-selected', isOn ? 'true' : 'false');
       });
 
       root.querySelectorAll('[data-panel]').forEach((panel) => {
@@ -861,17 +876,74 @@ export function initMyPage() {
    };
 
    /* ------------------------------
-      Initial render
+      Deep link actions
    ------------------------------ */
 
-   const initialTab = getInitialTabKey();
-   setActiveTab(initialTab);
+   const runDeepLink = async () => {
+      const q = readQuery();
+      const tab = getInitialTabKey();
+
+      setActiveTab(tab);
+
+      if (tab === 'coupon') {
+         paintOwned();
+         if (q.focus === 'register') {
+            setTimeout(() => {
+               root.querySelector('[data-coupon-register-input]')?.focus?.();
+            }, 0);
+         }
+      }
+
+      if (tab === 'profile') paintProfile();
+      if (tab === 'grade') paintGrade();
+
+      if (tab === 'orders') {
+         paintOrders();
+
+         if (q.open === 'detail' && q.orderId) {
+            setTimeout(async () => {
+               const order = orderStore.getOrder?.(q.orderId);
+               if (!order) {
+                  toast.show('주문을 찾을 수 없습니다.', { duration: 1300 });
+                  return;
+               }
+
+               await confirmModal({
+                  title: '주문 상세',
+                  message: buildOrderDetailLines(order),
+                  confirmText: '확인',
+                  cancelText: '닫기',
+               });
+            }, 0);
+         }
+      }
+
+      if (tab === 'address') {
+         paintAddress();
+
+         if (q.open === 'add') {
+            setTimeout(() => {
+               root.querySelector('[data-address-add]')?.click?.();
+            }, 0);
+         }
+      }
+
+      if (tab === 'delivery') {
+         /* delivery는 정적 패널이라 별도 처리 불필요 */
+      }
+   };
+
+   /* ------------------------------
+      Initial render
+   ------------------------------ */
 
    paintOwned();
    paintProfile();
    paintGrade();
    paintOrders();
    paintAddress();
+
+   runDeepLink();
 
    /* ------------------------------
       Store subscriptions
@@ -895,9 +967,17 @@ export function initMyPage() {
       /* A) Tab change */
       const tabBtn = e.target.closest('[data-tab]');
       if (tabBtn) {
-         const tabKey = tabBtn.getAttribute('data-tab');
+         const tabKey = String(tabBtn.getAttribute('data-tab') || '').trim();
          if (!tabKey) return;
+
          setActiveTab(tabKey);
+
+         if (tabKey === 'coupon') paintOwned();
+         if (tabKey === 'profile') paintProfile();
+         if (tabKey === 'grade') paintGrade();
+         if (tabKey === 'orders') paintOrders();
+         if (tabKey === 'address') paintAddress();
+
          return;
       }
 
@@ -917,16 +997,12 @@ export function initMyPage() {
             return;
          }
 
-         if (msgEl) {
+         if (msgEl)
             msgEl.textContent = String(result.message || DEFAULT_REGISTER_MSG);
-         }
-
          if (result.ok && inputEl) inputEl.value = '';
 
-         if (result.ok) {
+         if (result.ok)
             toast.show('쿠폰이 등록되었습니다.', { duration: 1200 });
-         }
-
          return;
       }
 
@@ -1166,17 +1242,9 @@ export function initMyPage() {
             return;
          }
 
-         const lines = [
-            `주문번호: ${order.orderId}`,
-            `상태: ${formatStatusLabel(order.status)}`,
-            `결제: ₩ ${formatKRW(order?.pricing?.total || 0)}`,
-            `배송비: ₩ ${formatKRW(order?.pricing?.shipping || 0)}`,
-            `쿠폰: ${order?.coupon?.code ? order.coupon.code : '없음'}`,
-         ].join('\n');
-
          await confirmModal({
             title: '주문 상세',
-            message: lines,
+            message: buildOrderDetailLines(order),
             confirmText: '확인',
             cancelText: '닫기',
          });

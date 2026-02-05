@@ -190,6 +190,7 @@ function buildShippingAddressSnapshot(address) {
 }
 
 function renderShippingAddressSummary(address) {
+   // ✅ 주소가 없으면 "등록"은 딥링크로 추가 모달까지 자동 오픈
    if (!address) {
       return `
         <div class="cart__address" aria-label="배송지">
@@ -198,7 +199,14 @@ function renderShippingAddressSummary(address) {
             <strong class="pill">미등록</strong>
           </div>
           <p class="cart__couponmsg">결제를 진행하려면 배송지를 등록해야 합니다.</p>
-          <button type="button" class="btn" data-address-open>배송지 등록</button>
+          <button
+            type="button"
+            class="btn"
+            data-address-open
+            data-address-mode="add"
+          >
+            배송지 등록
+          </button>
         </div>
       `;
    }
@@ -208,6 +216,7 @@ function renderShippingAddressSummary(address) {
       address.address1,
    )}${address.address2 ? ` ${escapeHtml(address.address2)}` : ''}`;
 
+   // ✅ 주소가 있으면 "변경"은 그냥 address 탭으로
    return `
       <div class="cart__address" aria-label="배송지">
         <div class="cart__row">
@@ -215,7 +224,14 @@ function renderShippingAddressSummary(address) {
           <strong>${escapeHtml(address.receiver)} ${label}</strong>
         </div>
         <p class="cart__couponmsg">${line}</p>
-        <button type="button" class="btn subtle" data-address-open>변경</button>
+        <button
+          type="button"
+          class="btn subtle"
+          data-address-open
+          data-address-mode="edit"
+        >
+          변경
+        </button>
       </div>
    `;
 }
@@ -232,10 +248,11 @@ async function ensureDefaultAddress() {
       cancelText: '취소',
    });
 
+   // ✅ 여기서도 open=add로 보내서 "추가 모달 자동 오픈"까지 연결
    if (go) {
       window.dispatchEvent(
          new CustomEvent('app:navigate', {
-            detail: { href: '/mypage?tab=address' },
+            detail: { href: '/mypage?tab=address&open=add' },
          }),
       );
    }
@@ -694,10 +711,18 @@ export async function initCartPage() {
       }
 
       if (e.target.closest('[data-address-open]')) {
+         const btn = e.target.closest('[data-address-open]');
+         const mode = String(
+            btn?.getAttribute('data-address-mode') || '',
+         ).trim();
+
+         const href =
+            mode === 'add'
+               ? '/mypage?tab=address&open=add'
+               : '/mypage?tab=address';
+
          window.dispatchEvent(
-            new CustomEvent('app:navigate', {
-               detail: { href: '/mypage?tab=address' },
-            }),
+            new CustomEvent('app:navigate', { detail: { href } }),
          );
          return;
       }
