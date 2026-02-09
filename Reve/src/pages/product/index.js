@@ -12,6 +12,11 @@
  * - 페이지네이션(기본 20개/페이지)
  * - URL 쿼리 동기화 (?min=&max=&sort=&page=)
  *
+ * ✅ UX 정책
+ * - 초기 진입 시: 필터를 "적용"하지 않아도 20개가 바로 보여야 함
+ * - 정렬/가격 입력은 "즉시" 리스트에 반영
+ * - 페이지 이동 시 URL(page=)도 함께 갱신
+ *
  * ⚠️ 절대 규칙
  * - bindSizePills()는 수정하지 않는다 (ProductCard + CSS 활성화 영향)
  * =============================================
@@ -20,6 +25,10 @@
 import { getProducts } from '../../api/products.js';
 import { ProductCard } from '../../components/ProductCard.js';
 import { cartStore } from '../../store/cartStore.js';
+
+/* =====================================================================
+   0) 상수 / 옵션 / 셀렉터
+   ===================================================================== */
 
 const PAGE_SIZE = 20;
 
@@ -35,17 +44,24 @@ const SELECTORS = {
    page: '[data-product-page]',
    grid: '[data-product-grid]',
    controls: '[data-product-controls]',
+
    minInput: '[data-filter-min]',
    maxInput: '[data-filter-max]',
    sortSelect: '[data-filter-sort]',
    applyBtn: '[data-filter-apply]',
    resetBtn: '[data-filter-reset]',
    summary: '[data-filter-summary]',
+
+   pagerSlot: '[data-product-pager-slot]',
    pager: '[data-product-pager]',
    pagerPrev: '[data-page-prev]',
    pagerNext: '[data-page-next]',
    pagerNums: '[data-page-numbers]',
 };
+
+/* =====================================================================
+   1) 공통 유틸
+   ===================================================================== */
 
 function clampInt(n, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
    // ✅ 빈 값은 "미입력"으로 처리 (null)
@@ -59,6 +75,22 @@ function clampInt(n, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
    const i = Math.floor(v);
    return Math.max(min, Math.min(max, i));
 }
+
+function formatKRW(value) {
+   return new Intl.NumberFormat('ko-KR').format(Number(value || 0));
+}
+
+function getDisplayBadge(product, type) {
+   const tags = Array.isArray(product?.tags) ? product.tags : [];
+   if (type === 'HOT') return tags.includes('HOT');
+   if (type === 'BEST') return tags.includes('베스트');
+   return false;
+}
+
+/* =====================================================================
+   2) URL Query <-> State
+   ===================================================================== */
+
 function getQueryState() {
    const params = new URLSearchParams(window.location.search);
 
@@ -109,16 +141,9 @@ function setQueryState(next) {
    window.history.replaceState({}, '', url);
 }
 
-function formatKRW(value) {
-   return new Intl.NumberFormat('ko-KR').format(Number(value || 0));
-}
-
-function getDisplayBadge(product, type) {
-   const tags = Array.isArray(product?.tags) ? product.tags : [];
-   if (type === 'HOT') return tags.includes('HOT');
-   if (type === 'BEST') return tags.includes('베스트');
-   return false;
-}
+/* =====================================================================
+   3) Filter / Sort / Pagination (Pure)
+   ===================================================================== */
 
 function applyFilterSort(products, { min, max, sort }) {
    const list = Array.isArray(products) ? products : [];
@@ -145,7 +170,6 @@ function applyFilterSort(products, { min, max, sort }) {
          const ah = getDisplayBadge(a, 'HOT') ? 1 : 0;
          const bh = getDisplayBadge(b, 'HOT') ? 1 : 0;
          if (bh !== ah) return bh - ah;
-         // HOT 동률이면 최신(목업 기준: id 내 숫자 큰 게 최신처럼 보이게)
          return String(b?.id || '').localeCompare(String(a?.id || ''));
       }
 
@@ -179,6 +203,10 @@ function paginate(items, page, pageSize) {
       slice: items.slice(start, end),
    };
 }
+
+/* =====================================================================
+   4) View (Template)
+   ===================================================================== */
 
 function renderControls(state) {
    const { min, max, sort } = state;
@@ -224,8 +252,9 @@ function renderControls(state) {
           </select>
         </div>
 
+        <!-- ✅ 버튼은 남겨두되, UX는 "즉시 반영"이 기본 -->
         <div class="product-toolbar__actions">
-          <button type="button" class="btn" data-filter-apply>적용</button>
+          <button type="button" class="btn subtle" data-filter-apply>적용</button>
           <button type="button" class="btn subtle" data-filter-reset>초기화</button>
         </div>
       </div>
@@ -277,6 +306,8 @@ function buildPageNumbers({ page, totalPages }) {
 }
 
 export const ProductPage = () => {
+   const qs = getQueryState();
+
    return `
     <section class='page product-page' aria-label='Product Page' data-product-page>
       <header class='page__header'>
@@ -287,7 +318,7 @@ export const ProductPage = () => {
       <div class='page__content'>
         <!-- ✅ 필터/정렬/요약 -->
         <div data-product-controls-slot>
-          ${renderControls(getQueryState())}
+          ${renderControls(qs)}
         </div>
 
         <!-- ✅ 리스트 -->
@@ -302,9 +333,13 @@ export const ProductPage = () => {
   `;
 };
 
+/* =====================================================================
+   5) Controller (init)
+   ===================================================================== */
+
 export async function initProductPage() {
-   const root = document.querySelector('[data-product-page]');
-   const gridEl = document.querySelector('[data-product-grid]');
+   const root = document.querySelector(SELECTORS.page);
+   const gridEl = document.querySelector(SELECTORS.grid);
    if (!root || !gridEl) return;
 
    // ✅ 라우팅 재진입 시 이벤트/구독 중복 방지
@@ -312,42 +347,27 @@ export async function initProductPage() {
    root.dataset.bound = '1';
 
    const controlsSlot = root.querySelector('[data-product-controls-slot]');
-   const pagerSlot = root.querySelector('[data-product-pager-slot]');
+   const pagerSlot = root.querySelector(SELECTORS.pagerSlot);
 
-   /**
-    * ✅ 카드 UI를 "현재 cartStore 상태"에 맞춰 동기화
-    * - 담긴 상품이면: card에 is-in-cart 클래스/데이터 부여
-    * - 나중에 CSS에서 아이콘 배경 빨강 처리하기 쉬움
-    */
+   /* ==============================
+      ✅ Cart UI Sync
+      ============================== */
    const syncCartUi = () => {
       const cards = gridEl.querySelectorAll('[data-product-id]');
       cards.forEach((card) => {
          const productId = card.getAttribute('data-product-id');
          if (!productId) return;
 
-         // 이 상품이 장바구니에 1개라도 담겼는지
          const inCart = cartStore.hasLine(productId);
 
          card.classList.toggle('is-in-cart', inCart);
          card.dataset.inCart = inCart ? '1' : '0';
-
-         // (선택) 담김 수량/라인 수 표시하고 싶으면 여기서 가능
-         // const lines = cartStore.getItemsByProductId(productId);
-         // card.dataset.inCartLines = String(lines.length);
       });
    };
 
-   /**
-    * ✅ 사이즈 pill UI 상태 처리
-    * - ProductCard에서 아래 훅을 제공한다고 가정:
-    *   - card: data-product-id + data-selected-size(초기값은 빈 문자열 권장)
-    *   - pill: [data-size-pill] + data-size="S|M|..."
-    *
-    * - 클릭하면:
-    *   - 같은 카드 내 pill만 토글
-    *   - 선택값을 card.dataset.selectedSize에 저장
-    *   - 다시 클릭하면 선택 해제도 가능(사용자 실수 방지)
-    */
+   /* ==============================
+      ⚠️ 절대 수정 금지: bindSizePills()
+      ============================== */
    const bindSizePills = () => {
       gridEl.addEventListener('click', (e) => {
          const pill = e.target.closest('[data-size-pill]');
@@ -387,9 +407,14 @@ export async function initProductPage() {
    // ✅ 이벤트 위임(1회)
    bindSizePills();
 
-   // ✅ 원본 상품 캐시(페이지 내부에서 필터/정렬/페이지네이션은 in-memory 처리)
+   /* ==============================
+      ✅ In-memory products cache
+      ============================== */
    let allProducts = [];
 
+   /* ==============================
+      ✅ Controls state reader
+      ============================== */
    function readControlsState() {
       const minEl = root.querySelector(SELECTORS.minInput);
       const maxEl = root.querySelector(SELECTORS.maxInput);
@@ -397,6 +422,7 @@ export async function initProductPage() {
 
       const min = clampInt(minEl?.value, { min: 0 });
       const max = clampInt(maxEl?.value, { min: 0 });
+
       const sortRaw = String(sortEl?.value || 'NEW').toUpperCase();
       const sort = SORT_OPTIONS.some((o) => o.value === sortRaw)
          ? sortRaw
@@ -410,6 +436,9 @@ export async function initProductPage() {
       return { min: min ?? null, max: max ?? null, sort };
    }
 
+   /* ==============================
+      ✅ Core paint (filter/sort/page -> render)
+      ============================== */
    function paint({ page } = {}) {
       const qs = getQueryState();
       const controls = readControlsState();
@@ -430,7 +459,7 @@ export async function initProductPage() {
       // ✅ 페이징
       const paged = paginate(processed, nextState.page, PAGE_SIZE);
 
-      // ✅ 그리드 렌더
+      // ✅ 그리드 렌더 (초기 진입 포함: 무조건 여기서 렌더됨)
       if (!paged.slice.length) {
          gridEl.innerHTML = `
            <div class="empty">
@@ -453,9 +482,12 @@ export async function initProductPage() {
             parts.push(`₩${formatKRW(nextState.min)} 이상`);
          if (nextState.max != null)
             parts.push(`₩${formatKRW(nextState.max)} 이하`);
-         parts.push(
-            `정렬: ${SORT_OPTIONS.find((o) => o.value === nextState.sort)?.label || '최신순'}`,
-         );
+
+         const sortLabel =
+            SORT_OPTIONS.find((o) => o.value === nextState.sort)?.label ||
+            '최신순';
+
+         parts.push(`정렬: ${sortLabel}`);
 
          summaryEl.textContent = `총 ${paged.total}개 · ${parts.join(' / ')} · ${paged.page}/${paged.totalPages} 페이지`;
       }
@@ -473,6 +505,7 @@ export async function initProductPage() {
                page: paged.page,
                totalPages: paged.totalPages,
             });
+
             numsEl.innerHTML = nums
                .map((n) => {
                   if (n === '…')
@@ -494,10 +527,16 @@ export async function initProductPage() {
       }
    }
 
-   // ✅ 컨트롤/페이지네이션 이벤트(페이지 루트 1회 위임)
+   /* ==============================
+      ✅ Events
+      - "선택/입력 즉시 반영"이 기본
+      ============================== */
+
+   // (1) click 위임: reset / pager / (옵션) apply
    root.addEventListener('click', (e) => {
       const applyBtn = e.target.closest(SELECTORS.applyBtn);
       if (applyBtn) {
+         // ✅ 버튼은 남겨두되, 즉시 반영 UX에서도 동작은 동일하게 유지
          paint({ page: 1 });
          return;
       }
@@ -541,31 +580,50 @@ export async function initProductPage() {
       }
    });
 
-   // ✅ Enter로도 적용되게 (input에서 Enter 누르면)
+   // (2) change/input: 즉시 반영
+   root.addEventListener('change', (e) => {
+      const sortEl = e.target.closest(SELECTORS.sortSelect);
+      if (sortEl) {
+         paint({ page: 1 });
+         return;
+      }
+   });
+
+   root.addEventListener('input', (e) => {
+      const minEl = e.target.closest(SELECTORS.minInput);
+      const maxEl = e.target.closest(SELECTORS.maxInput);
+
+      if (minEl || maxEl) {
+         // ✅ 가격 입력은 즉시 반영 + page 1로 리셋
+         paint({ page: 1 });
+      }
+   });
+
+   // (3) Enter로도 적용되게 (input에서 Enter 누르면)
    root.addEventListener('keydown', (e) => {
       const isInControls = Boolean(e.target?.closest?.(SELECTORS.controls));
       if (!isInControls) return;
       if (e.key !== 'Enter') return;
 
       const tag = String(e.target?.tagName || '').toUpperCase();
-      // select에서 Enter는 기본 동작이 애매해서 제외
       if (tag === 'SELECT') return;
 
       e.preventDefault();
       paint({ page: 1 });
    });
 
+   /* ==============================
+      ✅ Data load + initial paint
+      ============================== */
    try {
       const products = await getProducts();
       allProducts = Array.isArray(products) ? products : [];
 
-      // ✅ 첫 진입 시 URL 쿼리 기준으로 컨트롤 UI를 다시 그려도 좋지만,
-      // 여기서는 템플릿에서 이미 반영했으므로 그대로 사용.
-      // (혹시 라우팅 렌더 타이밍 이슈가 있으면 아래 1줄로 강제 재렌더 가능)
+      // ✅ controls는 렌더 타이밍 이슈 대비: 한번 더 확정 렌더
       if (controlsSlot)
          controlsSlot.innerHTML = renderControls(getQueryState());
 
-      // ✅ 최초 페인트
+      // ✅ 최초 페인트: "적용" 없어도 기본 20개가 보여야 함
       paint({ page: getQueryState().page });
    } catch (err) {
       gridEl.innerHTML = `
@@ -575,17 +633,11 @@ export async function initProductPage() {
       return;
    }
 
-   /**
-    * ✅ cartStore가 바뀔 때마다(담기/삭제/옵션변경/로그인 스위칭)
-    * 상품 리스트의 “담김 상태”도 자동으로 업데이트
-    *
-    * ⚠️ 여기서 unsubscribe를 저장해두고 싶다면,
-    * 라우터에 페이지 unmount 훅이 있을 때 해제하는 구조로 확장 가능.
-    * (지금은 sync 함수가 DOM 없으면 자연스럽게 영향이 적어서 MVP로 OK)
-    */
+   /* ==============================
+      ✅ cartStore subscribe (담김 상태 자동 동기화)
+      ============================== */
    cartStore.subscribe(() => {
-      // grid가 이미 다른 페이지로 바뀌었으면 안전하게 스킵
-      const stillHere = document.querySelector('[data-product-grid]');
+      const stillHere = document.querySelector(SELECTORS.grid);
       if (!stillHere) return;
       syncCartUi();
    });
