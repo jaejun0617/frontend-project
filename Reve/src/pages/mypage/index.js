@@ -679,6 +679,14 @@ function renderShippingSnapshot(order) {
   `;
 }
 
+/* ==============================
+   6-1) Delivery helpers (FIX)
+============================== */
+
+/**
+ * ✅ 타임라인은 "order 객체"를 받아야 statusHistory를 쓸 수 있다.
+ * @param {any} order
+ */
 function renderTimeline(order) {
    const s = normalizeOrderStatus(order?.status);
    const h = order?.statusHistory || {};
@@ -768,7 +776,7 @@ function renderDeliveryList(orders, { filterKey = 'ALL' } = {}) {
                    </div>
                  </div>
 
-                 ${renderTimeline(status)}
+                  ${renderTimeline(o)}
 
                  <div class="delivery-card__mid">
                    <div class="delivery-card__track">

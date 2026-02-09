@@ -57,7 +57,7 @@
 - `src/pages/checkoutSuccess/index.js`  
   결제 완료 페이지(주문 요약, 등급, 포인트 안내)
 - `src/pages/search/index.js`  
-  검색 페이지(`/search?q=`) + 최근/추천 + 결과 렌더
+  검색 페이지(`/search?q=`) + 최근/추천 + 결과 렌더 + (4탄) 필터/정렬/페이지네이션
 - `src/pages/mypage/index.js`  
   마이페이지(내정보, 배송지 CRUD, 주문내역, 주문·배송, 등급, 쿠폰)
 
@@ -101,8 +101,18 @@
 - 추천 검색어(정적 배열) 칩 제공
 - 검색 실행 시 `/search?q=...`로 이동(`app:navigate`)
 
-> UX 규칙: Enter/검색/칩 클릭으로 검색 실행해도 드로어는 자동으로 닫지 않음  
-> 닫힘은 X / 바깥 클릭 / ESC 로만 처리
+#### UX 규칙(최종)
+
+- 검색 실행(Enter/칩 클릭/검색 submit) 시 **드로어 자동 닫힘**
+- 닫힘 트리거: 검색 실행 / X / 바깥 클릭(overlay) / ESC
+
+#### 외부 제어(브릿지)
+
+- SearchPage 등에서 import 없이 닫을 수 있도록 이벤트 브릿지 제공
+   - `window.dispatchEvent(new CustomEvent('app:searchDrawerClose'))`
+   - `app.js`가 수신하여 `searchDrawer.close()` 실행
+
+---
 
 ### Search Page (`/search?q=`) ✅
 
@@ -115,6 +125,19 @@
    - 칩 클릭 시 `/search?q=...` 이동 + 최근 검색어 갱신
 - SearchDrawer ↔ SearchPage 동기화
    - `recent-search:changed` 이벤트로 최근검색 UI 즉시 동기화
+
+#### (고도화 4탄) SearchPage 탐색 UX 통합
+
+- 가격 필터: `min/max`
+- 정렬: `NEW / PRICE_ASC / PRICE_DESC / HOT / BEST`
+- 페이지네이션: `20개/페이지`
+- URL 쿼리 동기화:
+   - `/search?q=...&min=&max=&sort=&page=`
+   - `replaceState`로 URL만 갱신해 재마운트 방지
+- UX
+   - 필터/정렬 변경은 **즉시 반영** + `page=1` 리셋
+   - 페이지 이동 시 **상단 자동 스크롤**
+   - SearchPage 진입 시 드로어는 항상 닫힘(브릿지 이벤트)
 
 ---
 
@@ -273,8 +296,9 @@
 3. mock 결제(`handleCheckout`)
 4. 완료 모달(요약 표시)
 5. 이동 분기
-   - 주문 확인: `/checkout/success?orderId=...`
-   - 계속 쇼핑: `/product`
+
+- 주문 확인: `/checkout/success?orderId=...`
+- 계속 쇼핑: `/product`
 
 ### 멤버십/포인트
 
@@ -345,6 +369,12 @@
 - `cartStore.subscribe()`로 헤더 뱃지 및 리스트 동기화
 - `syncProductCardsWithCart()`로 아이콘/사이즈 표시 동기화
 
+### SearchDrawer 외부 제어(브릿지)
+
+- SearchPage 진입 시 드로어가 열려있다면 자동으로 닫기
+- 이벤트: `app:searchDrawerClose`
+   - `app.js`에서 수신 → `searchDrawer.close()`
+
 ---
 
 ## 10) 상품 상세(ProductDetailPage)
@@ -372,6 +402,7 @@
 
 - navigate: `app:navigate` (detail: `{ href }`)
 - recent search sync: `recent-search:changed`
+- search drawer close bridge: `app:searchDrawerClose`
 
 ---
 
@@ -485,28 +516,30 @@
 
 ## 17) 다음 작업 후보(TODO)
 
-### A. 검색(Search) 고도화 🔍 (추천: 1순위)
+> 기준: “효과 대비 리스크 낮고, 사용자 체감 큰 것”부터
 
-- 검색 결과 정렬/필터(카테고리/가격대/정렬) 추가
-- “입력 유지 정책” 확정
-   - 예: Drawer 입력값 유지 vs 검색 후 초기화
-- 검색 결과에서 키워드 하이라이트(선택)
-- 최근 검색어 상단 고정/최대 갯수 UX 튜닝
+### P1. 검색(Search) 후속 고도화 🔍 (가성비 최고)
 
-### B. 관리자 기능(Admin) 🧰
+- 키워드 하이라이트(검색 결과 카드에서 q 강조 표시)
+- 입력 디바운스(가격 필터/검색 입력 시 URL 업데이트 빈도 줄이기)
+- 필터 상태 칩 노출(min/max/sort) + 원클릭 제거
+- 검색 결과 `aria-live` 적용(접근성: 결과 갱신 안내)
+
+### P2. 품질/안정성 🧪 (유지보수 레벨 업)
+
+- 스토어 스키마 버전업/마이그레이션 유틸(예: v1 → v2)
+- 방어적 렌더링 강화(깨진 데이터 자동 복구/초기화)
+- E2E 시나리오 체크리스트 문서화
+   - guest → signup → search/product → add cart → checkout → mypage
+
+### P3. 관리자(Admin) 🧰 (기능 확장)
 
 - 상품 등록/수정/삭제(대분류/중분류)
 - 주문 상태 관리(ADMIN 전용)
-- 쿠폰/이벤트 관리(선택)
+- 이벤트/쿠폰 관리(선택)
 
-### C. 주문/배송 고도화 🚚
+### P4. 주문/배송 고도화 🚚 (현실감 강화)
 
-- `statusHistory`를 orderStore에 정식 반영(상태 전환 시 최초 1회 기록)
+- `statusHistory`를 orderStore에 “정식 반영”(최초 1회 기록 규칙)
 - 취소 플로우(결제완료 상태에서 취소 가능) + 타임라인 반영
 - 주문 후 배송지 변경 불가 정책/안내 문구 정리
-
-### D. 품질/안정성 🧪
-
-- 스토어 스키마 마이그레이션 유틸(버전업 대응)
-- 방어적 렌더링 강화(깨진 데이터 복구)
-- E2E 시나리오 체크리스트 문서화(guest → signup → checkout → mypage)

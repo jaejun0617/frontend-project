@@ -5,17 +5,18 @@
  *
  * ✅ 기능
  * - setOwner(ownerKey): 유저별 저장소 스위칭
- * - getAddresses(): 최신순
- * - createAddress(payload)
- * - updateAddress(id, patch)
- * - deleteAddress(id)
- * - setDefault(id): 기본 배송지 1개 강제
+ * - getAddresses(): 기본 배송지 우선 + 최신순
+ * - getDefault(): 기본 배송지 반환(없으면 null)
+ * - createAddress / updateAddress / deleteAddress / setDefault
  * =============================================
  */
 
 const STORAGE_PREFIX = 'reve_addresses_v1:';
 let ownerKey = 'guest';
 
+/* ==============================
+   0) Storage Helpers
+============================== */
 function storageKey() {
    return `${STORAGE_PREFIX}${ownerKey}`;
 }
@@ -41,6 +42,9 @@ function writeState(next) {
    localStorage.setItem(storageKey(), JSON.stringify(next));
 }
 
+/* ==============================
+   1) Store Core
+============================== */
 let state = readState();
 /** @type {Set<(state:any)=>void>} */
 const listeners = new Set();
@@ -50,12 +54,10 @@ function notify() {
    listeners.forEach((fn) => fn(state));
 }
 
-/* ------------------------------
-   Normalizers
------------------------------- */
-
+/* ==============================
+   2) Normalizers
+============================== */
 function normalizePhone(v) {
-   // 숫자/하이픈 허용, 공백 제거
    return String(v ?? '')
       .trim()
       .replace(/\s+/g, '')
@@ -68,15 +70,13 @@ function trimText(v) {
 
 function normalizePayload(payload) {
    const p = payload && typeof payload === 'object' ? payload : null;
-   if (!p) return null;
+   if (!p) return { ok: false, message: 'payload가 올바르지 않습니다.' };
 
    const receiver = trimText(p.receiver);
    const phone = normalizePhone(p.phone);
    const zip = trimText(p.zip);
    const address1 = trimText(p.address1);
    const address2 = trimText(p.address2);
-
-   // label은 optional
    const label = trimText(p.label);
 
    if (!receiver)
@@ -94,13 +94,11 @@ function normalizePayload(payload) {
          zip,
          address1,
          address2: address2 || '',
-         // isDefault는 create/update에서 결정
       },
    };
 }
 
 function ensureSingleDefault(list) {
-   // default가 2개 이상이면 첫 번째만 유지
    let seen = false;
    return list.map((a) => {
       if (!a.isDefault) return a;
@@ -112,23 +110,22 @@ function ensureSingleDefault(list) {
    });
 }
 
-function sortLatest(list) {
-   return [...list].sort(
-      (a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0),
-   );
-}
-
-/* ------------------------------
-   Store API
------------------------------- */
-
+/* ==============================
+   3) Public API
+============================== */
 export const addressStore = {
+   /* ------------------------------
+     owner switching
+  ------------------------------ */
    setOwner(nextOwner) {
       ownerKey = String(nextOwner || 'guest');
       state = readState();
       notify();
    },
 
+   /* ------------------------------
+     subscribe / getters
+  ------------------------------ */
    subscribe(listener) {
       listeners.add(listener);
       listener(state);
@@ -141,7 +138,6 @@ export const addressStore = {
 
    getAddresses() {
       const list = Array.isArray(state.addresses) ? state.addresses : [];
-      // 기본 배송지가 위로 오도록 1차 정렬 + 최신순 2차
       return [...list].sort((a, b) => {
          const ad = a.isDefault ? 1 : 0;
          const bd = b.isDefault ? 1 : 0;
@@ -150,12 +146,20 @@ export const addressStore = {
       });
    },
 
+   getDefault() {
+      const list = this.getAddresses();
+      return list.find((a) => Boolean(a?.isDefault)) ?? null;
+   },
+
    getAddress(id) {
       const key = trimText(id);
       if (!key) return null;
       return state.addresses.find((a) => a.id === key) || null;
    },
 
+   /* ------------------------------
+     commands
+  ------------------------------ */
    createAddress(payload) {
       const norm = normalizePayload(payload);
       if (!norm?.ok) return norm;
@@ -176,7 +180,6 @@ export const addressStore = {
 
       let nextList = [next, ...state.addresses];
 
-      // 기본 배송지 1개 강제
       if (next.isDefault) {
          nextList = nextList.map((a) =>
             a.id === id ? a : { ...a, isDefault: false },
@@ -201,6 +204,7 @@ export const addressStore = {
          ...base,
          ...(patch && typeof patch === 'object' ? patch : {}),
       };
+
       const norm = normalizePayload(merged);
       if (!norm?.ok) return norm;
 
@@ -217,7 +221,6 @@ export const addressStore = {
          };
       });
 
-      // 기본 배송지 1개 강제
       if (wantsDefault) {
          nextList = nextList.map((a) =>
             a.id === key ? a : { ...a, isDefault: false },
@@ -240,7 +243,6 @@ export const addressStore = {
 
       const nextList = state.addresses.filter((a) => a.id !== key);
 
-      // 삭제로 default가 사라졌다면: 남은 것 중 첫 번째를 default로 승격
       if (target.isDefault && nextList.length > 0) {
          nextList[0] = {
             ...nextList[0],
@@ -265,8 +267,7 @@ export const addressStore = {
       const now = Date.now();
       const nextList = state.addresses.map((a) => {
          if (a.id === key) return { ...a, isDefault: true, updatedAt: now };
-         if (a.isDefault)
-            return { ...a, isDefault: false, updatedAt: a.updatedAt };
+         if (a.isDefault) return { ...a, isDefault: false };
          return a;
       });
 

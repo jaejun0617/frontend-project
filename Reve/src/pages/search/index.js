@@ -54,12 +54,10 @@ const SELECTORS = {
    status: '[data-search-status]',
    results: '[data-search-results]',
 
-   // meta chips
    recentList: '[data-page-recent]',
    suggestList: '[data-page-suggest]',
    clearAllBtn: '[data-page-recent-clear]',
 
-   // controls
    controls: '[data-search-controls]',
    minInput: '[data-filter-min]',
    maxInput: '[data-filter-max]',
@@ -68,7 +66,6 @@ const SELECTORS = {
    resetBtn: '[data-filter-reset]',
    summary: '[data-filter-summary]',
 
-   // pager
    pagerSlot: '[data-search-pager-slot]',
    pagerPrev: '[data-page-prev]',
    pagerNext: '[data-page-next]',
@@ -118,7 +115,6 @@ function decodeChipValue(value) {
 
 /* =====================================================================
    2) URL Query <-> State
-   - q + min/max/sort/page
    ===================================================================== */
 
 function getQueryState() {
@@ -133,7 +129,6 @@ function getQueryState() {
 
    const page = clampInt(params.get('page'), { min: 1, max: 9999 }) || 1;
 
-   // ✅ min/max 역전 방지
    const safeMin = min != null ? min : null;
    const safeMax = max != null ? max : null;
    if (safeMin != null && safeMax != null && safeMin > safeMax) {
@@ -146,7 +141,6 @@ function getQueryState() {
 function setQueryState(next) {
    const params = new URLSearchParams(window.location.search);
 
-   // q는 search의 핵심이므로 유지
    const q = String(next?.q ?? params.get('q') ?? '').trim();
    if (!q) params.delete('q');
    else params.set('q', q);
@@ -172,7 +166,6 @@ function setQueryState(next) {
    const qs = params.toString();
    const url = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
 
-   // ✅ 라우터 재마운트 없이 URL만 갱신
    window.history.replaceState({}, '', url);
 }
 
@@ -229,7 +222,6 @@ function applyFilterSort(list, { min, max, sort }) {
          return String(b?.id || '').localeCompare(String(a?.id || ''));
       }
 
-      // NEW(목업에서는 id 기반)
       return String(b?.id || '').localeCompare(String(a?.id || ''));
    });
 
@@ -420,7 +412,6 @@ export const SearchPage = () => {
       </section>
 
       <div class='page__content'>
-        <!-- ✅ 4탄: Search Controls -->
         <div data-search-controls-slot>
           ${renderControls(qs)}
         </div>
@@ -428,7 +419,6 @@ export const SearchPage = () => {
         <div class='search-status' data-search-status></div>
         <div class='product-grid' data-search-results></div>
 
-        <!-- ✅ 4탄: Pager -->
         <div data-search-pager-slot></div>
       </div>
     </section>
@@ -474,14 +464,8 @@ export async function initSearchPage() {
       });
    }
 
-   /* ==============================
-     ✅ in-memory cache
-     ============================== */
    let allProducts = [];
 
-   /* ==============================
-     ✅ Scroll helper
-     ============================== */
    function scrollToTopOfList() {
       const anchor =
          pageRoot.querySelector(SELECTORS.controls) ||
@@ -491,9 +475,6 @@ export async function initSearchPage() {
       anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
    }
 
-   /* ==============================
-     ✅ Controls state reader
-     ============================== */
    function readControlsState() {
       const minEl = pageRoot.querySelector(SELECTORS.minInput);
       const maxEl = pageRoot.querySelector(SELECTORS.maxInput);
@@ -514,9 +495,6 @@ export async function initSearchPage() {
       return { min: min ?? null, max: max ?? null, sort };
    }
 
-   /* ==============================
-     ✅ Core paint (q + filter/sort/page)
-     ============================== */
    function paint({ page } = {}) {
       const qs = getQueryState();
       const controls = readControlsState();
@@ -531,16 +509,10 @@ export async function initSearchPage() {
 
       setQueryState(nextState);
 
-      // 1) 키워드 검색
       const keywordFiltered = filterByKeyword(allProducts, nextState.q);
-
-      // 2) 가격/정렬
       const processed = applyFilterSort(keywordFiltered, nextState);
-
-      // 3) 페이지
       const paged = paginate(processed, nextState.page, PAGE_SIZE);
 
-      // status
       const parts = [];
       if (nextState.min != null)
          parts.push(`₩${formatKRW(nextState.min)} 이상`);
@@ -571,14 +543,12 @@ export async function initSearchPage() {
 
       resultsEl.innerHTML = paged.slice.map(ProductCard).join('');
 
-      // summary line
       const summaryEl = pageRoot.querySelector(SELECTORS.summary);
       if (summaryEl) {
          const filterText = parts.length ? parts.join(' / ') : '필터 없음';
          summaryEl.textContent = `총 ${paged.total}개 · ${filterText} · 정렬: ${sortLabel} · ${paged.page}/${paged.totalPages} 페이지`;
       }
 
-      // pager
       if (pagerSlot) {
          pagerSlot.innerHTML = renderPager({
             page: paged.page,
@@ -591,6 +561,7 @@ export async function initSearchPage() {
                page: paged.page,
                totalPages: paged.totalPages,
             });
+
             numsEl.innerHTML = nums
                .map((n) => {
                   if (n === '…')
@@ -612,14 +583,10 @@ export async function initSearchPage() {
       }
    }
 
-   /* ==============================
-     ✅ Page click events (1회 위임)
-     ============================== */
    if (pageRoot.dataset.bound !== '1') {
       pageRoot.dataset.bound = '1';
 
       pageRoot.addEventListener('click', (e) => {
-         // (1) 최근 전체 삭제
          const clearAll = e.target.closest(SELECTORS.clearAllBtn);
          if (clearAll) {
             clearRecentSearches();
@@ -628,7 +595,6 @@ export async function initSearchPage() {
             return;
          }
 
-         // (2) 최근 개별 삭제
          const removeBtn = e.target.closest(
             "button[data-action='remove'][data-chip]",
          );
@@ -640,7 +606,6 @@ export async function initSearchPage() {
             return;
          }
 
-         // (3) 칩 검색 이동 (q 갱신 + page=1)
          const chipBtn = e.target.closest(
             "button[data-action='search'][data-chip]",
          );
@@ -652,10 +617,8 @@ export async function initSearchPage() {
             addRecentSearch(q);
             window.dispatchEvent(new CustomEvent('recent-search:changed'));
 
-            // ✅ SearchPage 내부이므로 재마운트 없이 URL만 갱신 + paint
             setQueryState({ q, min: null, max: null, sort: 'NEW', page: 1 });
 
-            // controls UI도 초기화해준다(즉시 반영 UX)
             if (controlsSlot)
                controlsSlot.innerHTML = renderControls(getQueryState());
 
@@ -663,7 +626,6 @@ export async function initSearchPage() {
             return;
          }
 
-         // (4) apply/reset
          const applyBtn = e.target.closest(SELECTORS.applyBtn);
          if (applyBtn) {
             paint({ page: 1 });
@@ -684,7 +646,6 @@ export async function initSearchPage() {
             return;
          }
 
-         // (5) pager prev/next/num
          const prevBtn = e.target.closest(SELECTORS.pagerPrev);
          if (prevBtn && !prevBtn.disabled) {
             const qs = getQueryState();
@@ -714,7 +675,6 @@ export async function initSearchPage() {
          }
       });
 
-      // 즉시 반영 UX: sort change / min,max input
       pageRoot.addEventListener('change', (e) => {
          const sortEl = e.target.closest(SELECTORS.sortSelect);
          if (sortEl) paint({ page: 1 });
@@ -726,7 +686,6 @@ export async function initSearchPage() {
          if (minEl || maxEl) paint({ page: 1 });
       });
 
-      // Enter 적용
       pageRoot.addEventListener('keydown', (e) => {
          const isInControls = Boolean(e.target?.closest?.(SELECTORS.controls));
          if (!isInControls) return;
@@ -740,9 +699,6 @@ export async function initSearchPage() {
       });
    }
 
-   /* ==============================
-     ✅ Query 기반 초기 로드
-     ============================== */
    const qs = getQueryState();
 
    if (!qs.q) {
@@ -752,7 +708,6 @@ export async function initSearchPage() {
       return;
    }
 
-   // controls는 항상 최신 query 기반으로 1회 확정 렌더
    if (controlsSlot) controlsSlot.innerHTML = renderControls(qs);
 
    statusEl.innerHTML = `<p class='loading'>"${escapeHtml(qs.q)}" 검색 중...</p>`;
@@ -763,7 +718,6 @@ export async function initSearchPage() {
       const products = await getProducts();
       allProducts = Array.isArray(products) ? products : [];
 
-      // 최초 페인트
       paint({ page: qs.page });
    } catch (err) {
       statusEl.innerHTML =

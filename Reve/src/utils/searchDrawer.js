@@ -2,15 +2,12 @@
  * =============================================
  * 📍 위치: src/utils/searchDrawer.js
  * 역할: 상단 Search Drawer 열기/닫기 + 최근/추천 검색어 UI + 검색 실행
+ * 사용처: app.js에서 initSearchDrawer() 1회 호출
+ * =============================================
  *
  * ✅ UX 정책 (최종)
- * - 검색 실행(Enter/칩 클릭/검색 버튼) 시 드로어는 자동으로 닫힘
+ * - 검색 실행(Enter/칩 클릭/검색 버튼) 시 드로어는 "자동으로 닫힘"
  * - 닫힘 트리거: 검색 실행 / X 버튼 / 바깥 클릭(overlay) / ESC
- *
- * ✅ 외부 제어(페이지에서 닫기)
- * - window 이벤트: 'app:searchDrawerClose'
- *   → app.js가 searchDrawer.close()로 수신 처리
- * =============================================
  */
 
 import {
@@ -78,7 +75,7 @@ function decodeAttr(value) {
 let isBound = false;
 
 /* =====================================================================
-    3) recent search change event
+    3) Recent changed bridge
     ===================================================================== */
 
 function emitRecentChanged() {
@@ -158,7 +155,6 @@ function renderChips(listEl, items, onClick, { removable = false } = {}) {
 
          const value = decodeAttr(removeBtn.getAttribute('data-chip'));
          removeRecentSearch(value);
-
          emitRecentChanged();
          syncLists();
          return;
@@ -205,7 +201,8 @@ function syncLists() {
 }
 
 /* =====================================================================
-    6) Search submit (✅ 검색 실행 시 드로어 자동 닫힘)
+    6) Search submit
+    - ✅ 검색 실행 시 드로어 자동 닫힘
     ===================================================================== */
 
 function submitSearch(keyword) {
@@ -220,7 +217,7 @@ function submitSearch(keyword) {
 
    syncLists();
 
-   // ✅ UX 핵심: 이동 전에 드로어 닫기
+   // ✅ 핵심 UX: 이동 전에 닫기
    setOpen(false);
 
    const url = `/search?q=${encodeURIComponent(q)}`;
@@ -230,7 +227,7 @@ function submitSearch(keyword) {
 }
 
 /* =====================================================================
-    7) Init (events bind once)
+    7) Init
     ===================================================================== */
 
 export function initSearchDrawer() {
@@ -306,5 +303,3 @@ export function initSearchDrawer() {
       isOpen: () => isDrawerOpen(),
    };
 }
-
-// 4:03
