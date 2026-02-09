@@ -153,6 +153,17 @@ const searchDrawer = initSearchDrawer();
 const toast = initToast();
 const authUi = initAuthUi();
 
+/* =====================================================================
+   ✅ SearchDrawer 외부 제어 브릿지
+   - SearchPage 등에서 import 없이도 drawer를 닫을 수 있게
+   - window.dispatchEvent(new CustomEvent('app:searchDrawerClose'))
+   ===================================================================== */
+
+window.addEventListener('app:searchDrawerClose', () => {
+   // 안전하게: 함수 존재할 때만
+   searchDrawer?.close?.();
+});
+
 /* ==============================
    4) UI 상태 갱신 유틸
    ============================== */

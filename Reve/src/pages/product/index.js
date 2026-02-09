@@ -6,7 +6,7 @@
  * - 상품 리스트에서 "담김 상태" 유지(아이콘 빨강 등)
  * - 사이즈 pill 선택 상태를 카드 dataset에 저장 (기본 선택 ❌)
  *
- * ✅ 이번 작업(필터/정렬/페이지네이션)
+ * ✅ 기능(필터/정렬/페이지네이션)
  * - 가격대(min/max) 입력 필터
  * - 정렬(최신/가격↑/가격↓/HOT/베스트)
  * - 페이지네이션(기본 20개/페이지)
@@ -251,7 +251,6 @@ function renderControls(state) {
           </select>
         </div>
 
-        <!-- ✅ 버튼은 남겨두되, UX는 "즉시 반영"이 기본 -->
         <div class="product-toolbar__actions">
           <button type="button" class="btn subtle" data-filter-apply>적용</button>
           <button type="button" class="btn subtle" data-filter-reset>초기화</button>
@@ -346,9 +345,8 @@ export async function initProductPage() {
    const pagerSlot = root.querySelector(SELECTORS.pagerSlot);
 
    /* ==============================
-      ✅ Page change UX: 자동 스크롤
-      - 페이지네이션 이동 시 상단으로 올려서 다음 상품이 바로 보이게
-      ============================== */
+     ✅ Page change UX: 자동 스크롤
+     ============================== */
    function scrollToTopOfList() {
       const anchor =
          root.querySelector(SELECTORS.controls) ||
@@ -359,8 +357,8 @@ export async function initProductPage() {
    }
 
    /* ==============================
-      ✅ Cart UI Sync
-      ============================== */
+     ✅ Cart UI Sync
+     ============================== */
    const syncCartUi = () => {
       const cards = gridEl.querySelectorAll('[data-product-id]');
       cards.forEach((card) => {
@@ -374,8 +372,8 @@ export async function initProductPage() {
    };
 
    /* ==============================
-      ⚠️ 절대 수정 금지: bindSizePills()
-      ============================== */
+     ⚠️ 절대 수정 금지: bindSizePills()
+     ============================== */
    const bindSizePills = () => {
       gridEl.addEventListener('click', (e) => {
          const pill = e.target.closest('[data-size-pill]');
@@ -412,17 +410,16 @@ export async function initProductPage() {
       });
    };
 
-   // ✅ 이벤트 위임(1회)
    bindSizePills();
 
    /* ==============================
-      ✅ In-memory products cache
-      ============================== */
+     ✅ In-memory products cache
+     ============================== */
    let allProducts = [];
 
    /* ==============================
-      ✅ Controls state reader
-      ============================== */
+     ✅ Controls state reader
+     ============================== */
    function readControlsState() {
       const minEl = root.querySelector(SELECTORS.minInput);
       const maxEl = root.querySelector(SELECTORS.maxInput);
@@ -445,8 +442,8 @@ export async function initProductPage() {
    }
 
    /* ==============================
-      ✅ Core paint (filter/sort/page -> render)
-      ============================== */
+     ✅ Core paint (filter/sort/page -> render)
+     ============================== */
    function paint({ page } = {}) {
       const qs = getQueryState();
       const controls = readControlsState();
@@ -467,14 +464,14 @@ export async function initProductPage() {
       // ✅ 페이징
       const paged = paginate(processed, nextState.page, PAGE_SIZE);
 
-      // ✅ 그리드 렌더 (초기 진입 포함: 무조건 여기서 렌더됨)
+      // ✅ 그리드 렌더
       if (!paged.slice.length) {
          gridEl.innerHTML = `
-           <div class="empty">
-             <p class="empty__title">조건에 맞는 상품이 없습니다.</p>
-             <p class="empty__desc">가격 범위를 조정하거나 초기화해 보세요.</p>
-           </div>
-         `;
+        <div class="empty">
+          <p class="empty__title">조건에 맞는 상품이 없습니다.</p>
+          <p class="empty__desc">가격 범위를 조정하거나 초기화해 보세요.</p>
+        </div>
+      `;
       } else {
          gridEl.innerHTML = paged.slice.map(ProductCard).join('');
       }
@@ -516,19 +513,20 @@ export async function initProductPage() {
 
             numsEl.innerHTML = nums
                .map((n) => {
-                  if (n === '…')
+                  if (n === '…') {
                      return `<span class="pager-ellipsis" aria-hidden="true">…</span>`;
+                  }
                   const active = Number(n) === paged.page;
                   return `
-                    <button
-                      type="button"
-                      class="pager-num ${active ? 'is-active' : ''}"
-                      data-page-num="${n}"
-                      aria-current="${active ? 'page' : 'false'}"
-                    >
-                      ${n}
-                    </button>
-                  `;
+              <button
+                type="button"
+                class="pager-num ${active ? 'is-active' : ''}"
+                data-page-num="${n}"
+                aria-current="${active ? 'page' : 'false'}"
+              >
+                ${n}
+              </button>
+            `;
                })
                .join('');
          }
@@ -536,11 +534,9 @@ export async function initProductPage() {
    }
 
    /* ==============================
-      ✅ Events
-      - "선택/입력 즉시 반영"이 기본
-      ============================== */
+     ✅ Events
+     ============================== */
 
-   // (1) click 위임: reset / pager / (옵션) apply
    root.addEventListener('click', (e) => {
       const applyBtn = e.target.closest(SELECTORS.applyBtn);
       if (applyBtn) {
@@ -592,23 +588,17 @@ export async function initProductPage() {
       }
    });
 
-   // (2) change/input: 즉시 반영
    root.addEventListener('change', (e) => {
       const sortEl = e.target.closest(SELECTORS.sortSelect);
-      if (sortEl) {
-         paint({ page: 1 });
-      }
+      if (sortEl) paint({ page: 1 });
    });
 
    root.addEventListener('input', (e) => {
       const minEl = e.target.closest(SELECTORS.minInput);
       const maxEl = e.target.closest(SELECTORS.maxInput);
-      if (minEl || maxEl) {
-         paint({ page: 1 });
-      }
+      if (minEl || maxEl) paint({ page: 1 });
    });
 
-   // (3) Enter로도 적용되게 (input에서 Enter 누르면)
    root.addEventListener('keydown', (e) => {
       const isInControls = Boolean(e.target?.closest?.(SELECTORS.controls));
       if (!isInControls) return;
@@ -622,32 +612,34 @@ export async function initProductPage() {
    });
 
    /* ==============================
-      ✅ Data load + initial paint
-      ============================== */
+     ✅ Data load + initial paint
+     ============================== */
    try {
       const products = await getProducts();
       allProducts = Array.isArray(products) ? products : [];
 
-      // ✅ controls 렌더 타이밍 안정화(1회 확정 렌더)
+      // ✅ controls 렌더 안정화(1회 확정 렌더)
       if (controlsSlot)
          controlsSlot.innerHTML = renderControls(getQueryState());
 
-      // ✅ 최초 페인트: "적용" 없어도 기본 20개가 보여야 함
+      // ✅ 최초 페인트
       paint({ page: getQueryState().page });
    } catch (err) {
       gridEl.innerHTML = `
-        <p class='error'>상품을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.</p>
-      `;
+      <p class='error'>상품을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.</p>
+    `;
       console.error('[product] load failed:', err);
       return;
    }
 
    /* ==============================
-      ✅ cartStore subscribe (담김 상태 자동 동기화)
-      ============================== */
+     ✅ cartStore subscribe
+     ============================== */
    cartStore.subscribe(() => {
       const stillHere = document.querySelector(SELECTORS.grid);
       if (!stillHere) return;
       syncCartUi();
    });
 }
+
+// 4:03

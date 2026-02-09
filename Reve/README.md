@@ -49,7 +49,7 @@
 - `src/pages/auth/index.js`  
   로그인/회원가입 + redirectTo 지원
 - `src/pages/product/index.js`  
-  상품 리스트(그리드)
+  상품 리스트(그리드) + 필터/정렬/페이지네이션
 - `src/pages/productDetail/index.js`  
   상품 상세(옵션, 장바구니, 바로구매)
 - `src/pages/cart/index.js`  
@@ -197,11 +197,64 @@
 
 ## 6) 상품 리스트(ProductCard) UX
 
+### 카드 UX (ProductCard)
+
 - 컬러 제거, 사이즈만 지원
 - 사이즈 기본 선택 없음(실수 방지)
-- 장바구니는 아이콘 버튼
+- 장바구니는 아이콘 버튼(하단 floating)
 - 담김 상태 `.is-added` 유지
 - 담긴 사이즈 pill `is-in-cart` 표시 가능 구조
+
+### 상품 리스트 UX (Product Page) ✅ 필터/정렬/페이지네이션
+
+#### 목표
+
+- **초기 진입 시** 아무 것도 누르지 않아도 **기본 20개가 바로 렌더**
+- 가격대/정렬은 **선택 즉시 반영**
+- 페이지 이동 시 **URL 동기화 + 자동 스크롤**로 이동 피로 제거
+
+#### 구성 파일
+
+- `src/pages/product/index.js`
+   - 필터/정렬/페이지네이션 + URL query 동기화
+   - 렌더와 이벤트 위임을 한 곳에서 관리
+- `src/components/ProductCard.js`
+   - 카드 UI/사이즈 pill 제공(리스트/상세 UI 일관성)
+- `src/store/cartStore.js`
+   - 담김 상태 동기화(`hasLine`)로 리스트 UI 반영
+
+#### 제공 기능
+
+- 가격 필터: `min/max`
+   - 입력 즉시 반영 (입력 시 `page=1`로 리셋)
+- 정렬:
+   - `NEW` 최신순(목업에서는 id 내 숫자 기반)
+   - `PRICE_DESC` 가격 높은순
+   - `PRICE_ASC` 가격 낮은순
+   - `HOT` / `BEST` 우선 노출(동률은 최신 우선)
+- 페이지네이션:
+   - 기본 `20개/페이지`
+   - 이전/다음/페이지 번호 제공
+- URL 쿼리 동기화:
+   - `/product?min=&max=&sort=&page=`
+   - 새로고침/링크 공유/뒤로가기 시 상태 복원 가능
+
+#### UX 디테일
+
+- 필터/정렬 변경 시:
+   - **즉시 반영**
+   - `page=1`로 자동 리셋
+- 페이지 이동 시:
+   - 리스트 상단(필터 영역)으로 **자동 스크롤**
+   - 다음 20개가 바로 보이도록 처리
+- 요약 문구:
+   - `총 N개 · 조건 · page/totalPages` 형태로 현재 상태 안내
+
+#### 절대 규칙(안전장치)
+
+- `bindSizePills()` 로직은 **수정 금지**
+   - ProductCard의 사이즈 선택/활성화 CSS 동작을 깨뜨릴 수 있음
+   - 필터/정렬/페이지네이션 추가는 **bindSizePills 외부**에서만 처리
 
 ---
 
