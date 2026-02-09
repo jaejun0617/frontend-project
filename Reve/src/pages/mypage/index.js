@@ -679,8 +679,9 @@ function renderShippingSnapshot(order) {
   `;
 }
 
-function renderTimeline(status) {
-   const s = normalizeOrderStatus(status);
+function renderTimeline(order) {
+   const s = normalizeOrderStatus(order?.status);
+   const h = order?.statusHistory || {};
 
    const steps = [
       { key: 'PAID', label: '결제완료' },
@@ -691,27 +692,35 @@ function renderTimeline(status) {
    const idx = steps.findIndex((x) => x.key === s);
    const activeIndex = idx >= 0 ? idx : 0;
 
-   // 취소는 타임라인을 멈춘 상태로 표시
    const isCanceled = s === 'CANCELED';
+   const canceledAt = h?.CANCELED ? formatDateTime(h.CANCELED) : '-';
+
+   const renderTime = (ms) => (ms ? formatDateTime(ms) : '-');
 
    return `
-    <div class="timeline ${isCanceled ? 'is-canceled' : ''}" aria-label="Delivery Timeline">
-      ${steps
-         .map((step, i) => {
-            const done = !isCanceled && i < activeIndex;
-            const on = !isCanceled && i === activeIndex;
+     <div class="timeline ${isCanceled ? 'is-canceled' : ''}" aria-label="Delivery Timeline">
+       ${steps
+          .map((step, i) => {
+             const done = !isCanceled && i < activeIndex;
+             const on = !isCanceled && i === activeIndex;
+             const ts = h?.[step.key];
 
-            return `
-              <div class="timeline__step ${done ? 'is-done' : ''} ${on ? 'is-active' : ''}">
-                <span class="timeline__dot" aria-hidden="true"></span>
-                <span class="timeline__label">${escapeHtml(step.label)}</span>
-              </div>
-            `;
-         })
-         .join('')}
-      ${isCanceled ? `<p class="timeline__canceled pill">취소됨</p>` : ''}
-    </div>
-  `;
+             return `
+             <div class="timeline__step ${done ? 'is-done' : ''} ${on ? 'is-active' : ''}">
+               <span class="timeline__dot" aria-hidden="true"></span>
+               <span class="timeline__label">${escapeHtml(step.label)}</span>
+               <span class="timeline__time muted">${escapeHtml(renderTime(ts))}</span>
+             </div>
+           `;
+          })
+          .join('')}
+       ${
+          isCanceled
+             ? `<p class="timeline__canceled pill">취소됨 · ${escapeHtml(canceledAt)}</p>`
+             : ''
+       }
+     </div>
+   `;
 }
 
 function filterOrdersByStatus(orders, filterKey) {
