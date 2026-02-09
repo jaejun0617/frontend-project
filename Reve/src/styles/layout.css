@@ -1,19 +1,12 @@
 .main {
    min-height: 100svh;
    padding-top: 7vh;
-   /* border: 1px solid red; */
 }
 
 .page {
    padding-top: 7vh;
    width: 100%;
    max-width: 1440px;
-   height: 100svh;
-   margin: 0 auto;
-   background-color: papayawhip;
-   /* border: 1px solid red; */
-}
-
-.product-page {
    height: auto;
+   margin: 0 auto;
 }

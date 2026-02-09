@@ -135,8 +135,18 @@
    display: none;
 }
 
-/* 푸터(참고) */
+/* .site-footer {
+   position: fixed;
+   left: 0;
+   right: 0;
+   bottom: 0;
+   border-top: 1px solid #c8c8c8;
+   background: #fff;
+   z-index: 1000;
+   height: 6vh;
+} */
+
 .site-footer {
-   height: 6svh;
+   margin-top: auto;
    border-top: 1px solid #c8c8c8;
 }

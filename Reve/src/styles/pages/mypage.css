@@ -1069,3 +1069,225 @@
    gap: 8px;
    justify-content: flex-end;
 }
+
+/* =============================================
+ * 10) MyPage Delivery (주문/배송 탭)
+ * - filter chips + delivery cards + timeline
+ * ============================================= */
+
+.mypage .delivery {
+   display: grid;
+   gap: 12px;
+}
+
+/* filter chips */
+.mypage .delivery__toolbar {
+   display: flex;
+   gap: 8px;
+   flex-wrap: wrap;
+}
+
+.mypage .chip {
+   height: 36px;
+   padding: 0 12px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+   background: rgba(255, 255, 255, 0.9);
+   cursor: pointer;
+   font-size: 12px;
+   font-weight: 900;
+   transition:
+      transform 120ms ease,
+      background 120ms ease,
+      border-color 120ms ease;
+}
+
+.mypage .chip:hover {
+   transform: translateY(-1px);
+   border-color: rgba(0, 0, 0, 0.18);
+   background: rgba(255, 255, 255, 1);
+}
+
+.mypage .chip.is-active {
+   background: rgba(0, 0, 0, 0.06);
+   border-color: rgba(0, 0, 0, 0.22);
+}
+
+.mypage .delivery__list {
+   display: block;
+}
+
+/* cards list */
+.mypage .delivery-cards {
+   list-style: none;
+   padding: 0;
+   margin: 0;
+   display: grid;
+   gap: 12px;
+}
+
+.mypage .delivery-card {
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   border-radius: 16px;
+   padding: 14px;
+   background: rgba(255, 255, 255, 0.95);
+   display: grid;
+   gap: 12px;
+}
+
+.mypage .delivery-card__top {
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: 12px;
+}
+
+.mypage .delivery-card__id {
+   margin: 0;
+   font-size: 13px;
+}
+
+.mypage .delivery-card__sum {
+   text-align: right;
+   display: grid;
+   gap: 4px;
+}
+
+.mypage .delivery-card__mid {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   flex-wrap: wrap;
+}
+
+.mypage .delivery-card__track {
+   display: inline-flex;
+   align-items: center;
+   gap: 10px;
+   padding: 10px 12px;
+   border-radius: 14px;
+   background: rgba(0, 0, 0, 0.02);
+   border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.mypage .delivery-card__actions {
+   display: flex;
+   gap: 10px;
+   flex-wrap: wrap;
+}
+
+/* shipping snapshot */
+.mypage .ship {
+   padding: 12px;
+   border-radius: 14px;
+   background: rgba(0, 0, 0, 0.02);
+   border: 1px solid rgba(0, 0, 0, 0.06);
+   display: grid;
+   gap: 6px;
+}
+
+.mypage .ship__to {
+   margin: 0;
+   font-size: 13px;
+   font-weight: 900;
+}
+
+.mypage .ship__addr {
+   margin: 0;
+   font-size: 13px;
+   opacity: 0.75;
+   line-height: 1.45;
+}
+
+/* timeline */
+.mypage .timeline {
+   display: grid;
+   grid-template-columns: repeat(3, minmax(0, 1fr));
+   gap: 10px;
+}
+
+.mypage .timeline__step {
+   display: flex;
+   align-items: center;
+   gap: 10px;
+   padding: 10px 12px;
+   border-radius: 14px;
+   background: rgba(0, 0, 0, 0.02);
+   border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.mypage .timeline__dot {
+   width: 10px;
+   height: 10px;
+   border-radius: 999px;
+   border: 2px solid rgba(0, 0, 0, 0.25);
+   background: rgba(255, 255, 255, 0.95);
+   flex: 0 0 auto;
+}
+
+.mypage .timeline__label {
+   font-size: 12px;
+   font-weight: 900;
+   opacity: 0.75;
+}
+
+/* done / active states */
+.mypage .timeline__step.is-done .timeline__dot {
+   background: rgba(0, 0, 0, 0.55);
+   border-color: rgba(0, 0, 0, 0.55);
+}
+
+.mypage .timeline__step.is-done .timeline__label {
+   opacity: 0.9;
+}
+
+.mypage .timeline__step.is-active {
+   background: rgba(0, 0, 0, 0.05);
+   border-color: rgba(0, 0, 0, 0.14);
+}
+
+.mypage .timeline__step.is-active .timeline__dot {
+   background: rgba(0, 0, 0, 0.85);
+   border-color: rgba(0, 0, 0, 0.85);
+}
+
+.mypage .timeline__step.is-active .timeline__label {
+   opacity: 1;
+}
+
+/* canceled */
+.mypage .timeline.is-canceled {
+   grid-template-columns: 1fr;
+}
+
+.mypage .timeline.is-canceled .timeline__step {
+   opacity: 0.6;
+}
+
+.mypage .timeline__canceled {
+   justify-self: start;
+   margin: 0;
+   padding: 6px 10px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.14);
+   background: rgba(0, 0, 0, 0.04);
+   font-size: 12px;
+   font-weight: 900;
+}
+
+/* mobile tweaks */
+@media (max-width: 520px) {
+   .mypage .timeline {
+      grid-template-columns: 1fr;
+   }
+
+   .mypage .delivery-card__top {
+      flex-direction: column;
+      align-items: stretch;
+   }
+
+   .mypage .delivery-card__sum {
+      text-align: left;
+   }
+}
