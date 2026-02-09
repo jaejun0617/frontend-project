@@ -69,7 +69,7 @@ export function initRouter({ mount, layout, routes }) {
 
       // 4) 패널 닫기
       document.body.classList.remove('is-sidebar-open');
-      document.body.classList.remove('is-search-open');
+      // document.body.classList.remove('is-search-open');
    }
 
    function navigate(href) {

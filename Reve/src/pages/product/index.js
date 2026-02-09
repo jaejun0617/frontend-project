@@ -1,19 +1,10 @@
 /**
  * =============================================
- * 위치: src/pages/product/index.js
+ * 📍 위치: src/pages/product/index.js
  * 역할: 상품(Product) 리스트 페이지
- *
- * 핵심 책임
- * 1) 상품 목록을 로드하여 ProductCard로 렌더링한다.
- * 2) 상품 리스트에서 “담김 상태” UI를 cartStore 기준으로 동기화한다.
- *    - 카드에 .is-in-cart 클래스 및 data-in-cart 플래그를 반영한다.
- * 3) 사이즈 pill 선택 상태를 “카드 dataset”에 저장한다.
- *    - 기본 선택은 없다.
- *    - 동일 사이즈 재클릭 시 선택 해제(토글)한다.
- *
- * 설계 원칙
- * - 이벤트는 위임 방식으로 1회만 바인딩한다(라우팅 재진입 중복 방지).
- * - 구독은 MVP 수준에서 유지하되, DOM이 사라진 경우 안전하게 무시한다.
+ * - ProductCard 렌더링
+ * - 상품 리스트에서 "담김 상태" 유지(아이콘 빨강 등)
+ * - 사이즈 pill 선택 상태를 카드 dataset에 저장 (기본 선택 ❌)
  * =============================================
  */
 
@@ -26,12 +17,12 @@ export const ProductPage = () => {
     <section class='page product-page' aria-label='Product Page' data-product-page>
       <header class='page__header'>
         <h1 class='page__title'>상품</h1>
-        <p class='page__desc'>목업 데이터 기반 상품 리스트(MVP)입니다.</p>
+        <p class='page__desc'>목업 데이터 기반 상품 리스트 (MVP)</p>
       </header>
 
       <div class='page__content'>
         <div class='product-grid' data-product-grid>
-          <p class='loading'>불러오는 중입니다...</p>
+          <p class='loading'>불러오는 중...</p>
         </div>
       </div>
     </section>
@@ -43,51 +34,43 @@ export async function initProductPage() {
    const gridEl = document.querySelector('[data-product-grid]');
    if (!root || !gridEl) return;
 
-   /**
-    * 라우팅 재진입 시 중복 바인딩을 방지한다.
-    * - 동일 페이지 DOM이 재사용될 수 있는 환경에서 특히 중요하다.
-    */
+   // ✅ 라우팅 재진입 시 이벤트/구독 중복 방지
    if (root.dataset.bound === '1') return;
    root.dataset.bound = '1';
 
    /**
-    * 카드 UI를 “현재 cartStore 상태”에 맞춰 동기화한다.
-    * - 해당 상품이 장바구니에 1개라도 담겨 있으면:
-    *   - card.classList에 is-in-cart를 부여한다.
-    *   - card.dataset.inCart를 '1'로 설정한다.
-    *
-    * 전제
-    * - ProductCard가 카드 루트에 data-product-id를 설정한다.
+    * ✅ 카드 UI를 "현재 cartStore 상태"에 맞춰 동기화
+    * - 담긴 상품이면: card에 is-in-cart 클래스/데이터 부여
+    * - 나중에 CSS에서 아이콘 배경 빨강 처리하기 쉬움
     */
    const syncCartUi = () => {
       const cards = gridEl.querySelectorAll('[data-product-id]');
-
       cards.forEach((card) => {
          const productId = card.getAttribute('data-product-id');
          if (!productId) return;
 
+         // 이 상품이 장바구니에 1개라도 담겼는지
          const inCart = cartStore.hasLine(productId);
 
          card.classList.toggle('is-in-cart', inCart);
          card.dataset.inCart = inCart ? '1' : '0';
 
-         // 확장 포인트:
+         // (선택) 담김 수량/라인 수 표시하고 싶으면 여기서 가능
          // const lines = cartStore.getItemsByProductId(productId);
          // card.dataset.inCartLines = String(lines.length);
       });
    };
 
    /**
-    * 사이즈 pill 선택 UX를 구성한다.
+    * ✅ 사이즈 pill UI 상태 처리
+    * - ProductCard에서 아래 훅을 제공한다고 가정:
+    *   - card: data-product-id + data-selected-size(초기값은 빈 문자열 권장)
+    *   - pill: [data-size-pill] + data-size="S|M|..."
     *
-    * 전제(마크업 계약)
-    * - 카드 루트: [data-product-id] + data-selected-size=""(초기 빈 값 권장)
-    * - pill 요소: [data-size-pill] + data-size="S|M|..."
-    *
-    * 동작
-    * - pill 클릭 시 선택값을 card의 data-selected-size로 저장한다.
-    * - 동일 값 재클릭 시 선택 해제한다.
-    * - 같은 카드 내 pill UI(is-active, aria-*)를 즉시 동기화한다.
+    * - 클릭하면:
+    *   - 같은 카드 내 pill만 토글
+    *   - 선택값을 card.dataset.selectedSize에 저장
+    *   - 다시 클릭하면 선택 해제도 가능(사용자 실수 방지)
     */
    const bindSizePills = () => {
       gridEl.addEventListener('click', (e) => {
@@ -102,19 +85,20 @@ export async function initProductPage() {
 
          const prev = String(card.getAttribute('data-selected-size') || '');
 
-         // 동일 사이즈 재클릭은 선택 해제한다.
+         // 같은 사이즈를 다시 누르면 해제(토글)
          const next = prev === picked ? '' : picked;
 
+         // 카드 dataset 업데이트
          card.setAttribute('data-selected-size', next);
 
-         // 같은 카드 내부 pill 상태를 일괄 갱신한다.
+         // 같은 카드 안의 pill 상태 갱신
          card.querySelectorAll('[data-size-pill]').forEach((el) => {
             const v = String(el.getAttribute('data-size') || '').trim();
-            const active = Boolean(next) && v === next;
+            const active = next && v === next;
 
             el.classList.toggle('is-active', active);
 
-            // 요소 타입에 따라 접근성 속성을 구분한다.
+            // 접근성: 버튼이면 aria-pressed, 그 외는 aria-selected
             if (el.tagName === 'BUTTON') {
                el.setAttribute('aria-pressed', active ? 'true' : 'false');
             } else {
@@ -124,37 +108,36 @@ export async function initProductPage() {
       });
    };
 
-   // 이벤트 위임은 1회 바인딩한다.
+   // ✅ 이벤트 위임(1회)
    bindSizePills();
 
    try {
       const products = await getProducts();
 
-      /**
-       * ProductCard가 기본 선택 없이 렌더링되도록 유지한다.
-       * - 각 카드의 data-selected-size는 초기값 ''이 바람직하다.
-       */
+      // ✅ ProductCard는 "기본 사이즈 선택 없음"이 목표라면:
+      // ProductCard 내부에서 data-selected-size=""로 렌더링하는 게 가장 깔끔함.
       gridEl.innerHTML = products.map(ProductCard).join('');
 
-      // 최초 렌더 직후: 장바구니 담김 상태를 반영한다.
+      // ✅ 최초 1회: 장바구니 상태 반영
       syncCartUi();
    } catch (err) {
       gridEl.innerHTML = `
-        <p class='error'>상품을 불러오지 못했습니다. 새로고침 후 다시 시도해 주시기 바랍니다.</p>
+        <p class='error'>상품을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.</p>
       `;
       console.error('[product] load failed:', err);
       return;
    }
 
    /**
-    * cartStore 변화(담기/삭제/옵션 변경/owner 스위칭 등)에 맞춰
-    * 리스트의 담김 상태 UI를 자동으로 갱신한다.
+    * ✅ cartStore가 바뀔 때마다(담기/삭제/옵션변경/로그인 스위칭)
+    * 상품 리스트의 “담김 상태”도 자동으로 업데이트
     *
-    * 주의
-    * - 라우팅으로 페이지가 바뀌어 DOM이 사라진 경우를 대비해,
-    *   존재 여부를 확인한 뒤 동기화를 수행한다.
+    * ⚠️ 여기서 unsubscribe를 저장해두고 싶다면,
+    * 라우터에 페이지 unmount 훅이 있을 때 해제하는 구조로 확장 가능.
+    * (지금은 sync 함수가 DOM 없으면 자연스럽게 영향이 적어서 MVP로 OK)
     */
    cartStore.subscribe(() => {
+      // grid가 이미 다른 페이지로 바뀌었으면 안전하게 스킵
       const stillHere = document.querySelector('[data-product-grid]');
       if (!stillHere) return;
       syncCartUi();

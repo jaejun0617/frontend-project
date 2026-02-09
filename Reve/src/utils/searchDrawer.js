@@ -49,6 +49,36 @@ const DEFAULT_SUGGESTIONS = [
 ];
 
 /* ==============================
+   0-1) 안전 유틸(escape / encode)
+   - 칩 텍스트는 DOM에 그대로 들어가므로 XSS 방지
+   - data-attribute에는 encodeURIComponent로 안전하게 저장
+   ============================== */
+
+function escapeHtml(value) {
+   return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+}
+
+function encodeAttr(value) {
+   // data-* 속성에 넣을 안전한 값
+   return encodeURIComponent(String(value ?? ''));
+}
+
+function decodeAttr(value) {
+   try {
+      return decodeURIComponent(String(value ?? ''));
+   } catch {
+      return String(value ?? '');
+   }
+}
+
+let isBound = false;
+
+/* ==============================
    1) 최근 검색어 저장소(searchHistory)
    ============================== */
 
@@ -114,14 +144,17 @@ function renderChips(listEl, items, onClick, options = {}) {
 
    listEl.innerHTML = items
       .map((text) => {
+         const label = escapeHtml(text);
+         const chipValue = encodeAttr(text);
+
          const removeBtn = removable
-            ? `<button type='button' class='chip-remove' data-action='remove' data-chip='${text}' aria-label='최근 검색어 삭제'>×</button>`
+            ? `<button type='button' class='chip-remove' data-action='remove' data-chip='${chipValue}' aria-label='최근 검색어 삭제'>×</button>`
             : '';
 
          return `
       <li>
         <div class='chip-row'>
-          <button type='button' class='chip-btn' data-chip='${text}'>${text}</button>
+          <button type='button' class='chip-btn' data-chip='${chipValue}'>${label}</button>
           ${removeBtn}
         </div>
       </li>
@@ -138,7 +171,7 @@ function renderChips(listEl, items, onClick, options = {}) {
          e.preventDefault();
          e.stopPropagation();
 
-         const value = removeBtn.getAttribute('data-chip');
+         const value = decodeAttr(removeBtn.getAttribute('data-chip'));
          removeRecentSearch(value);
          emitRecentChanged();
          syncLists();
@@ -154,7 +187,7 @@ function renderChips(listEl, items, onClick, options = {}) {
       e.preventDefault();
       e.stopPropagation();
 
-      const value = btn.getAttribute('data-chip');
+      const value = decodeAttr(btn.getAttribute('data-chip'));
       onClick(value);
    };
 }
@@ -171,8 +204,9 @@ function submitSearch(keyword) {
    syncLists();
 
    const url = `/search?q=${encodeURIComponent(q)}`;
-   window.history.pushState({}, '', url);
-   window.dispatchEvent(new PopStateEvent('popstate'));
+   window.dispatchEvent(
+      new CustomEvent('app:navigate', { detail: { href: url } }),
+   );
 }
 
 function syncLists() {
@@ -207,6 +241,19 @@ function syncLists() {
    ============================== */
 
 export function initSearchDrawer() {
+   if (isBound) {
+      // 라우팅으로 DOM이 교체되었을 수 있으니, 최신 리스트만 동기화
+      syncLists();
+      return {
+         open: () => setOpen(true),
+         close: () => setOpen(false),
+         toggle: () =>
+            setOpen(!document.body.classList.contains('is-search-open')),
+         refresh: () => syncLists(),
+      };
+   }
+   isBound = true;
+
    syncLists();
 
    document.addEventListener('click', (e) => {

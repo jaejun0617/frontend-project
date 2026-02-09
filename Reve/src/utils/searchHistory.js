@@ -3,26 +3,24 @@
  * 📍 위치: src/utils/searchHistory.js
  * 역할: 최근 검색어 저장소(localStorage) 단일 모듈
  *
- * ✅ 이 파일만의 책임
- * - 최근 검색어 CRUD
- * - 데이터 정규화(trim/중복 제거/최대 개수 제한)
+ * ✅ 책임
+ * - 최근 검색어 CRUD (추가/삭제/전체삭제)
+ * - 데이터 정규화(trim) + 중복 제거 + 최대 개수 제한
+ * - (하위호환) 구 키에서 신 키로 마이그레이션
  *
  * ✅ 사용처
- * - src/utils/searchDrawer.js (드로어 칩 렌더)
- * - src/pages/search/index.js (페이지 내 최근 검색어 UI)
- *
- * ⚠️ 왜 분리했나?
- * - 페이지 이동(라우팅)으로 DOM이 갈아끼워져도
- *   데이터는 여기(localStorage)에서 일관되게 가져오기 위함
+ * - src/utils/searchDrawer.js
+ * - src/pages/search/index.js
  * =============================================
  */
 
-const STORAGE_KEY = 'eclat_recent_searches';
+const STORAGE_KEY = 'reve_recent_searches_v1';
+const LEGACY_STORAGE_KEY = 'eclat_recent_searches'; // ✅ 과거 키 하위호환
 const MAX_ITEMS = 20;
 
-/* ==============================
-   0) 공통 유틸
-   ============================== */
+/* =============================================
+ * 0) Utils
+ * ============================================= */
 
 function safeParse(json) {
    try {
@@ -37,48 +35,69 @@ function normalize(keyword) {
 }
 
 function uniquePreserveOrder(items) {
-   // Set은 삽입 순서를 유지하므로 중복 제거에 적합
-   return Array.from(new Set(items));
+   const seen = new Set();
+   const out = [];
+   for (const v of items) {
+      if (seen.has(v)) continue;
+      seen.add(v);
+      out.push(v);
+   }
+   return out;
 }
 
-/* ==============================
-   1) Read
-   ============================== */
+/**
+ * ✅ 마이그레이션(1회)
+ * - 새 키가 비어있고, 구 키가 존재하면 새 키로 옮긴다.
+ */
+function migrateIfNeeded() {
+   const hasNew = localStorage.getItem(STORAGE_KEY);
+   if (hasNew) return;
+
+   const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+   if (!legacyRaw) return;
+
+   const parsed = safeParse(legacyRaw);
+   const items = Array.isArray(parsed) ? parsed : [];
+   const cleaned = items.map((v) => normalize(v)).filter(Boolean);
+
+   const unique = uniquePreserveOrder(cleaned).slice(0, MAX_ITEMS);
+   localStorage.setItem(STORAGE_KEY, JSON.stringify(unique));
+   localStorage.removeItem(LEGACY_STORAGE_KEY);
+}
+
+/* =============================================
+ * 1) Read
+ * ============================================= */
 
 /**
  * 최근 검색어 목록 가져오기
  * @returns {string[]}
  */
 export function getRecentSearches() {
+   migrateIfNeeded();
+
    const raw = localStorage.getItem(STORAGE_KEY);
    const parsed = raw ? safeParse(raw) : [];
 
-   // 형태 방어: 배열이 아니면 빈 배열
    const items = Array.isArray(parsed) ? parsed : [];
-
-   // 문자열로만 정리 + 공백 제거
    const cleaned = items.map((v) => normalize(v)).filter(Boolean);
 
    return cleaned.slice(0, MAX_ITEMS);
 }
 
-/* ==============================
-   2) Write helpers
-   ============================== */
+/* =============================================
+ * 2) Write (internal)
+ * ============================================= */
 
 function setRecentSearches(items) {
    const cleaned = items.map((v) => normalize(v)).filter(Boolean);
-
-   const unique = uniquePreserveOrder(cleaned);
-   localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(unique.slice(0, MAX_ITEMS)),
-   );
+   const unique = uniquePreserveOrder(cleaned).slice(0, MAX_ITEMS);
+   localStorage.setItem(STORAGE_KEY, JSON.stringify(unique));
 }
 
-/* ==============================
-   3) Create/Update
-   ============================== */
+/* =============================================
+ * 3) Create/Update
+ * ============================================= */
 
 /**
  * 최근 검색어 추가
@@ -94,9 +113,9 @@ export function addRecentSearch(keyword) {
    setRecentSearches(next);
 }
 
-/* ==============================
-   4) Delete
-   ============================== */
+/* =============================================
+ * 4) Delete
+ * ============================================= */
 
 /**
  * 최근 검색어 개별 삭제
@@ -118,9 +137,9 @@ export function clearRecentSearches() {
    localStorage.removeItem(STORAGE_KEY);
 }
 
-/* ==============================
-   5) 메타 정보(선택)
-   ============================== */
+/* =============================================
+ * 5) Meta
+ * ============================================= */
 
 export const RECENT_SEARCH_MAX = MAX_ITEMS;
 export const RECENT_SEARCH_STORAGE_KEY = STORAGE_KEY;
