@@ -4,6 +4,13 @@
  * 역할: Admin Product Store (Single Source of Truth)
  * - 데이터 소스: src/api/products.js (LocalStorage 기반)
  * - Admin UI에 맞게 normalize/repair 제공
+ *
+ * ✅ 이번 패치 포인트
+ * 1) createdAt/updatedAt 보장: create는 createdAt+updatedAt, update는 updatedAt만 갱신
+ * 2) 최신순 정렬 안정화: load 단계에서 createdAt/updatedAt desc 정렬
+ * 3) 이미지 업로드 "어댑터 슬롯" 제공:
+ *    - 지금: AdminPage에서 DataURL을 image에 넣으면 그대로 저장
+ *    - 나중: Firebase 연결 시, imageUploader를 주입해서 File->URL 업로드로 교체 가능
  * =============================================
  */
 
@@ -21,9 +28,15 @@ const listeners = new Set();
 /** @type {any[]} */
 let cache = [];
 
+/**
+ * ✅ 업로드 어댑터 (나중에 Firebase로 갈 때 교체)
+ * @type {null | ((file: File) => Promise<string>)}
+ */
+let imageUploader = null;
+
 /* ==============================
-    utils
- ============================== */
+   utils
+============================== */
 function normalizeText(v) {
    return String(v ?? '').trim();
 }
@@ -53,8 +66,20 @@ function uniq(arr) {
    return Array.from(new Set(arr));
 }
 
+function sortLatestFirst(list) {
+   const arr = Array.isArray(list) ? [...list] : [];
+   return arr.sort((a, b) => {
+      const at = Number(a?.createdAt || 0) || 0;
+      const bt = Number(b?.createdAt || 0) || 0;
+      if (bt !== at) return bt - at;
+
+      const au = Number(a?.updatedAt || 0) || 0;
+      const bu = Number(b?.updatedAt || 0) || 0;
+      return bu - au;
+   });
+}
+
 function normalizeItem(raw) {
-   // ✅ Admin에서 사용하는 필드
    const id = normalizeText(raw?.id);
    if (!id) return null;
 
@@ -62,16 +87,11 @@ function normalizeItem(raw) {
    const price = toNum(raw?.price, 0);
    const basePrice = toNum(raw?.basePrice, price);
 
-   // ✅ Product 시스템의 category(키) + Admin의 categoryMain/Sub(표시용) 동시 지원
-   // - category: product 페이지/검색/필터에서 쓰는 "키"
-   // - categoryMain/Sub: Admin 분류 UI용 "라벨"
-   // ✅ Product 시스템에서 쓰는 키(category)도 products.json의 majorCategory를 살림
+   // ✅ Product 시스템용 category(key) + Admin UI용 categoryMain/Sub(라벨)
    const category = normalizeText(
       raw?.category || raw?.majorCategory || raw?.categoryKey || '',
    );
-   // ✅ products.json 호환: majorCategoryLabel / majorCategory 지원
-   // - majorCategoryLabel: '상의' 같은 라벨
-   // - majorCategory: 'top' 같은 키
+
    const categoryMain = normalizeText(
       raw?.categoryMain ||
          raw?.majorCategoryLabel ||
@@ -106,20 +126,26 @@ function normalizeItem(raw) {
 
    const active = toBool(raw?.active, true);
 
+   const createdAt = toNum(raw?.createdAt, Date.now());
+   const updatedAt = toNum(raw?.updatedAt, createdAt);
+
+   const image = normalizeText(raw?.image || raw?.imageUrl || '');
+
    return {
       ...raw,
       id,
       name,
       price,
       basePrice,
-      category: category || categoryMain, // ✅ 최소한 하나는 채움
+      category: category || categoryMain, // ✅ 최소 1개는 채움
       categoryMain,
       categorySub,
       apparelSizes: uniq(apparelSizes),
       shoeSizes: uniq(shoeSizes),
       active,
-      updatedAt: toNum(raw?.updatedAt, Date.now()),
-      createdAt: toNum(raw?.createdAt, Date.now()),
+      image,
+      createdAt,
+      updatedAt,
    };
 }
 
@@ -128,11 +154,15 @@ function notify() {
 }
 
 /* ==============================
-    core
- ============================== */
+   core
+============================== */
 async function load() {
    const list = await getProducts();
-   cache = (Array.isArray(list) ? list : []).map(normalizeItem).filter(Boolean);
+   const normalized = (Array.isArray(list) ? list : [])
+      .map(normalizeItem)
+      .filter(Boolean);
+
+   cache = sortLatestFirst(normalized);
    notify();
    return cache;
 }
@@ -145,19 +175,31 @@ async function ensureBoot() {
    return load();
 }
 
+/**
+ * ✅ 나중에 Firebase 연결 시 여기만 교체하면 됨
+ * 예:
+ * adminProductStore.setImageUploader(async (file) => {
+ *   const url = await uploadToFirebase(file)
+ *   return url
+ * })
+ */
+function setImageUploader(uploader) {
+   imageUploader = typeof uploader === 'function' ? uploader : null;
+}
+
 /* ==============================
-    public store
- ============================== */
+   public store
+============================== */
 export const adminProductStore = {
+   setImageUploader,
+
    subscribe(fn) {
       listeners.add(fn);
-      // 즉시 1회 push
       ensureBoot().then(() => fn(cache));
       return () => listeners.delete(fn);
    },
 
    getProducts() {
-      // sync getter (이미 로드된 cache 기준)
       return cache;
    },
 
@@ -171,18 +213,11 @@ export const adminProductStore = {
       return { ok: true };
    },
 
-   // ✅ 기존 상품 유지하면서 “추가 seed”가 아니라,
-   // 네 UI/문구 정책이 "유지"라면 append 방식도 가능하지만
-   // 여기서는 안전하게 "추가" 옵션 제공
-   seed(count = 100, { mode = 'append' } = {}) {
-      // mode:
-      // - 'append' : 기존 유지 + 추가
-      // - 'reset'  : 전체 갈아엎고 seed
-      // ⚠️ api/products.js에 append API가 없으면 reset으로 간다.
-      // 지금은 reset(seed)로 통일(단순/안정)
+   seed(count = 100) {
+      // api/products.js의 adminSeedProducts는 "덮어쓰기 seed" 성격(현재 설계 기준)
       return (async () => {
          await ensureBoot();
-         const r = await adminSeedProducts(count); // api는 "reset seed" 성격
+         const r = await adminSeedProducts(count);
          await load();
          return { ok: true, count: r?.count ?? cache.length, mode: 'reset' };
       })();
@@ -192,8 +227,30 @@ export const adminProductStore = {
       return (async () => {
          await ensureBoot();
 
+         // ✅ (선택) File 업로드 지원: draft.imageFile 이 File이면 업로더가 있을 때 URL로 변환
+         let image = normalizeText(draft?.image || '');
+         const imageFile = draft?.imageFile;
+
+         if (imageFile instanceof File) {
+            if (!imageUploader) {
+               return {
+                  ok: false,
+                  message:
+                     '이미지 업로더가 설정되지 않았습니다. (현재는 DataURL/URL만 지원)',
+               };
+            }
+            try {
+               image = normalizeText(await imageUploader(imageFile));
+            } catch {
+               return { ok: false, message: '이미지 업로드에 실패했습니다.' };
+            }
+         }
+
+         const now = Date.now();
+
          const payload = {
             ...draft,
+            image,
             // form에서 들어오는 CSV -> 배열로 정규화
             apparelSizes: Array.isArray(draft?.apparelSizes)
                ? draft.apparelSizes
@@ -204,14 +261,22 @@ export const adminProductStore = {
                     .map((n) => Number(n))
                     .filter(Number.isFinite),
             active: toBool(draft?.active, true),
+
             categoryMain: normalizeText(draft?.categoryMain || ''),
             categorySub: normalizeText(draft?.categorySub || ''),
-            // Product 시스템 키
+
+            // Product 시스템 필터 키 (대분류 라벨을 일단 키로 사용)
             category: normalizeText(
                draft?.category || draft?.categoryMain || '',
             ),
-            updatedAt: Date.now(),
+
+            // ✅ 타임스탬프 보장
+            createdAt: toNum(draft?.createdAt, now),
+            updatedAt: now,
          };
+
+         // 불필요한 필드 제거(혹시 남아있다면)
+         delete payload.imageFile;
 
          const res = await adminCreateProduct(payload);
          if (!res?.ok) return res;
@@ -224,17 +289,42 @@ export const adminProductStore = {
    update(id, patch) {
       return (async () => {
          await ensureBoot();
+
          const key = normalizeText(id);
          if (!key) return { ok: false, message: '상품 ID가 필요합니다.' };
 
+         // ✅ File 업로드 지원(선택): patch.imageFile 이 File이면 업로더 사용
+         let image =
+            patch?.image != null ? normalizeText(patch.image) : undefined;
+
+         const imageFile = patch?.imageFile;
+         if (imageFile instanceof File) {
+            if (!imageUploader) {
+               return {
+                  ok: false,
+                  message:
+                     '이미지 업로더가 설정되지 않았습니다. (현재는 DataURL/URL만 지원)',
+               };
+            }
+            try {
+               image = normalizeText(await imageUploader(imageFile));
+            } catch {
+               return { ok: false, message: '이미지 업로드에 실패했습니다.' };
+            }
+         }
+
          const payload = {
             ...patch,
+
+            image,
+
             apparelSizes:
                patch?.apparelSizes != null
                   ? Array.isArray(patch.apparelSizes)
                      ? patch.apparelSizes
                      : splitCSV(patch.apparelSizes)
                   : undefined,
+
             shoeSizes:
                patch?.shoeSizes != null
                   ? Array.isArray(patch.shoeSizes)
@@ -243,24 +333,32 @@ export const adminProductStore = {
                           .map((n) => Number(n))
                           .filter(Number.isFinite)
                   : undefined,
+
             active:
                patch?.active != null ? toBool(patch.active, true) : undefined,
+
             categoryMain:
                patch?.categoryMain != null
                   ? normalizeText(patch.categoryMain)
                   : undefined,
+
             categorySub:
                patch?.categorySub != null
                   ? normalizeText(patch.categorySub)
                   : undefined,
+
             category:
                patch?.category != null
                   ? normalizeText(patch.category)
                   : patch?.categoryMain != null
                     ? normalizeText(patch.categoryMain)
                     : undefined,
+
+            // ✅ update에서는 createdAt 건드리지 않음
             updatedAt: Date.now(),
          };
+
+         delete payload.imageFile;
 
          const res = await adminUpdateProduct(key, payload);
          if (!res?.ok) return res;
@@ -273,6 +371,7 @@ export const adminProductStore = {
    remove(id) {
       return (async () => {
          await ensureBoot();
+
          const key = normalizeText(id);
          if (!key) return { ok: false, message: '상품 ID가 필요합니다.' };
 
@@ -285,7 +384,6 @@ export const adminProductStore = {
    },
 
    getCategories() {
-      // ✅ Admin에서 main/sub 셀렉트 채우기용
       const mainSet = new Set();
       const subSet = new Set();
       const subByMain = {};
