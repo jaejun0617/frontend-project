@@ -1,10 +1,59 @@
 /**
  * =============================================
  * 📍 위치: src/api/products.js
- * 역할: 상품 데이터를 가져오는 "데이터 레이어"
+ * 역할: 상품 데이터 레이어 (LocalStorage 기반 단일 소스)
+ *
+ * - 최초 1회 mock 생성 후 localStorage에 저장
+ * - 이후 Product/Admin 모두 동일 데이터 사용
  * =============================================
  */
 
+/* ==============================
+   0) Storage Key
+============================== */
+const STORAGE_KEY = 'reve_products_v1';
+
+/* ==============================
+   1) Utilities: storage
+============================== */
+function hasStorage() {
+   try {
+      return typeof window !== 'undefined' && !!window.localStorage;
+   } catch {
+      return false;
+   }
+}
+
+function safeParse(json) {
+   try {
+      return JSON.parse(json);
+   } catch {
+      return null;
+   }
+}
+
+function readRaw(key) {
+   if (!hasStorage()) return null;
+   return window.localStorage.getItem(key);
+}
+
+function writeRaw(key, value) {
+   if (!hasStorage()) return;
+   window.localStorage.setItem(key, value);
+}
+
+function removeRaw(key) {
+   if (!hasStorage()) return;
+   window.localStorage.removeItem(key);
+}
+
+function sleep(ms) {
+   return new Promise((r) => setTimeout(r, ms));
+}
+
+/* ==============================
+   2) Mock generator (네 코드 유지)
+============================== */
 function mulberry32(seed) {
    let t = seed >>> 0;
    return function () {
@@ -133,7 +182,6 @@ const MATERIAL_KR = [
    '코튼',
    '나일론',
 ];
-
 const STYLE_KR = [
    '시그니처',
    '클래식',
@@ -211,7 +259,6 @@ function applyDiscount(basePrice, discountRate = 0) {
 }
 
 function buildColorOptions() {
-   // 1~3개 컬러 옵션 제공
    const count = randInt(1, 3);
    const picked = pickSubset(COLORS, count, count);
    return picked.map((c) => ({ en: c.en, ko: c.ko }));
@@ -229,7 +276,6 @@ function buildTags({ brand, category, name, color }) {
       CATEGORIES.find((c) => c.key === category)?.label ?? ''
    ).trim();
 
-   // 카드 표시용: 브랜드(영문) + 랜덤 뱃지 1개
    const badges = [];
    if (rand() < 0.45) badges.push('신상');
    if (rand() < 0.3) badges.push('베스트');
@@ -237,7 +283,6 @@ function buildTags({ brand, category, name, color }) {
    if (!badges.length) badges.push(pickOne(['신상', '베스트', 'HOT']));
    const displayTags = [brand.en, pickOne(badges)].filter(Boolean);
 
-   // 검색용 토큰(영문/한글/별칭/소문자)
    const brandTokens = [
       brand.en,
       toSearchToken(brand.en),
@@ -281,14 +326,11 @@ function buildTags({ brand, category, name, color }) {
 }
 
 function buildSizes(category) {
-   // ✅ 의류 사이즈 정렬 우선순위
    const APPAREL_ORDER = { S: 1, M: 2, L: 3, XL: 4 };
    const sortApparel = (arr) =>
       [...arr].sort(
          (a, b) => (APPAREL_ORDER[a] || 99) - (APPAREL_ORDER[b] || 99),
       );
-
-   // ✅ 신발은 숫자 오름차순
    const sortShoes = (arr) => [...arr].sort((a, b) => Number(a) - Number(b));
 
    if (category === 'shoes') {
@@ -313,16 +355,15 @@ function buildSizes(category) {
       shoeSizes: [],
    };
 }
+
 function createMockProducts(count = 100) {
    const products = [];
 
    for (let i = 1; i <= count; i++) {
       const id = `p-${formatId(i)}`;
-
       const { key: category } = pickOne(CATEGORIES);
       const brand = pickOne(BRANDS);
       const color = pickOne(COLORS);
-
       const name = buildKoreanName({ category });
 
       const basePrice = buildBasePrice(category);
@@ -333,6 +374,7 @@ function createMockProducts(count = 100) {
       const colors = buildColorOptions();
       const tags = buildTags({ brand, category, name, color });
       const image = buildImageUrl({ id, category });
+
       products.push({
          id,
          name,
@@ -346,25 +388,160 @@ function createMockProducts(count = 100) {
          tags,
          category,
          image,
-         colors, // ✅ 상세 옵션용
+         colors,
          ...sizes,
+         createdAt: Date.now() - randInt(0, 1000 * 60 * 60 * 24 * 30), // 최근 30일 느낌
+         updatedAt: Date.now(),
       });
    }
 
    return products;
 }
 
-const MOCK_PRODUCTS = createMockProducts(100);
+/* ==============================
+   3) DB-like helpers
+============================== */
+function normalizeProduct(p) {
+   const id = String(p?.id ?? '').trim();
+   if (!id) return null;
 
+   const price = Number(p?.price ?? 0);
+   const basePrice = Number(p?.basePrice ?? price);
+
+   return {
+      ...p,
+      id,
+      name: String(p?.name ?? '').trim(),
+      brand: String(p?.brand ?? '').trim(),
+      category: String(p?.category ?? '').trim(),
+      price: Number.isFinite(price) ? price : 0,
+      basePrice: Number.isFinite(basePrice) ? basePrice : 0,
+      tags: Array.isArray(p?.tags) ? p.tags : [],
+      colors: Array.isArray(p?.colors) ? p.colors : [],
+      apparelSizes: Array.isArray(p?.apparelSizes) ? p.apparelSizes : [],
+      shoeSizes: Array.isArray(p?.shoeSizes) ? p.shoeSizes : [],
+      createdAt: Number(p?.createdAt || Date.now()),
+      updatedAt: Number(p?.updatedAt || Date.now()),
+   };
+}
+
+function readDb() {
+   const raw = safeParse(readRaw(STORAGE_KEY) || '');
+   if (!raw || !Array.isArray(raw)) return [];
+   return raw.map(normalizeProduct).filter(Boolean);
+}
+
+function writeDb(list) {
+   writeRaw(STORAGE_KEY, JSON.stringify(list));
+}
+
+function ensureSeeded() {
+   const existing = readDb();
+   if (existing.length) return existing;
+
+   const seeded = createMockProducts(100);
+   writeDb(seeded);
+   return seeded;
+}
+
+function now() {
+   return Date.now();
+}
+
+/* ==============================
+   4) Public API (Product UI용)
+============================== */
 export async function getProducts() {
-   await new Promise((r) => setTimeout(r, 250));
-   return MOCK_PRODUCTS;
+   await sleep(120);
+   return ensureSeeded();
 }
 
 export async function getProductById(productId) {
    const id = String(productId || '').trim();
    if (!id) return null;
 
-   await new Promise((r) => setTimeout(r, 120));
-   return MOCK_PRODUCTS.find((p) => p.id === id) ?? null;
+   await sleep(80);
+   const list = ensureSeeded();
+   return list.find((p) => p.id === id) ?? null;
+}
+
+/* ==============================
+   5) Admin API (CRUD)
+   - Admin 페이지에서 import해서 사용
+============================== */
+export async function adminSeedProducts(count = 100) {
+   await sleep(80);
+   const seeded = createMockProducts(count);
+   writeDb(seeded);
+   return { ok: true, count: seeded.length };
+}
+
+export async function adminCreateProduct(draft) {
+   await sleep(80);
+   const list = ensureSeeded();
+
+   const id = String(draft?.id || `p-${Date.now()}`).trim();
+   const next = normalizeProduct({
+      ...draft,
+      id,
+      createdAt: now(),
+      updatedAt: now(),
+   });
+
+   if (!next) return { ok: false, message: '상품 데이터가 올바르지 않습니다.' };
+   if (list.some((p) => p.id === next.id)) {
+      return { ok: false, message: '이미 존재하는 상품 ID입니다.' };
+   }
+
+   const out = [next, ...list];
+   writeDb(out);
+   return { ok: true, item: next };
+}
+
+export async function adminUpdateProduct(productId, patch) {
+   await sleep(80);
+   const id = String(productId || '').trim();
+   if (!id) return { ok: false, message: '상품 ID가 필요합니다.' };
+
+   const list = ensureSeeded();
+   const idx = list.findIndex((p) => p.id === id);
+   if (idx < 0) return { ok: false, message: '상품을 찾을 수 없습니다.' };
+
+   const merged = normalizeProduct({
+      ...list[idx],
+      ...patch,
+      id,
+      updatedAt: now(),
+   });
+
+   if (!merged)
+      return { ok: false, message: '상품 데이터가 올바르지 않습니다.' };
+
+   const out = [...list];
+   out[idx] = merged;
+   writeDb(out);
+
+   return { ok: true, item: merged };
+}
+
+export async function adminDeleteProduct(productId) {
+   await sleep(80);
+   const id = String(productId || '').trim();
+   if (!id) return { ok: false, message: '상품 ID가 필요합니다.' };
+
+   const list = ensureSeeded();
+   const exists = list.some((p) => p.id === id);
+   if (!exists) return { ok: false, message: '상품을 찾을 수 없습니다.' };
+
+   const out = list.filter((p) => p.id !== id);
+   writeDb(out);
+
+   return { ok: true };
+}
+
+export async function adminResetProducts() {
+   await sleep(80);
+   removeRaw(STORAGE_KEY);
+   ensureSeeded();
+   return { ok: true };
 }

@@ -1,48 +1,46 @@
 /**
  * =============================================
  * 📍 위치: src/store/adminProductStore.js
- * 역할: 관리자용 상품 카탈로그 저장소(localStorage)
- *
- * ✅ 기능
- * - 상품 CRUD + 정규화/복구
- * - 카테고리(대/중분류) 집계
- * - 더미 seed
- *
- * ✅ 주의
- * - storefront가 이 카탈로그를 실제로 쓰려면
- *   products API 레이어를 이 store 기반으로 교체하는 작업이 필요
+ * 역할: Admin Product Store (Single Source of Truth)
+ * - 데이터 소스: src/api/products.js (LocalStorage 기반)
+ * - Admin UI에 맞게 normalize/repair 제공
  * =============================================
  */
 
-const STORAGE_KEY = 'reve_admin_products_v1';
+import {
+   getProducts,
+   adminSeedProducts,
+   adminCreateProduct,
+   adminUpdateProduct,
+   adminDeleteProduct,
+} from '../api/products.js';
 
-function safeParse(json) {
-   try {
-      return JSON.parse(json);
-   } catch {
-      return null;
-   }
-}
+/** @type {Set<(items:any[])=>void>} */
+const listeners = new Set();
 
-function nowMs() {
-   return Date.now();
-}
+/** @type {any[]} */
+let cache = [];
 
-function normalizeMoney(n) {
-   const v = Number(n);
-   if (!Number.isFinite(v)) return 0;
-   return Math.max(0, Math.floor(v));
-}
-
+/* ==============================
+    utils
+ ============================== */
 function normalizeText(v) {
    return String(v ?? '').trim();
 }
 
-function normalizeId(v) {
-   return normalizeText(v).replace(/\s+/g, '_');
+function toBool(v, fallback = true) {
+   if (typeof v === 'boolean') return v;
+   if (v === 'true') return true;
+   if (v === 'false') return false;
+   return fallback;
 }
 
-function splitCsv(v) {
+function toNum(v, fallback = 0) {
+   const n = Number(v);
+   return Number.isFinite(n) ? n : fallback;
+}
+
+function splitCSV(v) {
    const raw = normalizeText(v);
    if (!raw) return [];
    return raw
@@ -51,269 +49,246 @@ function splitCsv(v) {
       .filter(Boolean);
 }
 
-function normalizeProduct(raw) {
-   if (!raw || typeof raw !== 'object') return null;
+function uniq(arr) {
+   return Array.from(new Set(arr));
+}
 
-   const id = normalizeId(raw.id);
-   const name = normalizeText(raw.name);
+function normalizeItem(raw) {
+   // ✅ Admin에서 사용하는 필드
+   const id = normalizeText(raw?.id);
+   if (!id) return null;
 
-   if (!id || !name) return null;
+   const name = normalizeText(raw?.name);
+   const price = toNum(raw?.price, 0);
+   const basePrice = toNum(raw?.basePrice, price);
 
-   const price = normalizeMoney(raw.price);
-   const basePrice =
-      raw.basePrice !== '' &&
-      raw.basePrice !== null &&
-      raw.basePrice !== undefined
-         ? normalizeMoney(raw.basePrice)
-         : 0;
+   // ✅ Product 시스템의 category(키) + Admin의 categoryMain/Sub(표시용) 동시 지원
+   // - category: product 페이지/검색/필터에서 쓰는 "키"
+   // - categoryMain/Sub: Admin 분류 UI용 "라벨"
+   const category = normalizeText(raw?.category || raw?.categoryKey || '');
+   const categoryMain = normalizeText(raw?.categoryMain || category || '-');
+   const categorySub = normalizeText(raw?.categorySub || '');
 
-   const categoryMain = normalizeText(raw.categoryMain);
-   const categorySub = normalizeText(raw.categorySub);
+   const apparelSizes = Array.isArray(raw?.apparelSizes)
+      ? raw.apparelSizes
+      : splitCSV(raw?.apparelSizes);
 
-   const apparelSizes = Array.isArray(raw.apparelSizes)
-      ? raw.apparelSizes.map((x) => normalizeText(x)).filter(Boolean)
-      : splitCsv(raw.apparelSizes);
+   const shoeSizes = Array.isArray(raw?.shoeSizes)
+      ? raw.shoeSizes
+      : splitCSV(raw?.shoeSizes)
+           .map((n) => Number(n))
+           .filter(Number.isFinite);
 
-   const shoeSizes = Array.isArray(raw.shoeSizes)
-      ? raw.shoeSizes.map((x) => normalizeText(x)).filter(Boolean)
-      : splitCsv(raw.shoeSizes);
+   const active = toBool(raw?.active, true);
 
    return {
+      ...raw,
       id,
       name,
-      desc: normalizeText(raw.desc || raw.description || ''),
+      price,
+      basePrice,
+      category: category || categoryMain, // ✅ 최소한 하나는 채움
       categoryMain,
       categorySub,
-
-      price,
-      basePrice: basePrice > 0 ? basePrice : 0,
-
-      active: raw.active === false ? false : true,
-      couponEligible: raw.couponEligible === false ? false : true,
-
-      apparelSizes,
-      shoeSizes,
-
-      createdAt: Number(raw.createdAt || nowMs()),
-      updatedAt: Number(raw.updatedAt || nowMs()),
+      apparelSizes: uniq(apparelSizes),
+      shoeSizes: uniq(shoeSizes),
+      active,
+      updatedAt: toNum(raw?.updatedAt, Date.now()),
+      createdAt: toNum(raw?.createdAt, Date.now()),
    };
 }
 
-function normalizeState(parsed) {
-   const items = Array.isArray(parsed?.items) ? parsed.items : [];
-   const normalized = items.map(normalizeProduct).filter(Boolean);
-
-   // id 중복 제거(최신 updatedAt 우선)
-   const map = new Map();
-   normalized.forEach((p) => {
-      const prev = map.get(p.id);
-      if (!prev) map.set(p.id, p);
-      else map.set(p.id, prev.updatedAt >= p.updatedAt ? prev : p);
-   });
-
-   const out = Array.from(map.values()).sort(
-      (a, b) => b.updatedAt - a.updatedAt,
-   );
-   return { items: out, updatedAt: Number(parsed?.updatedAt || nowMs()) };
-}
-
-function readState() {
-   const raw = localStorage.getItem(STORAGE_KEY);
-   const parsed = raw ? safeParse(raw) : null;
-   return normalizeState(parsed || {});
-}
-
-function writeState(next) {
-   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-}
-
-let state = readState();
-/** @type {Set<(state:any)=>void>} */
-const listeners = new Set();
-
 function notify() {
-   state = { ...state, updatedAt: nowMs() };
-   writeState(state);
-   listeners.forEach((fn) => fn(state));
+   listeners.forEach((fn) => fn(cache));
 }
 
-function exists(id) {
-   const key = normalizeId(id);
-   return state.items.some((p) => p.id === key);
+/* ==============================
+    core
+ ============================== */
+async function load() {
+   const list = await getProducts();
+   cache = (Array.isArray(list) ? list : []).map(normalizeItem).filter(Boolean);
+   notify();
+   return cache;
 }
 
-function ok(extra = {}) {
-   return { ok: true, ...extra };
+// ✅ 초기 1회 로드 트리거(어드민 진입 시 곧바로 데이터 준비)
+let booted = false;
+async function ensureBoot() {
+   if (booted) return cache;
+   booted = true;
+   return load();
 }
 
-function fail(message) {
-   return { ok: false, message };
-}
-
+/* ==============================
+    public store
+ ============================== */
 export const adminProductStore = {
-   subscribe(listener) {
-      listeners.add(listener);
-      listener(state);
-      return () => listeners.delete(listener);
-   },
-
-   getState() {
-      return state;
+   subscribe(fn) {
+      listeners.add(fn);
+      // 즉시 1회 push
+      ensureBoot().then(() => fn(cache));
+      return () => listeners.delete(fn);
    },
 
    getProducts() {
-      return state.items;
+      // sync getter (이미 로드된 cache 기준)
+      return cache;
    },
 
    getProduct(id) {
-      const key = normalizeId(id);
-      return state.items.find((p) => p.id === key) || null;
+      const key = normalizeText(id);
+      return cache.find((p) => p.id === key) || null;
+   },
+
+   async refresh() {
+      await load();
+      return { ok: true };
+   },
+
+   // ✅ 기존 상품 유지하면서 “추가 seed”가 아니라,
+   // 네 UI/문구 정책이 "유지"라면 append 방식도 가능하지만
+   // 여기서는 안전하게 "추가" 옵션 제공
+   seed(count = 100, { mode = 'append' } = {}) {
+      // mode:
+      // - 'append' : 기존 유지 + 추가
+      // - 'reset'  : 전체 갈아엎고 seed
+      // ⚠️ api/products.js에 append API가 없으면 reset으로 간다.
+      // 지금은 reset(seed)로 통일(단순/안정)
+      return (async () => {
+         await ensureBoot();
+         const r = await adminSeedProducts(count); // api는 "reset seed" 성격
+         await load();
+         return { ok: true, count: r?.count ?? cache.length, mode: 'reset' };
+      })();
+   },
+
+   create(draft) {
+      return (async () => {
+         await ensureBoot();
+
+         const payload = {
+            ...draft,
+            // form에서 들어오는 CSV -> 배열로 정규화
+            apparelSizes: Array.isArray(draft?.apparelSizes)
+               ? draft.apparelSizes
+               : splitCSV(draft?.apparelSizes),
+            shoeSizes: Array.isArray(draft?.shoeSizes)
+               ? draft.shoeSizes
+               : splitCSV(draft?.shoeSizes)
+                    .map((n) => Number(n))
+                    .filter(Number.isFinite),
+            active: toBool(draft?.active, true),
+            categoryMain: normalizeText(draft?.categoryMain || ''),
+            categorySub: normalizeText(draft?.categorySub || ''),
+            // Product 시스템 키
+            category: normalizeText(
+               draft?.category || draft?.categoryMain || '',
+            ),
+            updatedAt: Date.now(),
+         };
+
+         const res = await adminCreateProduct(payload);
+         if (!res?.ok) return res;
+
+         await load();
+         return { ok: true, item: res.item };
+      })();
+   },
+
+   update(id, patch) {
+      return (async () => {
+         await ensureBoot();
+         const key = normalizeText(id);
+         if (!key) return { ok: false, message: '상품 ID가 필요합니다.' };
+
+         const payload = {
+            ...patch,
+            apparelSizes:
+               patch?.apparelSizes != null
+                  ? Array.isArray(patch.apparelSizes)
+                     ? patch.apparelSizes
+                     : splitCSV(patch.apparelSizes)
+                  : undefined,
+            shoeSizes:
+               patch?.shoeSizes != null
+                  ? Array.isArray(patch.shoeSizes)
+                     ? patch.shoeSizes
+                     : splitCSV(patch.shoeSizes)
+                          .map((n) => Number(n))
+                          .filter(Number.isFinite)
+                  : undefined,
+            active:
+               patch?.active != null ? toBool(patch.active, true) : undefined,
+            categoryMain:
+               patch?.categoryMain != null
+                  ? normalizeText(patch.categoryMain)
+                  : undefined,
+            categorySub:
+               patch?.categorySub != null
+                  ? normalizeText(patch.categorySub)
+                  : undefined,
+            category:
+               patch?.category != null
+                  ? normalizeText(patch.category)
+                  : patch?.categoryMain != null
+                    ? normalizeText(patch.categoryMain)
+                    : undefined,
+            updatedAt: Date.now(),
+         };
+
+         const res = await adminUpdateProduct(key, payload);
+         if (!res?.ok) return res;
+
+         await load();
+         return { ok: true, item: res.item };
+      })();
+   },
+
+   remove(id) {
+      return (async () => {
+         await ensureBoot();
+         const key = normalizeText(id);
+         if (!key) return { ok: false, message: '상품 ID가 필요합니다.' };
+
+         const res = await adminDeleteProduct(key);
+         if (!res?.ok) return res;
+
+         await load();
+         return { ok: true };
+      })();
    },
 
    getCategories() {
+      // ✅ Admin에서 main/sub 셀렉트 채우기용
       const mainSet = new Set();
       const subSet = new Set();
       const subByMain = {};
 
-      state.items.forEach((p) => {
-         const m = normalizeText(p.categoryMain);
-         const s = normalizeText(p.categorySub);
+      cache.forEach((p) => {
+         const m = normalizeText(p.categoryMain || p.category || '');
+         const s = normalizeText(p.categorySub || '');
 
          if (m) mainSet.add(m);
          if (s) subSet.add(s);
 
-         if (m && s) {
-            if (!subByMain[m]) subByMain[m] = new Set();
-            subByMain[m].add(s);
+         if (m) {
+            if (!subByMain[m]) subByMain[m] = [];
+            if (s) subByMain[m].push(s);
          }
       });
 
-      const main = Array.from(mainSet.values()).sort();
-      const subAll = Array.from(subSet.values()).sort();
+      const main = Array.from(mainSet).sort((a, b) => a.localeCompare(b, 'ko'));
+      const subAll = Array.from(subSet).sort((a, b) =>
+         a.localeCompare(b, 'ko'),
+      );
 
-      /** @type {Record<string, string[]>} */
-      const outSubByMain = {};
-      Object.entries(subByMain).forEach(([k, set]) => {
-         outSubByMain[k] = Array.from(set.values()).sort();
+      Object.keys(subByMain).forEach((m) => {
+         subByMain[m] = uniq(subByMain[m]).sort((a, b) =>
+            a.localeCompare(b, 'ko'),
+         );
       });
 
-      return { main, subAll, subByMain: outSubByMain };
-   },
-
-   create(draft) {
-      const p = normalizeProduct(draft);
-      if (!p) return fail('상품 데이터가 올바르지 않습니다.');
-
-      if (exists(p.id)) return fail('이미 존재하는 상품 ID입니다.');
-
-      const now = nowMs();
-      const next = { ...p, createdAt: now, updatedAt: now };
-
-      state = { ...state, items: [next, ...state.items] };
-      notify();
-      return ok({ id: next.id });
-   },
-
-   update(id, patch) {
-      const key = normalizeId(id);
-      const current = this.getProduct(key);
-      if (!current) return fail('상품을 찾을 수 없습니다.');
-
-      // patch가 object가 아니라면 noop
-      const basePatch = patch && typeof patch === 'object' ? patch : {};
-      const merged = { ...current, ...basePatch, id: current.id };
-
-      const normalized = normalizeProduct(merged);
-      if (!normalized) return fail('수정 데이터가 올바르지 않습니다.');
-
-      const next = {
-         ...normalized,
-         createdAt: current.createdAt,
-         updatedAt: nowMs(),
-      };
-
-      state = {
-         ...state,
-         items: state.items.map((p) => (p.id === key ? next : p)),
-      };
-      notify();
-      return ok({ id: key });
-   },
-
-   remove(id) {
-      const key = normalizeId(id);
-      if (!exists(key)) return fail('상품을 찾을 수 없습니다.');
-
-      state = { ...state, items: state.items.filter((p) => p.id !== key) };
-      notify();
-      return ok({ id: key });
-   },
-
-   seed() {
-      const samples = [
-         {
-            id: `prod_${String(Date.now()).slice(-6)}_hoodie`,
-            name: 'REVE 후드',
-            categoryMain: '의류',
-            categorySub: '후드',
-            price: 59000,
-            basePrice: 79000,
-            active: true,
-            couponEligible: true,
-            apparelSizes: ['S', 'M', 'L', 'XL'],
-            shoeSizes: [],
-            desc: '부드러운 기모 후드',
-         },
-         {
-            id: `prod_${String(Date.now()).slice(-6)}_runner`,
-            name: 'REVE 러너',
-            categoryMain: '신발',
-            categorySub: '러닝화',
-            price: 129000,
-            basePrice: 159000,
-            active: true,
-            couponEligible: false,
-            apparelSizes: [],
-            shoeSizes: ['230', '240', '250', '260', '270'],
-            desc: '가벼운 착화감의 러닝화',
-         },
-         {
-            id: `prod_${String(Date.now()).slice(-6)}_bag`,
-            name: 'REVE 데일리 백',
-            categoryMain: '잡화',
-            categorySub: '가방',
-            price: 89000,
-            basePrice: 99000,
-            active: true,
-            couponEligible: true,
-            apparelSizes: [],
-            shoeSizes: [],
-            desc: '데일리로 쓰기 좋은 미니 백',
-         },
-      ];
-
-      let created = 0;
-      samples.forEach((s) => {
-         const p = normalizeProduct(s);
-         if (!p) return;
-         if (exists(p.id)) return;
-         state = {
-            ...state,
-            items: [
-               { ...p, createdAt: nowMs(), updatedAt: nowMs() },
-               ...state.items,
-            ],
-         };
-         created += 1;
-      });
-
-      if (created > 0) notify();
-      return ok({ count: created });
-   },
-
-   clearAll() {
-      state = { items: [], updatedAt: nowMs() };
-      localStorage.removeItem(STORAGE_KEY);
-      notify();
+      return { main, subAll, subByMain };
    },
 };

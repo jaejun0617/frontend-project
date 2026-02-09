@@ -615,14 +615,20 @@ export async function initProductPage() {
      ✅ Data load + initial paint
      ============================== */
    try {
-      const products = await getProducts();
-      allProducts = Array.isArray(products) ? products : [];
+      const res = await getProducts();
 
-      // ✅ controls 렌더 안정화(1회 확정 렌더)
+      // ✅ getProducts()가 배열이든 {items}든 모두 지원
+      const products = Array.isArray(res)
+         ? res
+         : Array.isArray(res?.items)
+           ? res.items
+           : [];
+
+      allProducts = products;
+
       if (controlsSlot)
          controlsSlot.innerHTML = renderControls(getQueryState());
 
-      // ✅ 최초 페인트
       paint({ page: getQueryState().page });
    } catch (err) {
       gridEl.innerHTML = `
