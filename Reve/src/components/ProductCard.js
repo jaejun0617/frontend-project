@@ -130,7 +130,7 @@ export function ProductCard(product) {
        `
            : ''
      }
- 
+ <
      <!-- ✅ 하단 고정 액션 영역 -->
      <div class="product-card__floating">
        <button

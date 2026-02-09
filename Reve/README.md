@@ -1,7 +1,7 @@
 # REVE MVP 기능 구현 기록 (Auth / Cart / Product / Search)
 
 목적: MVP 전자상거래 흐름을 **라우터 기반 SPA + localStorage 기반 스토어**로 구현  
-범위: 인증/권한, 쿠폰, 장바구니(옵션), 상품리스트 UX, 전역 이벤트 위임, 검색 구조, 멤버십(등급/적립), 주문/배송
+범위: 인증/권한, 쿠폰, 장바구니(옵션), 상품리스트 UX, 전역 이벤트 위임, 검색, 멤버십(등급/적립), 주문/배송
 
 ---
 
@@ -57,7 +57,7 @@
 - `src/pages/checkoutSuccess/index.js`  
   결제 완료 페이지(주문 요약, 등급, 포인트 안내)
 - `src/pages/search/index.js`  
-  검색 페이지 구조(확장 예정)
+  검색 페이지(`/search?q=`) + 최근/추천 + 결과 렌더
 - `src/pages/mypage/index.js`  
   마이페이지(내정보, 배송지 CRUD, 주문내역, 주문·배송, 등급, 쿠폰)
 
@@ -78,7 +78,8 @@
 
 - `src/utils/router.js` : 라우팅
 - `src/utils/guards.js` : `requireAuth` / `requireAdmin`
-- `src/utils/searchDrawer.js` : 검색 드로어 전역 UI
+- `src/utils/searchDrawer.js` : 검색 드로어 전역 UI + 최근/추천 + 라우팅 연동
+- `src/utils/searchHistory.js` : 최근 검색어 저장소(정규화/중복제거/최대개수/마이그레이션)
 - `src/utils/sidebar.js` : 사이드바 전역 UI
 - `src/utils/authUi.js` : Header 메뉴 노출/갱신
 - `src/utils/membership.js` : 멤버십 계산 단일 소스
@@ -94,20 +95,26 @@
 
 - `initSearchDrawer()`로 전역 1회 초기화
 - 라우팅이 바뀌어도 유지되는 UI
-- `app:render`마다 `searchDrawer.refresh()` 호출로 새 DOM 기준 재연결
+- `app:render`마다 `searchDrawer.refresh()` 호출로 최신 DOM 기준 재연결
 - Header 검색 버튼/아이콘으로 열리는 구조
+- 최근 검색어 CRUD(개별 삭제/전체 삭제) 지원
+- 추천 검색어(정적 배열) 칩 제공
+- 검색 실행 시 `/search?q=...`로 이동(`app:navigate`)
 
-### Search Page (`/search`)
+> UX 규칙: Enter/검색/칩 클릭으로 검색 실행해도 드로어는 자동으로 닫지 않음  
+> 닫힘은 X / 바깥 클릭 / ESC 로만 처리
 
-- 라우트 등록 완료
+### Search Page (`/search?q=`) ✅
+
+- 라우트 등록
    - `'/search': { render: SearchPage, afterRender: initSearchPage }`
-
-#### 확장 작업(후속)
-
-1. `/search?q=` 쿼리 연동 및 입력값 유지 정책
-2. 결과 렌더(ProductGrid) 및 empty 처리
-3. 최근 검색어(localStorage) 및 추천
-4. 필터(카테고리/가격대 등)
+- 쿼리 기반 검색 결과 렌더
+   - `loading / empty / error / result` 상태 분기
+- 최근/추천 검색어 UI를 페이지에도 노출
+   - 최근: 개별 삭제(×), 전체삭제
+   - 칩 클릭 시 `/search?q=...` 이동 + 최근 검색어 갱신
+- SearchDrawer ↔ SearchPage 동기화
+   - `recent-search:changed` 이벤트로 최근검색 UI 즉시 동기화
 
 ---
 
@@ -305,11 +312,13 @@
 - coupons: `reve_coupons_v1:<ownerKey>`
 - orders: `reve_orders_v1:<ownerKey>`
 - addresses: `reve_addresses_v1:<ownerKey>`
+- recent searches: `reve_recent_searches_v1`
 - after signup modal: `sessionStorage.reve_after_signup_modal`
 
 ### 전역 커스텀 이벤트
 
 - navigate: `app:navigate` (detail: `{ href }`)
+- recent search sync: `recent-search:changed`
 
 ---
 
@@ -349,22 +358,17 @@
 
 ### 딥링크(탭/자동 액션) + 1회성 소비(consume)
 
-- `/mypage?tab=address&open=add`  
-  배송지 탭 진입 후 “배송지 추가” 모달 자동 오픈(1회)
-- `/mypage?tab=orders&open=detail&orderId=...`  
-  주문내역 탭 진입 후 주문 상세 모달 자동 오픈(1회)
-- `/mypage?tab=coupon&focus=register`  
-  쿠폰 탭 진입 후 쿠폰 입력창 자동 포커스(1회)
+- `/mypage?tab=address&open=add` → 배송지 추가 모달 자동 오픈(1회)
+- `/mypage?tab=orders&open=detail&orderId=...` → 주문 상세 모달 자동 오픈(1회)
+- `/mypage?tab=coupon&focus=register` → 쿠폰 입력창 자동 포커스(1회)
 
 > `open / focus / orderId`는 실행 직후 URL에서 제거(consume)되어  
 > 새로고침/뒤로가기에서도 반복 트리거되지 않는다. (`replaceState` 기반)
 
 ### MyPage - 주문/배송(Delivery) 탭 구현 ✅
 
-- 주문 상태별 필터 제공
-   - 전체 / 결제완료 / 배송중 / 배송완료 / 취소
-- 주문 카드 기반 배송 타임라인 UI
-   - 결제 → 배송 → 완료 (취소 시 멈춤 표시)
+- 주문 상태별 필터 제공(전체/결제완료/배송중/배송완료/취소)
+- 주문 카드 기반 배송 타임라인 UI(결제→배송→완료, 취소 시 멈춤 표시)
 - 운송장(가짜 코드) 생성 + 배송조회 모달(MVP)
 - “상세”는 기존 주문 상세 모달(confirmModal) 재사용
 - 배송지 스냅샷 표시(주문 당시 주소 유지)
@@ -372,7 +376,7 @@
 #### 배송 단계별 날짜(체크리스트) ✅
 
 - 주문에 `statusHistory`를 기록/표시하는 구조로 확장
-- 각 상태 전환 시점의 타임스탬프를 저장
+- 상태 전환 시점의 타임스탬프 저장
    - `PAID / SHIPPING / DELIVERED / CANCELED`
 - 타임라인 각 단계 아래 날짜 라벨로 노출 가능
 
@@ -421,20 +425,20 @@
 - 주문번호 / 결제일시 / 상태
 - 쿠폰 / 배송비 / 최종 결제금액
 - 주문 상품 리스트(최대 5개)
-- 멤버십 안내
-   - 보유 포인트(authStore)
+- 멤버십 안내(보유 포인트: authStore)
 - 배송지 스냅샷(있을 경우)
 
 ---
 
 ## 17) 다음 작업 후보(TODO)
 
-### A. 검색(Search) 실구현 우선순위 🔍
+### A. 검색(Search) 고도화 🔍 (추천: 1순위)
 
-- `/search?q=` 쿼리 연동 + 입력 유지 정책 확정
-- 검색 결과 렌더(ProductGrid) + empty/로딩 상태
-- 최근 검색어(localStorage) + 추천 키워드
-- 필터(카테고리/가격대/정렬) 확장
+- 검색 결과 정렬/필터(카테고리/가격대/정렬) 추가
+- “입력 유지 정책” 확정
+   - 예: Drawer 입력값 유지 vs 검색 후 초기화
+- 검색 결과에서 키워드 하이라이트(선택)
+- 최근 검색어 상단 고정/최대 갯수 UX 튜닝
 
 ### B. 관리자 기능(Admin) 🧰
 
@@ -446,12 +450,10 @@
 
 - `statusHistory`를 orderStore에 정식 반영(상태 전환 시 최초 1회 기록)
 - 취소 플로우(결제완료 상태에서 취소 가능) + 타임라인 반영
-- 배송지 변경 히스토리(주문 후 변경 불가 정책/안내)
+- 주문 후 배송지 변경 불가 정책/안내 문구 정리
 
 ### D. 품질/안정성 🧪
 
 - 스토어 스키마 마이그레이션 유틸(버전업 대응)
 - 방어적 렌더링 강화(깨진 데이터 복구)
 - E2E 시나리오 체크리스트 문서화(guest → signup → checkout → mypage)
-
----
