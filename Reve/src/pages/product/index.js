@@ -157,6 +157,20 @@ function applyFilterSort(products, { min, max, sort }) {
       return true;
    });
 
+   // ✅ 최신순 타이브레이커(NEW 공통)
+   const cmpLatest = (a, b) => {
+      const ac = Number(a?.createdAt || 0) || 0;
+      const bc = Number(b?.createdAt || 0) || 0;
+      if (bc !== ac) return bc - ac;
+
+      const au = Number(a?.updatedAt || 0) || 0;
+      const bu = Number(b?.updatedAt || 0) || 0;
+      if (bu !== au) return bu - au;
+
+      // 마지막은 id로 안정화(동점일 때 깜빡임 방지)
+      return String(b?.id || '').localeCompare(String(a?.id || ''));
+   };
+
    // 2) sort
    const sorted = [...filtered].sort((a, b) => {
       const ap = Number(a?.price ?? 0);
@@ -169,18 +183,18 @@ function applyFilterSort(products, { min, max, sort }) {
          const ah = getDisplayBadge(a, 'HOT') ? 1 : 0;
          const bh = getDisplayBadge(b, 'HOT') ? 1 : 0;
          if (bh !== ah) return bh - ah;
-         return String(b?.id || '').localeCompare(String(a?.id || ''));
+         return cmpLatest(a, b); // ✅ 뱃지 우선 후 최신순
       }
 
       if (sort === 'BEST') {
          const ab = getDisplayBadge(a, 'BEST') ? 1 : 0;
          const bb = getDisplayBadge(b, 'BEST') ? 1 : 0;
          if (bb !== ab) return bb - ab;
-         return String(b?.id || '').localeCompare(String(a?.id || ''));
+         return cmpLatest(a, b); // ✅ 뱃지 우선 후 최신순
       }
 
-      // NEW: 최신(목업에서는 id로)
-      return String(b?.id || '').localeCompare(String(a?.id || ''));
+      // ✅ NEW: createdAt/updatedAt 기준 "진짜 최신순"
+      return cmpLatest(a, b);
    });
 
    return sorted;
