@@ -1,233 +1,168 @@
 /**
  * =============================================
  * 📍 위치: src/utils/validate.js
- * 역할: 공통 Validation / Normalizer 유틸
- * - Admin/Product/Coupon/Order 상태 전이 검증
- * - 숫자/문자 정규화, 방어적 처리
+ * 역할: 공통 validation 유틸(상품/쿠폰/주문 상태 전이)
  * =============================================
  */
 
-/* ==============================
-   0) Primitives
-============================== */
-
-export function normalizeText(v, fallback = '') {
-   const s = String(v ?? '').trim();
-   return s ? s : fallback;
+function normalizeText(v) {
+   return String(v ?? '').trim();
 }
 
-export function normalizeUpper(v, fallback = '') {
-   const s = normalizeText(v, fallback);
-   return s ? s.toUpperCase() : s;
+function normalizeId(v) {
+   return normalizeText(v).replace(/\s+/g, '_');
 }
 
-export function normalizeNumber(v, fallback = 0) {
+function toNumber(v) {
    const n = Number(v);
-   return Number.isFinite(n) ? n : fallback;
+   return Number.isFinite(n) ? n : NaN;
 }
 
-export function normalizeInt(v, fallback = 0) {
-   return Math.floor(normalizeNumber(v, fallback));
+function normalizeCode(v) {
+   return normalizeText(v).toUpperCase();
 }
 
-export function normalizeMoney(v) {
-   // ✅ KRW 기준: 정수 + 음수 방지
-   return Math.max(0, Math.floor(normalizeNumber(v, 0)));
+function clampRate(v) {
+   const n = toNumber(v);
+   if (!Number.isFinite(n)) return NaN;
+   return Math.max(0, Math.min(1, n));
 }
 
-export function clamp(v, min, max) {
-   const n = normalizeNumber(v, min);
-   return Math.max(min, Math.min(max, n));
-}
+export function validateProductDraft(draft, { allowIdExisting = false } = {}) {
+   const id = normalizeId(draft?.id);
+   const name = normalizeText(draft?.name);
 
-export function isPlainObject(v) {
-   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
-}
-
-/* ==============================
-    1) Product validation
- ============================== */
-/**
- * ✅ 권장 Product shape (Admin 관리 기준)
- * - id, name, categoryMain, categorySub, basePrice, price
- * - isActive, couponEligible
- * - sizes: apparelSizes[], shoeSizes[]
- * - images: thumb, gallery[]
- */
-export function validateProduct(input) {
-   if (!isPlainObject(input)) {
-      return { ok: false, message: '상품 데이터가 올바르지 않습니다.' };
+   if (!id) return { ok: false, message: '상품 ID가 필요합니다.' };
+   if (!allowIdExisting && !/^[a-zA-Z0-9_:-]+$/.test(id)) {
+      return { ok: false, message: '상품 ID는 영문/숫자/_/-/: 만 허용합니다.' };
    }
+   if (!name) return { ok: false, message: '상품명을 입력해 주세요.' };
 
-   const id = normalizeText(input.id);
-   const name = normalizeText(input.name);
-   const categoryMain = normalizeText(input.categoryMain);
-   const categorySub = normalizeText(input.categorySub);
-
-   const basePrice = normalizeMoney(input.basePrice);
-   const price = normalizeMoney(input.price);
-
-   // ✅ price는 0 허용(무료/테스트)하지만, 보통은 basePrice/price 관계가 자연스러워야 함
-   if (!id) return { ok: false, message: '상품 id가 필요합니다.' };
-   if (!name) return { ok: false, message: '상품명(name)이 필요합니다.' };
-   if (!categoryMain)
-      return { ok: false, message: '대분류(categoryMain)가 필요합니다.' };
-   if (!categorySub)
-      return { ok: false, message: '중분류(categorySub)가 필요합니다.' };
-
-   // ✅ 가격 역전 방지(운영 안정성)
-   if (basePrice > 0 && price > basePrice) {
+   const price = toNumber(draft?.price);
+   if (!Number.isFinite(price) || price <= 0) {
       return {
          ok: false,
-         message: 'price는 basePrice보다 클 수 없습니다.',
+         message: '판매가(price)는 0보다 큰 숫자여야 합니다.',
       };
    }
 
-   const couponEligible = Boolean(input.couponEligible);
-   const isActive =
-      input.isActive === undefined ? true : Boolean(input.isActive);
-
-   const apparelSizes = Array.isArray(input.apparelSizes)
-      ? input.apparelSizes.map((x) => normalizeText(x)).filter(Boolean)
-      : [];
-
-   const shoeSizes = Array.isArray(input.shoeSizes)
-      ? input.shoeSizes.map((x) => normalizeText(x)).filter(Boolean)
-      : [];
-
-   const images = isPlainObject(input.images) ? input.images : {};
-   const thumb = normalizeText(images.thumb);
-   const gallery = Array.isArray(images.gallery)
-      ? images.gallery.map((x) => normalizeText(x)).filter(Boolean)
-      : [];
-
-   const description = normalizeText(input.description);
-
-   return {
-      ok: true,
-      data: {
-         id,
-         name,
-         categoryMain,
-         categorySub,
-         basePrice,
-         price,
-         couponEligible,
-         isActive,
-         apparelSizes,
-         shoeSizes,
-         images: { thumb, gallery },
-         description,
-         updatedAt: Date.now(),
-      },
-   };
-}
-
-/* ==============================
-    2) Coupon validation
- ============================== */
-/**
- * ✅ Coupon shape
- * - code, title, rate(0~1)
- * - isActive, startAt/endAt (optional)
- * - maxUses / perUserLimit (optional)
- * - minOrder (optional)
- */
-export function validateCoupon(input) {
-   if (!isPlainObject(input)) {
-      return { ok: false, message: '쿠폰 데이터가 올바르지 않습니다.' };
+   const basePriceRaw = draft?.basePrice;
+   if (normalizeText(basePriceRaw) !== '') {
+      const basePrice = toNumber(basePriceRaw);
+      if (!Number.isFinite(basePrice) || basePrice < 0) {
+         return {
+            ok: false,
+            message: '정가(basePrice)는 0 이상의 숫자여야 합니다.',
+         };
+      }
+      if (basePrice > 0 && basePrice < price) {
+         return {
+            ok: false,
+            message:
+               '정가(basePrice)는 판매가(price) 이상이어야 자연스럽습니다.',
+         };
+      }
    }
 
-   const code = normalizeUpper(input.code);
-   const title = normalizeText(input.title, code);
-   const rate = clamp(normalizeNumber(input.rate, 0), 0, 1);
+   // 카테고리는 운영 정책상 선택이지만, 완전체에선 필수 권장
+   const main = normalizeText(draft?.categoryMain);
+   const sub = normalizeText(draft?.categorySub);
+   if (!main)
+      return { ok: false, message: '대분류(categoryMain)를 입력해 주세요.' };
+   if (!sub)
+      return { ok: false, message: '중분류(categorySub)를 입력해 주세요.' };
+
+   return { ok: true };
+}
+
+export function validateCouponDraft(draft, { allowCodeExisting = false } = {}) {
+   const code = normalizeCode(draft?.code);
+   const title = normalizeText(draft?.title);
 
    if (!code) return { ok: false, message: '쿠폰 코드(code)가 필요합니다.' };
+   if (!allowCodeExisting && !/^[A-Z0-9_:-]+$/.test(code)) {
+      return {
+         ok: false,
+         message: '쿠폰 코드는 대문자/숫자/_/-/: 만 허용합니다.',
+      };
+   }
+   if (!title)
+      return { ok: false, message: '쿠폰 타이틀(title)을 입력해 주세요.' };
+
+   const rate = clampRate(draft?.rate);
+   if (!Number.isFinite(rate))
+      return { ok: false, message: '할인율(rate)은 숫자여야 합니다.' };
    if (rate <= 0)
       return { ok: false, message: '할인율(rate)은 0보다 커야 합니다.' };
 
-   const isActive =
-      input.isActive === undefined ? true : Boolean(input.isActive);
+   const startsAt = normalizeText(draft?.startsAt);
+   const endsAt = normalizeText(draft?.endsAt);
+   if (startsAt && endsAt) {
+      const s = toNumber(startsAt);
+      const e = toNumber(endsAt);
+      if (!Number.isFinite(s) || !Number.isFinite(e)) {
+         return {
+            ok: false,
+            message: '기간(startsAt/endsAt)은 ms 숫자여야 합니다.',
+         };
+      }
+      if (e > 0 && s > 0 && e < s) {
+         return {
+            ok: false,
+            message: '종료일(endsAt)은 시작일(startsAt) 이후여야 합니다.',
+         };
+      }
+   }
 
-   const startAt = input.startAt ? Date.parse(input.startAt) : null;
-   const endAt = input.endAt ? Date.parse(input.endAt) : null;
+   const minOrderTotal = normalizeText(draft?.minOrderTotal);
+   if (minOrderTotal) {
+      const n = toNumber(minOrderTotal);
+      if (!Number.isFinite(n) || n < 0)
+         return {
+            ok: false,
+            message: '최소 주문금액은 0 이상의 숫자여야 합니다.',
+         };
+   }
 
-   if (startAt && Number.isNaN(startAt))
-      return { ok: false, message: 'startAt 형식이 올바르지 않습니다.' };
-   if (endAt && Number.isNaN(endAt))
-      return { ok: false, message: 'endAt 형식이 올바르지 않습니다.' };
-   if (startAt && endAt && endAt < startAt)
-      return { ok: false, message: 'endAt은 startAt보다 빠를 수 없습니다.' };
+   const maxUses = normalizeText(draft?.maxUses);
+   if (maxUses) {
+      const n = toNumber(maxUses);
+      if (!Number.isFinite(n) || n < 0)
+         return {
+            ok: false,
+            message: '최대 사용횟수는 0 이상의 숫자여야 합니다.',
+         };
+   }
 
-   const maxUses =
-      input.maxUses === undefined || input.maxUses === null
-         ? null
-         : Math.max(1, normalizeInt(input.maxUses, 1));
+   return { ok: true };
+}
 
-   const perUserLimit =
-      input.perUserLimit === undefined || input.perUserLimit === null
-         ? null
-         : Math.max(1, normalizeInt(input.perUserLimit, 1));
+export function validateOrderStatusTransition(from, to) {
+   const f = String(from || '').toUpperCase();
+   const t = String(to || '').toUpperCase();
 
-   const minOrder =
-      input.minOrder === undefined || input.minOrder === null
-         ? null
-         : normalizeMoney(input.minOrder);
+   // Allowed statuses
+   const allowed = new Set(['PAID', 'SHIPPING', 'DELIVERED', 'CANCELED']);
+   if (!allowed.has(f) || !allowed.has(t)) {
+      return { ok: false, message: '유효하지 않은 주문 상태입니다.' };
+   }
 
-   return {
-      ok: true,
-      data: {
-         code,
-         title,
-         rate,
-         isActive,
-         startAt,
-         endAt,
-         maxUses,
-         perUserLimit,
-         minOrder,
-         updatedAt: Date.now(),
-      },
+   // Terminal
+   if (f === 'DELIVERED')
+      return { ok: false, message: '배송완료 주문은 상태 변경이 제한됩니다.' };
+   if (f === 'CANCELED')
+      return { ok: false, message: '취소 주문은 상태 변경이 제한됩니다.' };
+
+   // Transitions
+   const nextMap = {
+      PAID: new Set(['SHIPPING', 'CANCELED']),
+      SHIPPING: new Set(['DELIVERED', 'CANCELED']),
    };
-}
 
-/* ==============================
-    3) Order status transition
- ============================== */
+   const ok = nextMap[f]?.has(t) ?? false;
+   if (!ok) {
+      return { ok: false, message: `상태 전이 불가: ${f} → ${t}` };
+   }
 
-export const ORDER_STATUS = /** @type {const} */ ([
-   'PAID',
-   'SHIPPING',
-   'DELIVERED',
-   'CANCELED',
-]);
-
-export function normalizeOrderStatus(v) {
-   const s = normalizeUpper(v);
-   if (ORDER_STATUS.includes(s)) return s;
-   return 'PAID';
-}
-
-/**
- * ✅ 상태 전이 규칙 (운영 안정성)
- * - PAID -> SHIPPING, CANCELED
- * - SHIPPING -> DELIVERED, CANCELED
- * - DELIVERED -> (없음)
- * - CANCELED -> (없음)
- */
-const ALLOWED_TRANSITIONS = {
-   PAID: new Set(['SHIPPING', 'CANCELED']),
-   SHIPPING: new Set(['DELIVERED', 'CANCELED']),
-   DELIVERED: new Set([]),
-   CANCELED: new Set([]),
-};
-
-export function canTransitionOrderStatus(from, to) {
-   const f = normalizeOrderStatus(from);
-   const t = normalizeOrderStatus(to);
-   if (f === t) return { ok: true };
-   const allowed = ALLOWED_TRANSITIONS[f] || new Set();
-   return allowed.has(t)
-      ? { ok: true }
-      : { ok: false, message: `상태 전이 불가: ${f} -> ${t}` };
+   return { ok: true };
 }
