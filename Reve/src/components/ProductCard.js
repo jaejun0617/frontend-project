@@ -49,7 +49,7 @@ function getSizeOptions(product) {
 }
 
 /* ==============================
-  ✅ Image helpers (safe)
+✅ Image helpers (safe)
 ============================== */
 
 function buildPlaceholderImage({ id, name }) {
@@ -115,96 +115,96 @@ export function ProductCard(product) {
 
    return `
 <article
-  class="product-card"
-  data-product-id="${safeId}"
-  data-selected-size=""
-  ${hasSize ? `data-requires-size="1"` : ``}
+class="product-card"
+data-product-id="${safeId}"
+data-selected-size=""
+${hasSize ? `data-requires-size="1"` : ``}
 >
-  <a
-    class="product-card__thumb"
-    href="/product/${safeId}"
-    data-link
-    aria-label="${escapeHtml(rawName)} 상세 보기"
-  >
-    <img
-      class="product-card__img"
-      src="${safeImgSrc}"
-      alt="${safeName}"
-      loading="lazy"
-      decoding="async"
-      onerror="this.onerror=null; this.src='${safeFallback}';"
-    />
-  </a>
+<a
+  class="product-card__thumb"
+  href="/product/${safeId}"
+  data-link
+  aria-label="${escapeHtml(rawName)} 상세 보기"
+>
+  <img
+    class="product-card__img"
+    src="${safeImgSrc}"
+    alt="${safeName}"
+    loading="lazy"
+    decoding="async"
+    onerror="this.onerror=null; this.src='${safeFallback}';"
+  />
+</a>
 
-  <div class="product-card__body">
-    <h3 class="product-card__name">
-      <a href="/product/${safeId}" data-link>${safeName}</a>
-    </h3>
+<div class="product-card__body">
+  <h3 class="product-card__name">
+    <a href="/product/${safeId}" data-link>${safeName}</a>
+  </h3>
 
-    <div class="product-card__pricebox">
-      ${
-         isDiscounted
-            ? `
-            <p class="product-card__base" aria-label="정가">₩ ${formatKRW(basePrice)}</p>
-            <p class="product-card__price" aria-label="할인가">
-              ₩ ${formatKRW(price)}
-              <span class="product-card__discount" aria-label="할인율">-${percent}%</span>
-            </p>
-          `
-            : `<p class="product-card__price">₩ ${formatKRW(price)}</p>`
-      }
-    </div>
-
-    <ul class="product-card__tags" aria-label="Product Tags">
-      ${
-         displayTags.length
-            ? displayTags
-                 .map((t) => `<li class="product-tag">#${escapeHtml(t)}</li>`)
-                 .join('')
-            : ''
-      }
-    </ul>
-
+  <div class="product-card__pricebox">
     ${
-       hasSize
+       isDiscounted
           ? `
-        <div class="product-card__sizes" aria-label="사이즈 선택" data-size-pills>
-          ${sizes
-             .map((s) => {
-                const v = String(s).trim();
-                if (!v) return '';
-                return `
-                 <button
-                   type="button"
-                   class="size-pill"
-                   data-size-pill
-                   data-size="${escapeHtml(v)}"
-                   data-size-value="${escapeHtml(v)}"
-                   aria-pressed="false"
-                 >
-                   ${escapeHtml(v)}
-                 </button>
-                `;
-             })
-             .join('')}
-        </div>
-      `
+          <p class="product-card__base" aria-label="정가">₩ ${formatKRW(basePrice)}</p>
+          <p class="product-card__price" aria-label="할인가">
+            ₩ ${formatKRW(price)}
+            <span class="product-card__discount" aria-label="할인율">-${percent}%</span>
+          </p>
+        `
+          : `<p class="product-card__price">₩ ${formatKRW(price)}</p>`
+    }
+  </div>
+
+  <ul class="product-card__tags" aria-label="Product Tags">
+    ${
+       displayTags.length
+          ? displayTags
+               .map((t) => `<li class="product-tag">#${escapeHtml(t)}</li>`)
+               .join('')
           : ''
     }
+  </ul>
 
-    <!-- ✅ 하단 고정 액션 영역 -->
-    <div class="product-card__floating">
-      <button
-        type="button"
-        class="cart-fav-btn"
-        data-add-cart
-        aria-label="장바구니 담기"
-        title="장바구니 담기"
-      >
-        <img src="/src/icons/favorite.svg" alt="" aria-hidden="true" />
-      </button>
-    </div>
+  ${
+     hasSize
+        ? `
+      <div class="product-card__sizes" aria-label="사이즈 선택" data-size-pills>
+        ${sizes
+           .map((s) => {
+              const v = String(s).trim();
+              if (!v) return '';
+              return `
+               <button
+                 type="button"
+                 class="size-pill"
+                 data-size-pill
+                 data-size="${escapeHtml(v)}"
+                 data-size-value="${escapeHtml(v)}"
+                 aria-pressed="false"
+               >
+                 ${escapeHtml(v)}
+               </button>
+              `;
+           })
+           .join('')}
+      </div>
+    `
+        : ''
+  }
+
+  <!-- ✅ 하단 고정 액션 영역 -->
+  <div class="product-card__floating">
+    <button
+      type="button"
+      class="cart-fav-btn"
+      data-add-cart
+      aria-label="장바구니 담기"
+      title="장바구니 담기"
+    >
+      <img src="/src/icons/favorite.svg" alt="" aria-hidden="true" />
+    </button>
   </div>
+</div>
 </article>
 `;
 }

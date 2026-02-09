@@ -333,10 +333,63 @@ function getFileFromInput(el) {
 }
 
 /* ==============================
+   4.5) Brand/Tags helpers (NEW)
+============================== */
+
+function slugifyBrand(brand) {
+   return String(brand || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '') // 공백 제거
+      .replace(/[^a-z0-9가-힣]/g, ''); // 특수문자 제거
+}
+
+function uniq(arr) {
+   return Array.from(new Set((arr || []).filter(Boolean)));
+}
+
+function buildTagsFromForm(form) {
+   const brand = String(form?.brand || '').trim();
+   const tags = [];
+
+   if (brand) {
+      tags.push(brand);
+      tags.push(brand.toLowerCase());
+   }
+
+   if (form?.isHot) tags.push('HOT');
+   if (form?.isBest) tags.push('베스트');
+   if (form?.isNew) tags.push('신상');
+
+   if (form?.categoryMain) tags.push(form.categoryMain);
+   if (form?.categorySub) tags.push(form.categorySub);
+
+   return uniq(tags);
+}
+
+function getNextIdByBrandSlug(brandSlug) {
+   const list = adminProductStore.getProducts(); // 전체 상품
+   const nums = list
+      .map((p) => String(p.id || ''))
+      .filter((id) => id.startsWith(`${brandSlug}-`))
+      .map((id) => Number(id.split('-').pop()))
+      .filter((n) => Number.isFinite(n));
+
+   const max = nums.length ? Math.max(...nums) : 0;
+   return `${brandSlug}-${max + 1}`;
+}
+
+/* ==============================
    5) Modals
 ============================== */
 
-function openFormModal({ title, fields, initial = {}, submitText = '저장' }) {
+function openFormModal({
+   title,
+   fields,
+   initial = {},
+   submitText = '저장',
+   onMount,
+}) {
    return new Promise((resolve) => {
       const overlay = document.createElement('div');
       overlay.className = 'reve-modal-overlay admin-form-overlay';
@@ -438,7 +491,12 @@ function openFormModal({ title, fields, initial = {}, submitText = '저장' }) {
           </div>
         </div>
       `;
-
+      // ✅ 여기 추가: DOM 준비된 시점에 caller가 overlay를 만질 수 있게
+      try {
+         if (typeof onMount === 'function') onMount(overlay);
+      } catch (e) {
+         console.warn('[admin] onMount failed:', e);
+      }
       /* --------------------------------
          ✅ categoryMain/categorySub 연동
       -------------------------------- */
@@ -882,12 +940,19 @@ export function initAdminPage() {
    const sortProductsLatestFirst = (list) => {
       const arr = Array.isArray(list) ? [...list] : [];
       return arr.sort((a, b) => {
-         const at = Number(a?.createdAt || 0) || 0;
-         const bt = Number(b?.createdAt || 0) || 0;
+         const at = Number(a?.updatedAt || 0) || 0;
+         const bt = Number(b?.updatedAt || 0) || 0;
          if (bt !== at) return bt - at;
-         const au = Number(a?.updatedAt || 0) || 0;
-         const bu = Number(b?.updatedAt || 0) || 0;
-         return bu - au;
+         return (
+            (Number(b?.createdAt || 0) || 0) - (Number(a?.createdAt || 0) || 0)
+         );
+         //최신순
+         // const at = Number(a?.createdAt || 0) || 0;
+         // const bt = Number(b?.createdAt || 0) || 0;
+         // if (bt !== at) return bt - at;
+         // const au = Number(a?.updatedAt || 0) || 0;
+         // const bu = Number(b?.updatedAt || 0) || 0;
+         // return bu - au;
       });
    };
 
@@ -1182,13 +1247,58 @@ export function initAdminPage() {
                type: 'textarea',
                placeholder: '상품 설명(선택)',
             },
+            {
+               key: 'brand',
+               label: '브랜드',
+               type: 'select',
+               options: [
+                  { value: '', label: '선택' } /* 여기 브랜드 옵션 채울 예정 */,
+               ],
+               hint: '브랜드 선택 시 ID 추천값이 자동으로 채워집니다.',
+            },
+            { key: 'isHot', label: 'HOT', type: 'checkbox' },
+            { key: 'isBest', label: '베스트', type: 'checkbox' },
+            { key: 'isNew', label: '신상', type: 'checkbox' },
          ];
+         // ✅ 브랜드 옵션 자동 채우기 (기존 상품들에서 추출)
+         const brands = uniq(
+            adminProductStore
+               .getProducts()
+               .map((p) => String(p.brand || '').trim()),
+         ).sort((a, b) => a.localeCompare(b));
 
+         const brandField = fields.find((f) => f.key === 'brand');
+         if (brandField) {
+            brandField.options = [
+               { value: '', label: '선택' },
+               ...brands.map((b) => ({ value: b, label: b })),
+            ];
+         }
          const form = await openFormModal({
             title: '상품 등록',
             fields,
             initial: { active: true, couponEligible: true },
             submitText: '등록',
+            onMount: (overlay) => {
+               const brandEl = overlay.querySelector('[data-f="brand"]');
+               const idEl = overlay.querySelector('[data-f="id"]');
+               if (!brandEl || !idEl) return;
+
+               const updateIdPreview = () => {
+                  const brand = String(brandEl.value || '').trim();
+                  if (!brand) return;
+
+                  // 사용자가 이미 id를 직접 입력했다면 덮어쓰지 않기
+                  const typed = String(idEl.value || '').trim();
+                  if (typed) return;
+
+                  const slug = slugifyBrand(brand);
+                  idEl.value = getNextIdByBrandSlug(slug);
+               };
+
+               brandEl.addEventListener('change', updateIdPreview);
+               updateIdPreview();
+            },
          });
          if (!form) return;
 
@@ -1214,6 +1324,38 @@ export function initAdminPage() {
 
          delete form.__fileInputs;
          delete form.imageFile;
+
+         // ✅ validate 전에 정규화 (brand/tags/id)
+         form.brand = String(form.brand || '').trim();
+
+         if (!String(form.id || '').trim() && form.brand) {
+            const slug = slugifyBrand(form.brand);
+            form.id = getNextIdByBrandSlug(slug);
+         }
+
+         form.tags = buildTagsFromForm(form);
+
+         delete form.isHot;
+         delete form.isBest;
+         delete form.isNew;
+
+         // ✅ 기존 URL 검사 (그대로)
+         const url = String(form.image || '').trim();
+         if (
+            url &&
+            !url.startsWith('data:image/') &&
+            !url.startsWith('blob:') &&
+            !url.startsWith('http://') &&
+            !url.startsWith('https://') &&
+            !url.startsWith('/') &&
+            !url.startsWith('./') &&
+            !url.startsWith('../')
+         ) {
+            toast.show('이미지 URL 형식이 올바르지 않습니다.', {
+               duration: 1600,
+            });
+            return;
+         }
 
          const v = validateProductDraft(form);
          if (!v.ok) {
@@ -1358,6 +1500,24 @@ export function initAdminPage() {
 
          delete form.__fileInputs;
          delete form.imageFile;
+
+         // ✅ 여기! (validate 전에)
+         const url = String(form.image || '').trim();
+         if (
+            url &&
+            !url.startsWith('data:image/') &&
+            !url.startsWith('blob:') &&
+            !url.startsWith('http://') &&
+            !url.startsWith('https://') &&
+            !url.startsWith('/') &&
+            !url.startsWith('./') &&
+            !url.startsWith('../')
+         ) {
+            toast.show('이미지 URL 형식이 올바르지 않습니다.', {
+               duration: 1600,
+            });
+            return;
+         }
 
          const v = validateProductDraft(form, { allowIdExisting: true });
          if (!v.ok) {

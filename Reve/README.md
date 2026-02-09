@@ -1,7 +1,7 @@
-# REVE MVP 기능 구현 기록 (Auth / Cart / Product / Search)
+# REVE MVP 기능 구현 기록 (Auth / Cart / Product / Search / Admin)
 
 목적: MVP 전자상거래 흐름을 **라우터 기반 SPA + localStorage 기반 스토어**로 구현  
-범위: 인증/권한, 쿠폰, 장바구니(옵션), 상품리스트 UX, 전역 이벤트 위임, 검색, 멤버십(등급/적립), 주문/배송
+범위: 인증/권한, 쿠폰, 장바구니(옵션), 상품리스트 UX, 전역 이벤트 위임, 검색, 멤버십(등급/적립), 주문/배송, **관리자(Admin)**
 
 ---
 
@@ -24,7 +24,9 @@
 - [14) 승급 쿠폰 지급(Upgrade Reward)](#14-승급-쿠폰-지급upgrade-reward)
 - [15) 주문(Order) 시스템](#15-주문order-시스템)
 - [16) 결제 완료 페이지(Checkout Success)](#16-결제-완료-페이지checkout-success)
-- [17) 다음 작업 후보(TODO)](#17-다음-작업-후보todo)
+- [17) 관리자(Admin) 운영툴](#17-관리자admin-운영툴)
+- [18) 품질/안정성 체크리스트(P2)](#18-품질안정성-체크리스트p2)
+- [19) 다음 작업 후보(TODO)](#19-다음-작업-후보todo)
 
 ---
 
@@ -57,9 +59,11 @@
 - `src/pages/checkoutSuccess/index.js`  
   결제 완료 페이지(주문 요약, 등급, 포인트 안내)
 - `src/pages/search/index.js`  
-  검색 페이지(`/search?q=`) + 최근/추천 + 결과 렌더 + (4탄) 필터/정렬/페이지네이션
+  검색 페이지(`/search?q=`) + 최근/추천 + 결과 렌더 + 필터/정렬/페이지네이션
 - `src/pages/mypage/index.js`  
   마이페이지(내정보, 배송지 CRUD, 주문내역, 주문·배송, 등급, 쿠폰)
+- `src/pages/admin/index.js`  
+  관리자 운영 툴(상품/주문/쿠폰/감사로그/백업)
 
 ### 스토어
 
@@ -73,6 +77,10 @@
   유저별 주문 저장소, 결제 완료 시 주문 생성 + 주문 상태 관리
 - `src/store/addressStore.js`  
   유저별 배송지 CRUD, 기본 배송지 지정, persist + owner 스위칭
+- `src/store/adminProductStore.js`  
+  **Admin 상품 SSOT**: normalize/repair, createdAt/updatedAt 보장, 최신순 정렬, (옵션) 업로더 어댑터 슬롯, brand/tags 정규화
+- `src/store/adminOrderStore.js`, `src/store/adminCouponStore.js`  
+  Admin 주문/쿠폰 운영 스토어
 
 ### 유틸 / 컴포넌트
 
@@ -83,9 +91,12 @@
 - `src/utils/sidebar.js` : 사이드바 전역 UI
 - `src/utils/authUi.js` : Header 메뉴 노출/갱신
 - `src/utils/membership.js` : 멤버십 계산 단일 소스
+- `src/utils/validate.js` : Product/Coupon/Order 검증
+- `src/utils/auditLog.js` : 감사 로그 저장/구독
+- `src/utils/exportImport.js` : Admin 데이터 번들 Export/Import
 - `src/components/Toast.js` : 토스트
 - `src/components/ConfirmModal.js` : 확인/취소 모달
-- `src/components/ProductCard.js` : 상품 카드(사이즈 pill + 장바구니 아이콘)
+- `src/components/ProductCard.js` : 상품 카드(사이즈 pill + 장바구니 아이콘 + 태그 + 안전 이미지)
 
 ---
 
@@ -96,9 +107,7 @@
 - `initSearchDrawer()`로 전역 1회 초기화
 - 라우팅이 바뀌어도 유지되는 UI
 - `app:render`마다 `searchDrawer.refresh()` 호출로 최신 DOM 기준 재연결
-- Header 검색 버튼/아이콘으로 열리는 구조
-- 최근 검색어 CRUD(개별 삭제/전체 삭제) 지원
-- 추천 검색어(정적 배열) 칩 제공
+- 최근 검색어 CRUD(개별 삭제/전체 삭제) + 추천 검색어 칩
 - 검색 실행 시 `/search?q=...`로 이동(`app:navigate`)
 
 #### UX 규칙(최종)
@@ -112,27 +121,19 @@
    - `window.dispatchEvent(new CustomEvent('app:searchDrawerClose'))`
    - `app.js`가 수신하여 `searchDrawer.close()` 실행
 
----
+### Search Page (`/search?q=`) ✅ (P1)
 
-### Search Page (`/search?q=`) ✅
-
-- 라우트 등록
-   - `'/search': { render: SearchPage, afterRender: initSearchPage }`
-- 쿼리 기반 검색 결과 렌더
-   - `loading / empty / error / result` 상태 분기
+- 라우트 등록: `'/search': { render: SearchPage, afterRender: initSearchPage }`
+- 쿼리 기반 결과 렌더: `loading / empty / error / result`
 - 최근/추천 검색어 UI를 페이지에도 노출
-   - 최근: 개별 삭제(×), 전체삭제
-   - 칩 클릭 시 `/search?q=...` 이동 + 최근 검색어 갱신
-- SearchDrawer ↔ SearchPage 동기화
-   - `recent-search:changed` 이벤트로 최근검색 UI 즉시 동기화
+- SearchDrawer ↔ SearchPage 동기화: `recent-search:changed`
 
-#### (고도화 4탄) SearchPage 탐색 UX 통합
+#### SearchPage 탐색 UX 통합 ✅
 
 - 가격 필터: `min/max`
 - 정렬: `NEW / PRICE_ASC / PRICE_DESC / HOT / BEST`
 - 페이지네이션: `20개/페이지`
-- URL 쿼리 동기화:
-   - `/search?q=...&min=&max=&sort=&page=`
+- URL 쿼리 동기화: `/search?q=...&min=&max=&sort=&page=`
    - `replaceState`로 URL만 갱신해 재마운트 방지
 - UX
    - 필터/정렬 변경은 **즉시 반영** + `page=1` 리셋
@@ -228,56 +229,23 @@
 - 담김 상태 `.is-added` 유지
 - 담긴 사이즈 pill `is-in-cart` 표시 가능 구조
 
-### 상품 리스트 UX (Product Page) ✅ 필터/정렬/페이지네이션
+### (P2) 안전한 이미지 렌더링 ✅
 
-#### 목표
+- `product.image` 허용:
+   - `data:image/*`, `blob:`, `http(s)://`, 상대경로(`/`, `./`, `../`)
+- 위험 스킴 차단 후 placeholder로 대체
+- 이미지 로딩 실패 시 placeholder로 fallback
 
-- **초기 진입 시** 아무 것도 누르지 않아도 **기본 20개가 바로 렌더**
-- 가격대/정렬은 **선택 즉시 반영**
-- 페이지 이동 시 **URL 동기화 + 자동 스크롤**로 이동 피로 제거
+### 상품 리스트 UX (Product Page) ✅
 
-#### 구성 파일
-
-- `src/pages/product/index.js`
-   - 필터/정렬/페이지네이션 + URL query 동기화
-   - 렌더와 이벤트 위임을 한 곳에서 관리
-- `src/components/ProductCard.js`
-   - 카드 UI/사이즈 pill 제공(리스트/상세 UI 일관성)
-- `src/store/cartStore.js`
-   - 담김 상태 동기화(`hasLine`)로 리스트 UI 반영
-
-#### 제공 기능
-
-- 가격 필터: `min/max`
-   - 입력 즉시 반영 (입력 시 `page=1`로 리셋)
-- 정렬:
-   - `NEW` 최신순(목업에서는 id 내 숫자 기반)
-   - `PRICE_DESC` 가격 높은순
-   - `PRICE_ASC` 가격 낮은순
-   - `HOT` / `BEST` 우선 노출(동률은 최신 우선)
-- 페이지네이션:
-   - 기본 `20개/페이지`
-   - 이전/다음/페이지 번호 제공
-- URL 쿼리 동기화:
-   - `/product?min=&max=&sort=&page=`
-   - 새로고침/링크 공유/뒤로가기 시 상태 복원 가능
-
-#### UX 디테일
-
-- 필터/정렬 변경 시:
-   - **즉시 반영**
-   - `page=1`로 자동 리셋
-- 페이지 이동 시:
-   - 리스트 상단(필터 영역)으로 **자동 스크롤**
-   - 다음 20개가 바로 보이도록 처리
-- 요약 문구:
-   - `총 N개 · 조건 · page/totalPages` 형태로 현재 상태 안내
+- 가격 필터: `min/max` (입력 즉시 반영 + `page=1` 리셋)
+- 정렬: `NEW / PRICE_DESC / PRICE_ASC / HOT / BEST`
+- 페이지네이션: `20개/페이지`
+- URL 쿼리 동기화: `/product?min=&max=&sort=&page=`
 
 #### 절대 규칙(안전장치)
 
 - `bindSizePills()` 로직은 **수정 금지**
-   - ProductCard의 사이즈 선택/활성화 CSS 동작을 깨뜨릴 수 있음
-   - 필터/정렬/페이지네이션 추가는 **bindSizePills 외부**에서만 처리
 
 ---
 
@@ -296,9 +264,8 @@
 3. mock 결제(`handleCheckout`)
 4. 완료 모달(요약 표시)
 5. 이동 분기
-
-- 주문 확인: `/checkout/success?orderId=...`
-- 계속 쇼핑: `/product`
+   - 주문 확인: `/checkout/success?orderId=...`
+   - 계속 쇼핑: `/product`
 
 ### 멤버십/포인트
 
@@ -310,70 +277,17 @@
 
 ## 8) 배송지(Address) 시스템
 
-### 목표
-
-- 결제 진행 조건으로 기본 배송지 필요
+- 결제 진행 조건: 기본 배송지 필요
 - Cart에서 기본 배송지 요약 + 변경은 MyPage에서 수행
 - 주문 저장 시 배송지 스냅샷 포함(주문 당시 주소 보존)
-
-### 구현 구성
-
-#### 1) addressStore (유저별 분리 + CRUD)
-
-- storage key: `reve_addresses_v1:<ownerKey>`
-- owner 전환: `addressStore.setOwner(userId || 'guest')`
-- 제공 기능
-   - `getAddresses()`
-   - `getAddress(id)`
-   - `createAddress(payload)`
-   - `updateAddress(id, payload)`
-   - `deleteAddress(id)`
-   - `setDefault(id)`
-   - `getDefault()`
-
-#### 2) MyPage 배송지 탭 (CRUD UI)
-
-- 배송지 추가/수정/삭제
-- 기본 배송지 설정
-- 입력 모달 기반 폼
-- 이벤트 위임으로 패널 내부 처리
-
-#### 3) Cart 배송지 요약 UI
-
-- 기본 배송지 존재 시 요약 노출
-- “변경” 클릭 시 `/mypage?tab=address` 이동
-- 기본 배송지 없으면 “등록” CTA 노출
-
-#### 4) 결제 가드(ensureDefaultAddress)
-
-- 기본 배송지 없으면 결제 진행 중단 + `/mypage?tab=address` 유도
-- 주소는 있어도 기본 배송지 없으면 “기본 배송지 설정” 유도
-
-#### 5) 주문 저장 시 배송지 스냅샷 포함
-
-- 결제 payload에 `shippingAddress` 스냅샷 포함
-- 주소가 이후 수정되어도 주문 당시 주소 유지
 
 ---
 
 ## 9) 전역 이벤트 위임(app.js)
 
-### owner 스위칭
-
-- 앱 시작 시 현재 유저 기준 owner 세팅
-- `authStore.subscribe()`에서 로그인 상태 변경 시 owner 변경 후 스위칭
-- 대상 스토어: `cart / coupon / order / address`
-
-### 동기화
-
-- `cartStore.subscribe()`로 헤더 뱃지 및 리스트 동기화
-- `syncProductCardsWithCart()`로 아이콘/사이즈 표시 동기화
-
-### SearchDrawer 외부 제어(브릿지)
-
-- SearchPage 진입 시 드로어가 열려있다면 자동으로 닫기
-- 이벤트: `app:searchDrawerClose`
-   - `app.js`에서 수신 → `searchDrawer.close()`
+- 로그인 상태 변경 시 owner 스위칭: `cart/coupon/order/address`
+- `cartStore.subscribe()`로 헤더 뱃지/리스트 동기화
+- SearchDrawer 브릿지: `app:searchDrawerClose`
 
 ---
 
@@ -410,135 +324,110 @@
 
 - `src/utils/membership.js`
 - `getMembershipSnapshot({ totalSpent, checkoutTotal })`
-   - `current / next / remainToNext / progressToNextPct`
-   - `earnRate / expectedPoints`
-- `getUpgradedTiers({ prevTotalSpent, nextTotalSpent })`
-- `getUpgradeCouponCode(tierName)`
-- `formatPercent(rate)`
 
 ---
 
 ## 13) 마이페이지(MyPage)
 
-### 탭 구성
-
 - 내 정보 / 배송지 / 주문내역 / 주문·배송 / 회원등급 / 쿠폰·혜택
-
-### 쿠폰 UX
-
-- 사용 가능 쿠폰 우선 노출
-- 사용 완료 쿠폰은 토글로 펼치기
-- 승급 쿠폰은 prefix 기반 표시
-
-### 배송지(Address)
-
-- CRUD + 기본 배송지 + 입력 모달
-- Cart 이동 딥링크(`/mypage?tab=address`) 지원
-
-### 주문내역
-
-- `orderStore.getOrders()`로 렌더
-- 상태 변경(테스트) 버튼 유지
-
-### 딥링크(탭/자동 액션) + 1회성 소비(consume)
-
-- `/mypage?tab=address&open=add` → 배송지 추가 모달 자동 오픈(1회)
-- `/mypage?tab=orders&open=detail&orderId=...` → 주문 상세 모달 자동 오픈(1회)
-- `/mypage?tab=coupon&focus=register` → 쿠폰 입력창 자동 포커스(1회)
-
-> `open / focus / orderId`는 실행 직후 URL에서 제거(consume)되어  
-> 새로고침/뒤로가기에서도 반복 트리거되지 않는다. (`replaceState` 기반)
-
-### MyPage - 주문/배송(Delivery) 탭 구현 ✅
-
-- 주문 상태별 필터 제공(전체/결제완료/배송중/배송완료/취소)
-- 주문 카드 기반 배송 타임라인 UI(결제→배송→완료, 취소 시 멈춤 표시)
-- 운송장(가짜 코드) 생성 + 배송조회 모달(MVP)
-- “상세”는 기존 주문 상세 모달(confirmModal) 재사용
-- 배송지 스냅샷 표시(주문 당시 주소 유지)
-
-#### 배송 단계별 날짜(체크리스트) ✅
-
-- 주문에 `statusHistory`를 기록/표시하는 구조로 확장
-- 상태 전환 시점의 타임스탬프 저장
-   - `PAID / SHIPPING / DELIVERED / CANCELED`
-- 타임라인 각 단계 아래 날짜 라벨로 노출 가능
+- 딥링크(탭/자동 액션) + 1회성 consume(`replaceState`)
+- 주문/배송 탭: 상태 필터 + 타임라인 + 운송장 모달(MVP)
 
 ---
 
 ## 14) 승급 쿠폰 지급(Upgrade Reward)
 
-- 단일 소스: `membership.js`의 `UPGRADE_COUPON_BY_TIER`
-- 결제 후 누적 구매액 변화로 승급 감지
 - 점프 승급 시 중간 등급 포함 지급
-- 지급은 `couponStore.register(code)` 처리(중복 방지)
-- `grantedUpgradeCoupons[]`로 결과 반환
+- `couponStore.register(code)`로 중복 방지
 
 ---
 
 ## 15) 주문(Order) 시스템
 
-### orderStore
-
-- storage key: `reve_orders_v1:<ownerKey>`
-- owner 전환: `orderStore.setOwner(userId || 'guest')`
-
-### 제공 API
-
-- `getOrders()` / `getOrder(orderId)`
-- `createOrder(orderPayload)`
-- `updateOrderStatus(orderId, status)`
-- (확장) `statusHistory` 기록을 위한 필드 지원
-
-### 결제 → 주문 저장
-
-- 결제 성공 직후 주문 저장
-- payload에 `shippingAddress` 포함(스냅샷)
-- 쿠폰 사용 처리, 포인트/누적 구매 반영, 승급 쿠폰 지급, cart clear 순서로 처리
+- `orderStore.createOrder()`로 결제 후 주문 저장
+- 상태 변경 + (확장) statusHistory 구조 지원
 
 ---
 
 ## 16) 결제 완료 페이지(Checkout Success)
 
 - `/checkout/success?orderId=...`
-- 주문 조회 후 요약 렌더
-- 주문 없으면 empty 상태 + CTA 제공
-
-### 주문 요약
-
-- 주문번호 / 결제일시 / 상태
-- 쿠폰 / 배송비 / 최종 결제금액
-- 주문 상품 리스트(최대 5개)
-- 멤버십 안내(보유 포인트: authStore)
-- 배송지 스냅샷(있을 경우)
+- 주문 요약 + 주문 상품 리스트 + 멤버십 안내 + 배송지 스냅샷
 
 ---
 
-## 17) 다음 작업 후보(TODO)
+## 17) 관리자(Admin) 운영툴 ✅ (P3)
 
-> 기준: “효과 대비 리스크 낮고, 사용자 체감 큰 것”부터
+경로: `/admin` (app.js에서 `requireAdmin` 가드 적용)
 
-### P1. 검색(Search) 후속 고도화 🔍 (가성비 최고)
+### 탭 구성
 
-- 키워드 하이라이트(검색 결과 카드에서 q 강조 표시)
-- 입력 디바운스(가격 필터/검색 입력 시 URL 업데이트 빈도 줄이기)
-- 필터 상태 칩 노출(min/max/sort) + 원클릭 제거
-- 검색 결과 `aria-live` 적용(접근성: 결과 갱신 안내)
+- 상품 관리 / 주문 관리 / 쿠폰/이벤트 / 감사 로그 / 백업/복구
 
-### P2. 품질/안정성 🧪 (유지보수 레벨 업)
+### 상품 관리 ✅ (등록/수정/삭제 + 대/중분류 + 이미지 + 브랜드/태그)
 
-- 스토어 스키마 버전업/마이그레이션 유틸(예: v1 → v2)
-- 방어적 렌더링 강화(깨진 데이터 자동 복구/초기화)
-- E2E 시나리오 체크리스트 문서화
-   - guest → signup → search/product → add cart → checkout → mypage
+#### 1) 대/중분류 연동
 
-### P3. 관리자(Admin) 🧰 (기능 확장)
+- `categoryMain` 변경 시 `categorySub` 옵션 자동 변경
+- 리스트 필터: 검색/대분류/중분류/상태
 
-- 상품 등록/수정/삭제(대분류/중분류)
+#### 2) 이미지: URL + 파일 첨부 ✅
+
+- 파일 첨부 시 DataURL(base64)로 변환 → `image`에 자동 반영
+- 2MB 제한(로컬 저장 한계 대응)
+- 허용 스킴: `data:image/*`, `blob:`, `http(s)`, 상대경로
+
+#### 3) 최신순 정렬(기본) ✅
+
+- `updatedAt desc` 우선, 동률이면 `createdAt desc`
+
+#### 4) 브랜드/태그 + 브랜드 기반 ID 자동 ✅
+
+- `slugifyBrand(brand)`로 브랜드 slug 생성
+- `getNextIdByBrandSlug(slug)`로 다음 ID 발급  
+  예: `nike-3`
+- tags 자동 생성:
+   - brand, brand lowercase
+   - 뱃지: `HOT`, `베스트`, `신상`
+   - (선택) categoryMain/categorySub
+
+### 주문 관리 ✅
+
+- 주문 조회 + 상태 변경 + 상세 보기 모달
+- 상태 전이 검증 포함
+
+### 쿠폰/이벤트 ✅
+
+- 더미 생성 + 등록/수정/삭제 + 활성 토글 + 필터
+
+### 감사 로그 ✅
+
+- 관리자 액션 기록 + 로그 비우기 + 새로고침
+
+### 백업/복구 ✅
+
+- Export JSON 번들 생성
+- Import JSON 덮어쓰기 복원(confirm 포함)
+
+---
+
+## 18) 품질/안정성 체크리스트(P2)
+
+- 입력 검증: 상품/쿠폰/주문 상태 전이
+- 안전 렌더링: `escapeHtml` + 이미지 allowlist + fallback
+- 데이터 정규화: load 시 normalize/repair + `createdAt/updatedAt` 보장
+- 운영 편의: 감사 로그 + Export/Import
+
+---
+
+## 19) 다음 작업 후보(TODO)
+
+### P1. 관리자(Admin) 🧰 (기능 확장)
+
 - 주문 상태 관리(ADMIN 전용)
-- 이벤트/쿠폰 관리(선택)
+- 이벤트/쿠폰 관리 관리자가 사용 가능한 쿠폰을 등록하면 일반유저들이 코드를 알시 쿠폰지급 + 쿠폰사용가능하게
 
-### P4. 주문/배송 고도화 🚚 (현실감 강화)
+### P2. 주문/배송 고도화 🚚 (현실감 강화)
 
 - `statusHistory`를 orderStore에 “정식 반영”(최초 1회 기록 규칙)
 - 취소 플로우(결제완료 상태에서 취소 가능) + 타임라인 반영

@@ -11,6 +11,11 @@
  * 3) 이미지 업로드 "어댑터 슬롯" 제공:
  *    - 지금: AdminPage에서 DataURL을 image에 넣으면 그대로 저장
  *    - 나중: Firebase 연결 시, imageUploader를 주입해서 File->URL 업로드로 교체 가능
+ *
+ * ✅ 추가 패치(브랜드/태그)
+ * 4) brand/tags normalize:
+ *    - brand: trim 보장
+ *    - tags: 배열 보장 + uniq + trim
  * =============================================
  */
 
@@ -63,7 +68,14 @@ function splitCSV(v) {
 }
 
 function uniq(arr) {
-   return Array.from(new Set(arr));
+   return Array.from(new Set((arr || []).filter(Boolean)));
+}
+
+/** tags는 배열/문자열/기타 입력을 모두 "배열"로 정규화 */
+function normalizeTags(v) {
+   if (Array.isArray(v)) return uniq(v.map((x) => normalizeText(x)));
+   if (typeof v === 'string') return uniq(splitCSV(v));
+   return [];
 }
 
 function sortLatestFirst(list) {
@@ -131,6 +143,10 @@ function normalizeItem(raw) {
 
    const image = normalizeText(raw?.image || raw?.imageUrl || '');
 
+   // ✅ NEW: brand/tags normalize (데이터가 깨져도 복구)
+   const brand = normalizeText(raw?.brand || '');
+   const tags = normalizeTags(raw?.tags);
+
    return {
       ...raw,
       id,
@@ -146,6 +162,8 @@ function normalizeItem(raw) {
       image,
       createdAt,
       updatedAt,
+      brand,
+      tags,
    };
 }
 
@@ -214,7 +232,6 @@ export const adminProductStore = {
    },
 
    seed(count = 100) {
-      // api/products.js의 adminSeedProducts는 "덮어쓰기 seed" 성격(현재 설계 기준)
       return (async () => {
          await ensureBoot();
          const r = await adminSeedProducts(count);
@@ -251,15 +268,22 @@ export const adminProductStore = {
          const payload = {
             ...draft,
             image,
+
+            // ✅ NEW: brand/tags normalize
+            brand: normalizeText(draft?.brand || ''),
+            tags: normalizeTags(draft?.tags),
+
             // form에서 들어오는 CSV -> 배열로 정규화
             apparelSizes: Array.isArray(draft?.apparelSizes)
                ? draft.apparelSizes
                : splitCSV(draft?.apparelSizes),
+
             shoeSizes: Array.isArray(draft?.shoeSizes)
                ? draft.shoeSizes
                : splitCSV(draft?.shoeSizes)
                     .map((n) => Number(n))
                     .filter(Number.isFinite),
+
             active: toBool(draft?.active, true),
 
             categoryMain: normalizeText(draft?.categoryMain || ''),
@@ -317,6 +341,12 @@ export const adminProductStore = {
             ...patch,
 
             image,
+
+            // ✅ NEW: brand/tags normalize (patch에 들어온 경우만 반영)
+            brand:
+               patch?.brand != null ? normalizeText(patch.brand) : undefined,
+
+            tags: patch?.tags != null ? normalizeTags(patch.tags) : undefined,
 
             apparelSizes:
                patch?.apparelSizes != null
