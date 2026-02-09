@@ -66,8 +66,24 @@ function normalizeItem(raw) {
    // - category: product 페이지/검색/필터에서 쓰는 "키"
    // - categoryMain/Sub: Admin 분류 UI용 "라벨"
    const category = normalizeText(raw?.category || raw?.categoryKey || '');
-   const categoryMain = normalizeText(raw?.categoryMain || category || '-');
-   const categorySub = normalizeText(raw?.categorySub || '');
+   // ✅ 더 넓게 호환 (seed/products.js가 어떤 키를 쓰든 최대한 살림)
+   const categoryMain = normalizeText(
+      raw?.categoryMain ||
+         raw?.mainCategory ||
+         raw?.categoryMainLabel ||
+         raw?.category ||
+         raw?.categoryKey ||
+         '-',
+   );
+
+   const categorySub = normalizeText(
+      raw?.categorySub ||
+         raw?.subCategory ||
+         raw?.subcategory ||
+         raw?.categorySubLabel ||
+         raw?.sub ||
+         '',
+   );
 
    const apparelSizes = Array.isArray(raw?.apparelSizes)
       ? raw.apparelSizes

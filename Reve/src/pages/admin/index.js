@@ -15,6 +15,11 @@
  * 설계 포인트
  * - root 내부 이벤트 위임(data-bound)으로 중복 init 방지
  * - localStorage 파손 대비: store가 normalize & repair 수행
+ *
+ * ✅ 이번 수정 포인트
+ * - 비동기 store 호출(await) 누락으로 성공 작업이 실패 토스트로 보이던 문제 수정
+ * - 상품 등록/수정 모달에 대/중분류 select 옵션 + main 변경 시 sub 자동 갱신
+ * - 상품 이미지 URL 필드 추가(미입력 시 placeholder 자동 생성)
  * =============================================
  */
 
@@ -298,7 +303,36 @@ function statusLabel(s) {
 }
 
 /* ==============================
-   4) Modals
+   4) Category + Image helpers
+============================== */
+
+/**
+ * adminProductStore.getCategories() 기반으로
+ * 모달에서 쓸 옵션 배열을 만들어준다.
+ */
+function getAdminCategoryOptions() {
+   const cats = adminProductStore.getCategories();
+   const mainOptions = (cats.main || []).map((m) => ({ value: m, label: m }));
+   const subAllOptions = (cats.subAll || []).map((s) => ({
+      value: s,
+      label: s,
+   }));
+   return { cats, mainOptions, subAllOptions };
+}
+
+/**
+ * 이미지 URL 미입력 시 기본 placeholder 생성
+ * (외부 이미지 정책이 싫으면 나중에 로컬 에셋 방식으로 교체 가능)
+ */
+function buildPlaceholderImage({ id, categoryMain, categorySub }) {
+   const text = encodeURIComponent(
+      `${categoryMain || 'product'}${categorySub ? `/${categorySub}` : ''}\n${id || ''}`,
+   );
+   return `https://placehold.co/800x800?text=${text}`;
+}
+
+/* ==============================
+   5) Modals
 ============================== */
 
 function openFormModal({ title, fields, initial = {}, submitText = '저장' }) {
@@ -391,6 +425,43 @@ function openFormModal({ title, fields, initial = {}, submitText = '저장' }) {
         </div>
       `;
 
+      /* --------------------------------
+         ✅ categoryMain/categorySub 연동
+      -------------------------------- */
+      const mainSel = overlay.querySelector('[data-f="categoryMain"]');
+      const subSel = overlay.querySelector('[data-f="categorySub"]');
+
+      if (mainSel && subSel) {
+         const cats = adminProductStore.getCategories();
+
+         const renderSubs = (main) => {
+            const m = String(main || '').trim();
+            const list = m ? cats.subByMain?.[m] || [] : cats.subAll || [];
+
+            subSel.innerHTML =
+               `<option value="">선택</option>` +
+               list
+                  .map(
+                     (s) =>
+                        `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`,
+                  )
+                  .join('');
+         };
+
+         // 최초 1회
+         renderSubs(String(mainSel.value || '').trim());
+
+         // initial sub 유효하면 유지
+         const initSub = String(initial?.categorySub || '').trim();
+         if (initSub) subSel.value = initSub;
+
+         // main 변경 시 sub 갱신
+         mainSel.addEventListener('change', () => {
+            renderSubs(String(mainSel.value || '').trim());
+            subSel.value = '';
+         });
+      }
+
       const getValue = (key, type) => {
          const el = overlay.querySelector(`[data-f="${key}"]`);
          if (!el) return '';
@@ -432,7 +503,7 @@ function openFormModal({ title, fields, initial = {}, submitText = '저장' }) {
 }
 
 /* ==============================
-   5) Products UI
+   6) Products UI
 ============================== */
 
 function renderProductsTable(products) {
@@ -505,8 +576,8 @@ function fillCategorySelects(root) {
    if (!mainSel || !subSel) return;
 
    const cats = adminProductStore.getCategories();
-   const main = cats.main;
-   const subByMain = cats.subByMain;
+   const main = cats.main || [];
+   const subByMain = cats.subByMain || {};
 
    // main options
    const currentMain = String(mainSel.value || '').trim();
@@ -522,7 +593,7 @@ function fillCategorySelects(root) {
 
    // sub options depends on main
    const mKey = String(mainSel.value || '').trim();
-   const subs = mKey ? subByMain[mKey] || [] : cats.subAll;
+   const subs = mKey ? subByMain[mKey] || [] : cats.subAll || [];
 
    const currentSub = String(subSel.value || '').trim();
    subSel.innerHTML =
@@ -539,7 +610,7 @@ function fillCategorySelects(root) {
 }
 
 /* ==============================
-   6) Orders UI
+   7) Orders UI
 ============================== */
 
 function renderOrdersTable(orders) {
@@ -605,7 +676,7 @@ function renderOrdersTable(orders) {
 }
 
 /* ==============================
-   7) Coupons UI
+   8) Coupons UI
 ============================== */
 
 function renderCouponsTable(coupons) {
@@ -684,7 +755,7 @@ function renderCouponsTable(coupons) {
 }
 
 /* ==============================
-   8) Audit UI
+   9) Audit UI
 ============================== */
 
 function renderAuditList(rows) {
@@ -725,7 +796,7 @@ function renderAuditList(rows) {
 }
 
 /* ==============================
-   9) Init
+   10) Init
 ============================== */
 
 export function initAdminPage() {
@@ -844,7 +915,7 @@ export function initAdminPage() {
    const paintOrders = () => {
       if (!ordersWrap) return;
 
-      const list = adminOrderStore.getAllOrders(); // includes __ownerKey
+      const list = adminOrderStore.getAllOrders();
       const q = String(state.orders.q || '').toLowerCase();
       const st = String(state.orders.status || 'ALL').toUpperCase();
 
@@ -909,7 +980,6 @@ export function initAdminPage() {
       C) Initial paint + subscriptions
    ------------------------------ */
 
-   // input -> state sync
    const syncFiltersFromDOM = () => {
       state.products.q = String(productQ?.value || '');
       state.products.main = String(productMain?.value || '');
@@ -923,7 +993,6 @@ export function initAdminPage() {
       state.coupons.active = String(couponActive?.value || 'ALL');
    };
 
-   // default category select fill
    fillCategorySelects(root);
 
    paintProducts();
@@ -939,7 +1008,6 @@ export function initAdminPage() {
       D) Events
    ------------------------------ */
 
-   // input events
    root.addEventListener('input', (e) => {
       if (e.target.closest('[data-admin-product-q]')) {
          syncFiltersFromDOM();
@@ -960,7 +1028,6 @@ export function initAdminPage() {
    root.addEventListener('change', (e) => {
       if (e.target.closest('[data-admin-product-main]')) {
          syncFiltersFromDOM();
-         // main 변경 시 sub options 갱신
          fillCategorySelects(root);
          paintProducts();
          return;
@@ -1014,6 +1081,9 @@ export function initAdminPage() {
          return;
       }
 
+      /* ---------
+         Seed Products
+      --------- */
       if (e.target.closest('[data-admin-seed-products]')) {
          const ok = await confirmModal({
             title: '더미 상품 생성',
@@ -1023,7 +1093,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminProductStore.seed();
+         const r = await adminProductStore.seed();
          if (r?.ok) {
             auditLog.add('PRODUCT_SEED', '더미 상품 생성', { count: r.count });
             toast.show(`더미 상품 ${r.count}개 생성`, { duration: 1400 });
@@ -1033,7 +1103,12 @@ export function initAdminPage() {
          return;
       }
 
+      /* ---------
+         Add Product
+      --------- */
       if (e.target.closest('[data-admin-add-product]')) {
+         const { mainOptions, subAllOptions } = getAdminCategoryOptions();
+
          const fields = [
             {
                key: 'id',
@@ -1045,12 +1120,15 @@ export function initAdminPage() {
             {
                key: 'categoryMain',
                label: '대분류',
-               placeholder: '예: 의류 / 신발 / 잡화',
+               type: 'select',
+               options: [{ value: '', label: '선택' }, ...mainOptions],
+               hint: '대분류 선택 시 중분류 옵션이 자동으로 변경됩니다.',
             },
             {
                key: 'categorySub',
                label: '중분류',
-               placeholder: '예: 후드 / 러닝화 / 가방',
+               type: 'select',
+               options: [{ value: '', label: '선택' }, ...subAllOptions],
             },
             {
                key: 'price',
@@ -1064,6 +1142,12 @@ export function initAdminPage() {
                type: 'number',
                placeholder: '12000',
                hint: '세일 전 가격(선택)',
+            },
+            {
+               key: 'image',
+               label: '이미지 URL(선택)',
+               placeholder: 'https://... (미입력 시 자동 생성)',
+               hint: '비워두면 placeholder 이미지가 자동으로 생성됩니다.',
             },
             { key: 'active', label: '활성', type: 'checkbox' },
             {
@@ -1111,7 +1195,16 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminProductStore.create(form);
+         // ✅ 이미지 미입력 시 자동 생성
+         if (!String(form.image || '').trim()) {
+            form.image = buildPlaceholderImage({
+               id: form.id,
+               categoryMain: form.categoryMain,
+               categorySub: form.categorySub,
+            });
+         }
+
+         const r = await adminProductStore.create(form);
          if (!r?.ok) {
             toast.show(r?.message || '등록 실패', { duration: 1600 });
             return;
@@ -1124,6 +1217,9 @@ export function initAdminPage() {
          return;
       }
 
+      /* ---------
+         Edit Product
+      --------- */
       const editBtn = e.target.closest('[data-admin-product-edit]');
       if (editBtn) {
          const id = String(
@@ -1135,6 +1231,8 @@ export function initAdminPage() {
             return;
          }
 
+         const { mainOptions, subAllOptions } = getAdminCategoryOptions();
+
          const fields = [
             {
                key: 'id',
@@ -1144,10 +1242,26 @@ export function initAdminPage() {
                type: 'text',
             },
             { key: 'name', label: '상품명' },
-            { key: 'categoryMain', label: '대분류' },
-            { key: 'categorySub', label: '중분류' },
+            {
+               key: 'categoryMain',
+               label: '대분류',
+               type: 'select',
+               options: [{ value: '', label: '선택' }, ...mainOptions],
+            },
+            {
+               key: 'categorySub',
+               label: '중분류',
+               type: 'select',
+               options: [{ value: '', label: '선택' }, ...subAllOptions],
+            },
             { key: 'price', label: '판매가(원)', type: 'number' },
             { key: 'basePrice', label: '정가(원)', type: 'number' },
+            {
+               key: 'image',
+               label: '이미지 URL(선택)',
+               placeholder: 'https://... (미입력 시 자동 생성)',
+               hint: '비워두면 placeholder 이미지가 자동으로 생성됩니다.',
+            },
             { key: 'active', label: '활성', type: 'checkbox' },
             {
                key: 'couponEligible',
@@ -1196,7 +1310,16 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminProductStore.update(current.id, form);
+         // ✅ 이미지 미입력 시 자동 생성
+         if (!String(form.image || '').trim()) {
+            form.image = buildPlaceholderImage({
+               id: form.id,
+               categoryMain: form.categoryMain,
+               categorySub: form.categorySub,
+            });
+         }
+
+         const r = await adminProductStore.update(current.id, form);
          if (!r?.ok) {
             toast.show(r?.message || '수정 실패', { duration: 1600 });
             return;
@@ -1209,6 +1332,9 @@ export function initAdminPage() {
          return;
       }
 
+      /* ---------
+         Toggle Product
+      --------- */
       const toggleBtn = e.target.closest('[data-admin-product-toggle]');
       if (toggleBtn) {
          const id = String(
@@ -1226,7 +1352,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         adminProductStore.update(id, { active: next });
+         await adminProductStore.update(id, { active: next });
          auditLog.add('PRODUCT_TOGGLE', `상품 상태 변경: ${id}`, {
             id,
             active: next,
@@ -1235,6 +1361,9 @@ export function initAdminPage() {
          return;
       }
 
+      /* ---------
+         Delete Product
+      --------- */
       const delBtn = e.target.closest('[data-admin-product-delete]');
       if (delBtn) {
          const id = String(
@@ -1251,7 +1380,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminProductStore.remove(id);
+         const r = await adminProductStore.remove(id);
          if (!r?.ok) {
             toast.show(r?.message || '삭제 실패', { duration: 1600 });
             return;
@@ -1334,7 +1463,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminOrderStore.updateOrderStatus(orderId, nextStatus);
+         const r = await adminOrderStore.updateOrderStatus(orderId, nextStatus);
          if (!r?.ok) {
             toast.show(r?.message || '변경 실패', { duration: 1600 });
             return;
@@ -1379,7 +1508,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminOrderStore.updateOrderStatus(orderId, nextStatus);
+         const r = await adminOrderStore.updateOrderStatus(orderId, nextStatus);
          if (!r?.ok) {
             toast.show(r?.message || '취소 실패', { duration: 1600 });
             return;
@@ -1410,7 +1539,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminCouponStore.seed();
+         const r = await adminCouponStore.seed();
          if (r?.ok) {
             auditLog.add('COUPON_SEED', '더미 쿠폰 생성', { count: r.count });
             toast.show(`더미 쿠폰 ${r.count}개 생성`, { duration: 1400 });
@@ -1437,36 +1566,15 @@ export function initAdminPage() {
                hint: '0.1 = 10%',
             },
             { key: 'active', label: '활성', type: 'checkbox' },
-            {
-               key: 'startsAt',
-               label: '시작일(ms, 선택)',
-               type: 'number',
-               placeholder: '',
-            },
-            {
-               key: 'endsAt',
-               label: '종료일(ms, 선택)',
-               type: 'number',
-               placeholder: '',
-            },
+            { key: 'startsAt', label: '시작일(ms, 선택)', type: 'number' },
+            { key: 'endsAt', label: '종료일(ms, 선택)', type: 'number' },
             {
                key: 'minOrderTotal',
                label: '최소 주문금액(원, 선택)',
                type: 'number',
-               placeholder: '',
             },
-            {
-               key: 'maxUses',
-               label: '최대 사용횟수(선택)',
-               type: 'number',
-               placeholder: '',
-            },
-            {
-               key: 'description',
-               label: '설명(선택)',
-               type: 'textarea',
-               placeholder: '쿠폰 설명',
-            },
+            { key: 'maxUses', label: '최대 사용횟수(선택)', type: 'number' },
+            { key: 'description', label: '설명(선택)', type: 'textarea' },
          ];
 
          const form = await openFormModal({
@@ -1491,7 +1599,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminCouponStore.create(form);
+         const r = await adminCouponStore.create(form);
          if (!r?.ok) {
             toast.show(r?.message || '등록 실패', { duration: 1600 });
             return;
@@ -1555,7 +1663,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminCouponStore.update(current.code, form);
+         const r = await adminCouponStore.update(current.code, form);
          if (!r?.ok) {
             toast.show(r?.message || '수정 실패', { duration: 1600 });
             return;
@@ -1585,7 +1693,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         adminCouponStore.update(code, { active: next });
+         await adminCouponStore.update(code, { active: next });
          auditLog.add('COUPON_TOGGLE', `쿠폰 상태 변경: ${code}`, {
             code,
             active: next,
@@ -1610,7 +1718,7 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         const r = adminCouponStore.remove(code);
+         const r = await adminCouponStore.remove(code);
          if (!r?.ok) {
             toast.show(r?.message || '삭제 실패', { duration: 1600 });
             return;
@@ -1700,7 +1808,6 @@ export function initAdminPage() {
          });
          toast.show('Import 완료', { duration: 1200 });
 
-         // repaint
          fillCategorySelects(root);
          paintProducts();
          paintCoupons();
