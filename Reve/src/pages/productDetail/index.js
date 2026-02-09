@@ -148,8 +148,9 @@ export async function initProductDetailPage(params) {
    const layout = wrap.querySelector('[data-product-id]');
    if (!layout) return;
 
-   // ✅ 상태(선택된 사이즈)
+   // ✅ 상태(선택된 사이즈, 프리셋 라인 key)
    let selectedSize = '';
+   let selectedLineKey = '';
 
    const sizeWrap = wrap.querySelector('[data-opt-size]');
    const needsSize = Boolean(sizeWrap?.querySelector('[data-size]'));
@@ -162,14 +163,19 @@ export async function initProductDetailPage(params) {
 
    if (needsSize) {
       const lines = cartStore.getItemsByProductId?.(product.id) ?? [];
-      const firstSize = Array.isArray(lines)
-         ? String(
-              lines.find((l) => l?.options?.size)?.options?.size || '',
-           ).trim()
-         : '';
 
-      if (firstSize) {
-         setSelectedSize(firstSize);
+      // ✅ 같은 상품이 여러 라인(사이즈)로 담겨있을 수 있음
+      // - 상세 진입 시에는 "가장 최근 라인"(items가 최신이 앞이라는 가정) 1개만 프리셋
+      const pickedLine = Array.isArray(lines)
+         ? lines.find((l) => l?.options?.size)
+         : null;
+
+      const presetSize = String(pickedLine?.options?.size || '').trim();
+      const presetKey = String(pickedLine?.key || '').trim();
+
+      if (presetSize) {
+         selectedLineKey = presetKey;
+         setSelectedSize(presetSize);
       }
    }
 
@@ -233,7 +239,19 @@ export async function initProductDetailPage(params) {
 
          if (!ok) return;
 
+         // ✅ UI 상태 먼저 변경
          setSelectedSize(nextSize);
+
+         // ✅ 이미 장바구니에 담겨있던 라인이 있으면(상세 진입 시 프리셋된 라인)
+         // 해당 라인의 옵션(사이즈)을 업데이트해서 "상세에서 변경 → 장바구니 반영" 일관성 유지
+         if (selectedLineKey) {
+            const r = cartStore.updateOptions?.(selectedLineKey, {
+               size: nextSize,
+            });
+
+            if (r?.ok && r?.key) selectedLineKey = r.key;
+         }
+
          toast.show('사이즈가 변경됐어요 👌', { duration: 1400 });
          return;
       }
@@ -261,6 +279,10 @@ export async function initProductDetailPage(params) {
             });
             return;
          }
+
+         // ✅ 방금 담긴(또는 qty가 추가된) 라인의 key를 기억해두면
+         // 상세에서 사이즈 변경 시 같은 라인을 업데이트할 수 있음
+         if (result?.key) selectedLineKey = String(result.key);
 
          toast.show(
             selectedSize
@@ -294,6 +316,8 @@ export async function initProductDetailPage(params) {
             });
             return;
          }
+
+         if (result?.key) selectedLineKey = String(result.key);
 
          const goCart = await confirmModal({
             title: '바로구매',
