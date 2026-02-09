@@ -114,15 +114,16 @@ export function ProductCard(product) {
                  const v = String(s).trim();
                  if (!v) return '';
                  return `
-                   <button
-                     type="button"
-                     class="size-pill"
-                     data-size-pill
-                     data-size-value="${escapeHtml(v)}"
-                     aria-pressed="false"
-                   >
-                     ${escapeHtml(v)}
-                   </button>
+                  <button
+                    type="button"
+                    class="size-pill"
+                    data-size-pill
+                    data-size="${escapeHtml(v)}"
+                    data-size-value="${escapeHtml(v)}"
+                    aria-pressed="false"
+                  >
+                    ${escapeHtml(v)}
+                  </button>
                  `;
               })
               .join('')}

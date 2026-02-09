@@ -3,15 +3,19 @@
  * 📍 위치: src/api/products.js
  * 역할: 상품 데이터 레이어 (LocalStorage 기반 단일 소스)
  *
- * - 최초 1회 mock 생성 후 localStorage에 저장
- * - 이후 Product/Admin 모두 동일 데이터 사용
+ * ✅ 정책(이번 개편)
+ * - "초기 원본"은 무조건 src/data/products.json
+ * - localStorage는 운영 DB(수정/삭제/추가 반영)
+ * - products.json version이 바뀌면 localStorage를 자동으로 JSON으로 덮어쓰기(마이그레이션)
+ * - fetch 금지, import 기반으로만 seed 로드 (빌드/번들 안정)
  * =============================================
  */
 
 /* ==============================
-   0) Storage Key
+   0) Storage Keys
 ============================== */
 const STORAGE_KEY = 'reve_products_v1';
+const STORAGE_META_KEY = 'reve_products_meta_v1'; // ✅ seed version 추적용
 
 /* ==============================
    1) Utilities: storage
@@ -51,355 +55,108 @@ function sleep(ms) {
    return new Promise((r) => setTimeout(r, ms));
 }
 
+function now() {
+   return Date.now();
+}
+
 /* ==============================
-   2) Mock generator (네 코드 유지)
+   2) JSON seed loader (import 방식)
+   - fetch 금지
 ============================== */
-function mulberry32(seed) {
-   let t = seed >>> 0;
-   return function () {
-      t += 0x6d2b79f5;
-      let x = t;
-      x = Math.imul(x ^ (x >>> 15), x | 1);
-      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-   };
-}
-
-const rand = mulberry32(617);
-
-function randInt(min, max) {
-   return Math.floor(rand() * (max - min + 1)) + min;
-}
-
-function pickOne(arr) {
-   return arr[randInt(0, arr.length - 1)];
-}
-
-function pickSubset(arr, minCount = 1, maxCount = 3) {
-   const count = randInt(minCount, Math.min(maxCount, arr.length));
-   const copy = [...arr];
-
-   for (let i = copy.length - 1; i > 0; i--) {
-      const j = randInt(0, i);
-      [copy[i], copy[j]] = [copy[j], copy[i]];
+async function readProductsJson() {
+   try {
+      // ✅ Vite/Webpack에서 json import는 default에 들어오는 경우가 많음
+      const mod = await import('../data/products.json');
+      return mod?.default ?? mod ?? null;
+   } catch {
+      return null;
    }
-   return copy.slice(0, count);
 }
 
-function formatId(n) {
-   return String(n).padStart(3, '0');
-}
+/**
+ * products.json 허용 형태:
+ * 1) { version, items: [...] }
+ * 2) [...]
+ */
+function normalizeJsonSeed(json) {
+   const items = Array.isArray(json)
+      ? json
+      : Array.isArray(json?.items)
+        ? json.items
+        : [];
 
-function toSearchToken(value) {
-   return String(value ?? '')
-      .trim()
-      .toLowerCase();
-}
+   const version = String(json?.version ?? '0').trim() || '0';
 
-const CATEGORIES = [
-   { key: 'bag', label: '가방' },
-   { key: 'wallet', label: '지갑' },
-   { key: 'watch', label: '시계' },
-   { key: 'shoes', label: '신발' },
-   { key: 'accessory', label: '액세서리' },
-   { key: 'outer', label: '아우터' },
-   { key: 'top', label: '상의' },
-   { key: 'jewelry', label: '주얼리' },
-];
+   const normalizedItems = items
+      .map((raw) => {
+         const id = String(raw?.id ?? '').trim();
+         if (!id) return null;
 
-const BRANDS = [
-   { en: 'Chanel', ko: '샤넬', aliases: ['chanel', '샤넬'] },
-   {
-      en: 'Louis Vuitton',
-      ko: '루이비통',
-      aliases: ['louis vuitton', 'lv', '루이비통', '루비통'],
-   },
-   { en: 'Hermes', ko: '에르메스', aliases: ['hermes', '에르메스'] },
-   { en: 'Gucci', ko: '구찌', aliases: ['gucci', '구찌'] },
-   { en: 'Prada', ko: '프라다', aliases: ['prada', '프라다'] },
-   { en: 'Dior', ko: '디올', aliases: ['dior', '디올'] },
-   {
-      en: 'Saint Laurent',
-      ko: '생로랑',
-      aliases: ['saint laurent', 'ysl', '생로랑'],
-   },
-   {
-      en: 'Balenciaga',
-      ko: '발렌시아가',
-      aliases: ['balenciaga', '발렌시아가'],
-   },
-   {
-      en: 'Bottega Veneta',
-      ko: '보테가베네타',
-      aliases: ['bottega veneta', 'bv', '보테가베네타'],
-   },
-   { en: 'Burberry', ko: '버버리', aliases: ['burberry', '버버리'] },
-   { en: 'Fendi', ko: '펜디', aliases: ['fendi', '펜디'] },
-   { en: 'Celine', ko: '셀린느', aliases: ['celine', '셀린느'] },
-   { en: 'Loewe', ko: '로에베', aliases: ['loewe', '로에베'] },
-   { en: 'Moncler', ko: '몽클레르', aliases: ['moncler', '몽클레르'] },
-   { en: 'Off-White', ko: '오프화이트', aliases: ['off-white', '오프화이트'] },
-   {
-      en: 'Maison Margiela',
-      ko: '메종 마르지엘라',
-      aliases: ['maison margiela', 'margiela', '메종 마르지엘라', '마르지엘라'],
-   },
-   {
-      en: 'Thom Browne',
-      ko: '톰 브라운',
-      aliases: ['thom browne', '톰 브라운'],
-   },
-   { en: 'Valentino', ko: '발렌티노', aliases: ['valentino', '발렌티노'] },
-   { en: 'Givenchy', ko: '지방시', aliases: ['givenchy', '지방시'] },
-   { en: 'Rolex', ko: '롤렉스', aliases: ['rolex', '롤렉스'] },
-   { en: 'Omega', ko: '오메가', aliases: ['omega', '오메가'] },
-   { en: 'Cartier', ko: '까르띠에', aliases: ['cartier', '까르띠에'] },
-   { en: 'Bvlgari', ko: '불가리', aliases: ['bvlgari', 'bulgari', '불가리'] },
-];
+         // products.json 스키마
+         const category = String(
+            raw?.category ?? raw?.majorCategory ?? raw?.categoryKey ?? '',
+         ).trim();
 
-const COLORS = [
-   { en: 'Black', ko: '블랙', aliases: ['black', '블랙'] },
-   {
-      en: 'Off-White',
-      ko: '오프화이트',
-      aliases: ['offwhite', 'off-white', '오프화이트'],
-   },
-   { en: 'Beige', ko: '베이지', aliases: ['beige', '베이지'] },
-   { en: 'Navy', ko: '네이비', aliases: ['navy', '네이비'] },
-   { en: 'Khaki', ko: '카키', aliases: ['khaki', '카키'] },
-   { en: 'Burgundy', ko: '버건디', aliases: ['burgundy', '버건디', '와인'] },
-   { en: 'Gray', ko: '그레이', aliases: ['gray', 'grey', '그레이'] },
-];
+         const categoryMain = String(
+            raw?.categoryMain ?? raw?.majorCategoryLabel ?? '',
+         ).trim();
 
-const MATERIAL_KR = [
-   '가죽',
-   '스웨이드',
-   '캔버스',
-   '실크',
-   '캐시미어',
-   '울',
-   '데님',
-   '코튼',
-   '나일론',
-];
-const STYLE_KR = [
-   '시그니처',
-   '클래식',
-   '미니멀',
-   '아이코닉',
-   '뉴 시즌',
-   '모노그램',
-   '테일러드',
-   '하이엔드',
-   '프리미엄',
-   '스페셜',
-];
+         const categorySub = String(
+            raw?.categorySub ?? raw?.subCategory ?? '',
+         ).trim();
 
-const ITEM_BY_CATEGORY = {
-   bag: ['숄더백', '토트백', '크로스백', '미니백', '버킷백', '백팩'],
-   wallet: ['반지갑', '장지갑', '카드지갑', '지퍼월렛'],
-   watch: ['클래식 워치', '드레스 워치', '메탈 워치', '가죽 워치'],
-   shoes: ['스니커즈', '로퍼', '부츠', '더비 슈즈', '플랫'],
-   accessory: ['스카프', '벨트', '선글라스', '캡', '글러브'],
-   outer: ['캐시미어 코트', '울 코트', '다운 재킷', '레더 재킷', '트렌치코트'],
-   top: ['셔츠', '니트', '후디', '티셔츠', '자켓'],
-   jewelry: ['브레이슬릿', '링', '네크리스', '이어링'],
-};
+         const image = String(raw?.image ?? raw?.imageUrl ?? '').trim();
 
-const PRICE_RANGE_BY_CATEGORY = {
-   bag: [1200000, 6500000],
-   wallet: [450000, 2200000],
-   watch: [2500000, 18000000],
-   shoes: [650000, 2800000],
-   accessory: [250000, 1600000],
-   outer: [1400000, 9000000],
-   top: [350000, 3200000],
-   jewelry: [900000, 15000000],
-};
+         const tags = Array.isArray(raw?.tags)
+            ? raw.tags
+            : [categoryMain || category, categorySub].filter(Boolean);
 
-const APPAREL_SIZES = ['S', 'M', 'L', 'XL'];
-const SHOE_SIZES = Array.from({ length: 13 }, (_, i) => 220 + i * 5);
+         const price = Number(raw?.price ?? 0);
+         const basePrice = Number(raw?.basePrice ?? raw?.price ?? 0);
 
-function buildImageUrl({ id, category }) {
-   const text = encodeURIComponent(`${category}\n${id}`);
-   return `https://placehold.co/800x800?text=${text}`;
-}
+         return {
+            ...raw,
+            id,
+            name: String(raw?.name ?? '').trim(),
+            brand: String(raw?.brand ?? '').trim(),
 
-function buildBasePrice(category) {
-   const [min, max] = PRICE_RANGE_BY_CATEGORY[category] ?? [300000, 2000000];
-   const raw = randInt(min, max);
-   return Math.round(raw / 10000) * 10000;
-}
+            // ✅ storefront 필터 키는 category(= majorCategory)로 고정
+            category:
+               category ||
+               String(raw?.majorCategory ?? '').trim() ||
+               categoryMain,
 
-function buildPromotion(category) {
-   const hasPromo = rand() < 0.35;
+            // ✅ admin 표시용 라벨/중분류
+            categoryMain: categoryMain || category || '-',
+            categorySub,
 
-   const couponEligible = rand() < 0.6;
-   const couponRateCap = couponEligible ? randInt(5, 15) / 100 : 0;
+            image,
+            tags,
 
-   const discountRatePool =
-      category === 'watch' || category === 'jewelry'
-         ? [0.05, 0.08, 0.1]
-         : [0.05, 0.1, 0.12, 0.15, 0.2];
+            colors: Array.isArray(raw?.colors) ? raw.colors : [],
+            apparelSizes: Array.isArray(raw?.apparelSizes)
+               ? raw.apparelSizes
+               : [],
+            shoeSizes: Array.isArray(raw?.shoeSizes) ? raw.shoeSizes : [],
 
-   const discountRate = hasPromo ? pickOne(discountRatePool) : 0;
+            price: Number.isFinite(price) ? price : 0,
+            basePrice: Number.isFinite(basePrice) ? basePrice : 0,
+            discountRate: Number(raw?.discountRate ?? 0),
+            couponEligible: Boolean(raw?.couponEligible ?? true),
+            couponRateCap: Number(raw?.couponRateCap ?? 0),
+            couponTags: Array.isArray(raw?.couponTags) ? raw.couponTags : [],
 
-   const couponTags = couponEligible
-      ? pickSubset(['WELCOME', 'SEASON', 'VIP', 'APP_ONLY', 'BUNDLE'], 1, 2)
-      : [];
-
-   return { discountRate, couponEligible, couponRateCap, couponTags };
-}
-
-function applyDiscount(basePrice, discountRate = 0) {
-   if (!discountRate) return basePrice;
-   const discounted =
-      Math.round((basePrice * (1 - discountRate)) / 10000) * 10000;
-   return Math.max(discounted, 10000);
-}
-
-function buildColorOptions() {
-   const count = randInt(1, 3);
-   const picked = pickSubset(COLORS, count, count);
-   return picked.map((c) => ({ en: c.en, ko: c.ko }));
-}
-
-function buildKoreanName({ category }) {
-   const item = pickOne(ITEM_BY_CATEGORY[category] ?? ['아이템']);
-   const style = pickOne(STYLE_KR);
-   const material = pickOne(MATERIAL_KR);
-   return `${style} ${material} ${item}`;
-}
-
-function buildTags({ brand, category, name, color }) {
-   const categoryLabel = (
-      CATEGORIES.find((c) => c.key === category)?.label ?? ''
-   ).trim();
-
-   const badges = [];
-   if (rand() < 0.45) badges.push('신상');
-   if (rand() < 0.3) badges.push('베스트');
-   if (rand() < 0.18) badges.push('HOT');
-   if (!badges.length) badges.push(pickOne(['신상', '베스트', 'HOT']));
-   const displayTags = [brand.en, pickOne(badges)].filter(Boolean);
-
-   const brandTokens = [
-      brand.en,
-      toSearchToken(brand.en),
-      brand.ko,
-      toSearchToken(brand.ko),
-      ...(brand.aliases ?? []),
-      ...(brand.aliases ?? []).map(toSearchToken),
-   ].filter(Boolean);
-
-   const colorTokens = [
-      color?.en,
-      toSearchToken(color?.en),
-      color?.ko,
-      toSearchToken(color?.ko),
-      ...(color?.aliases ?? []),
-      ...(color?.aliases ?? []).map(toSearchToken),
-   ].filter(Boolean);
-
-   const nameTokens = String(name ?? '')
-      .replace(/[()]/g, '')
-      .split(' ')
-      .map((t) => t.trim())
+            createdAt: Number(raw?.createdAt || now()),
+            updatedAt: Number(raw?.updatedAt || now()),
+         };
+      })
       .filter(Boolean);
 
-   const searchTokens = [
-      category,
-      categoryLabel,
-      ...brandTokens,
-      ...colorTokens,
-      ...nameTokens,
-   ].filter(Boolean);
-
-   const normalized = searchTokens.flatMap((t) => {
-      const raw = String(t ?? '').trim();
-      if (!raw) return [];
-      const lower = raw.toLowerCase();
-      return raw === lower ? [raw] : [raw, lower];
-   });
-
-   return Array.from(new Set([...displayTags, ...normalized])).slice(0, 40);
-}
-
-function buildSizes(category) {
-   const APPAREL_ORDER = { S: 1, M: 2, L: 3, XL: 4 };
-   const sortApparel = (arr) =>
-      [...arr].sort(
-         (a, b) => (APPAREL_ORDER[a] || 99) - (APPAREL_ORDER[b] || 99),
-      );
-   const sortShoes = (arr) => [...arr].sort((a, b) => Number(a) - Number(b));
-
-   if (category === 'shoes') {
-      return {
-         apparelSizes: [],
-         shoeSizes: sortShoes(pickSubset(SHOE_SIZES, 2, 6)),
-      };
-   }
-
-   if (category === 'outer' || category === 'top') {
-      return {
-         apparelSizes: sortApparel(pickSubset(APPAREL_SIZES, 2, 4)),
-         shoeSizes: [],
-      };
-   }
-
-   const hasApparel = rand() < 0.25;
-   return {
-      apparelSizes: hasApparel
-         ? sortApparel(pickSubset(APPAREL_SIZES, 1, 3))
-         : [],
-      shoeSizes: [],
-   };
-}
-
-function createMockProducts(count = 100) {
-   const products = [];
-
-   for (let i = 1; i <= count; i++) {
-      const id = `p-${formatId(i)}`;
-      const { key: category } = pickOne(CATEGORIES);
-      const brand = pickOne(BRANDS);
-      const color = pickOne(COLORS);
-      const name = buildKoreanName({ category });
-
-      const basePrice = buildBasePrice(category);
-      const promo = buildPromotion(category);
-      const price = applyDiscount(basePrice, promo.discountRate);
-
-      const sizes = buildSizes(category);
-      const colors = buildColorOptions();
-      const tags = buildTags({ brand, category, name, color });
-      const image = buildImageUrl({ id, category });
-
-      products.push({
-         id,
-         name,
-         brand: brand.en,
-         price,
-         basePrice,
-         discountRate: promo.discountRate,
-         couponEligible: promo.couponEligible,
-         couponRateCap: promo.couponRateCap,
-         couponTags: promo.couponTags,
-         tags,
-         category,
-         image,
-         colors,
-         ...sizes,
-         createdAt: Date.now() - randInt(0, 1000 * 60 * 60 * 24 * 30), // 최근 30일 느낌
-         updatedAt: Date.now(),
-      });
-   }
-
-   return products;
+   return { version, items: normalizedItems };
 }
 
 /* ==============================
-   3) DB-like helpers
+   3) DB normalize
 ============================== */
 function normalizeProduct(p) {
    const id = String(p?.id ?? '').trim();
@@ -413,15 +170,27 @@ function normalizeProduct(p) {
       id,
       name: String(p?.name ?? '').trim(),
       brand: String(p?.brand ?? '').trim(),
+
       category: String(p?.category ?? '').trim(),
+      categoryMain: String(p?.categoryMain ?? '').trim(),
+      categorySub: String(p?.categorySub ?? '').trim(),
+
       price: Number.isFinite(price) ? price : 0,
       basePrice: Number.isFinite(basePrice) ? basePrice : 0,
+
+      discountRate: Number(p?.discountRate ?? 0),
+      couponEligible: Boolean(p?.couponEligible ?? true),
+      couponRateCap: Number(p?.couponRateCap ?? 0),
+      couponTags: Array.isArray(p?.couponTags) ? p.couponTags : [],
+
       tags: Array.isArray(p?.tags) ? p.tags : [],
       colors: Array.isArray(p?.colors) ? p.colors : [],
       apparelSizes: Array.isArray(p?.apparelSizes) ? p.apparelSizes : [],
       shoeSizes: Array.isArray(p?.shoeSizes) ? p.shoeSizes : [],
-      createdAt: Number(p?.createdAt || Date.now()),
-      updatedAt: Number(p?.updatedAt || Date.now()),
+
+      image: String(p?.image ?? '').trim(),
+      createdAt: Number(p?.createdAt || now()),
+      updatedAt: Number(p?.updatedAt || now()),
    };
 }
 
@@ -435,50 +204,99 @@ function writeDb(list) {
    writeRaw(STORAGE_KEY, JSON.stringify(list));
 }
 
-function ensureSeeded() {
-   const existing = readDb();
-   if (existing.length) return existing;
-
-   const seeded = createMockProducts(100);
-   writeDb(seeded);
-   return seeded;
+function readMeta() {
+   const raw = safeParse(readRaw(STORAGE_META_KEY) || '');
+   if (!raw) return null;
+   return {
+      version: String(raw?.version ?? '0'),
+      seededAt: Number(raw?.seededAt ?? 0),
+   };
 }
 
-function now() {
-   return Date.now();
+function writeMeta(version) {
+   writeRaw(
+      STORAGE_META_KEY,
+      JSON.stringify({ version: String(version || '0'), seededAt: now() }),
+   );
 }
 
 /* ==============================
-   4) Public API (Product UI용)
+   4) Seed / Migration
+============================== */
+async function seedFromJsonOrThrow() {
+   const json = await readProductsJson();
+   const norm = normalizeJsonSeed(json);
+
+   const items = (norm?.items || []).map(normalizeProduct).filter(Boolean);
+   if (!items.length) {
+      throw new Error(
+         'products.json seed가 비어있거나 형식이 올바르지 않습니다.',
+      );
+   }
+
+   writeDb(items);
+   writeMeta(norm.version);
+   return items;
+}
+
+async function ensureSeeded() {
+   const existing = readDb();
+
+   // ✅ JSON 버전 확인
+   const json = await readProductsJson();
+   const norm = normalizeJsonSeed(json);
+   const nextVersion = String(norm?.version ?? '0');
+
+   const meta = readMeta();
+   const curVersion = String(meta?.version ?? '0');
+
+   // ✅ 1) DB가 비어있으면 무조건 seed
+   if (!existing.length) {
+      return await seedFromJsonOrThrow();
+   }
+
+   // ✅ 2) 버전이 다르면 JSON으로 강제 덮어쓰기
+   if (nextVersion && nextVersion !== curVersion) {
+      return await seedFromJsonOrThrow();
+   }
+
+   return existing;
+}
+
+/* ==============================
+   5) Public API (storefront)
 ============================== */
 export async function getProducts() {
-   await sleep(120);
-   return ensureSeeded();
+   await sleep(80);
+   return await ensureSeeded();
 }
 
 export async function getProductById(productId) {
    const id = String(productId || '').trim();
    if (!id) return null;
 
-   await sleep(80);
-   const list = ensureSeeded();
+   await sleep(50);
+   const list = await ensureSeeded();
    return list.find((p) => p.id === id) ?? null;
 }
 
 /* ==============================
-   5) Admin API (CRUD)
-   - Admin 페이지에서 import해서 사용
+   6) Admin API (CRUD)
+   - Admin에서 "products.json으로 덮어쓰기"를 확실하게 제공
 ============================== */
-export async function adminSeedProducts(count = 100) {
-   await sleep(80);
-   const seeded = createMockProducts(count);
-   writeDb(seeded);
-   return { ok: true, count: seeded.length };
+export async function adminSeedProducts() {
+   await sleep(50);
+   try {
+      const seeded = await seedFromJsonOrThrow();
+      return { ok: true, count: seeded.length, source: 'json' };
+   } catch (e) {
+      return { ok: false, message: e?.message || 'seed 실패' };
+   }
 }
 
 export async function adminCreateProduct(draft) {
-   await sleep(80);
-   const list = ensureSeeded();
+   await sleep(50);
+   const list = await ensureSeeded();
 
    const id = String(draft?.id || `p-${Date.now()}`).trim();
    const next = normalizeProduct({
@@ -499,11 +317,11 @@ export async function adminCreateProduct(draft) {
 }
 
 export async function adminUpdateProduct(productId, patch) {
-   await sleep(80);
+   await sleep(50);
    const id = String(productId || '').trim();
    if (!id) return { ok: false, message: '상품 ID가 필요합니다.' };
 
-   const list = ensureSeeded();
+   const list = await ensureSeeded();
    const idx = list.findIndex((p) => p.id === id);
    if (idx < 0) return { ok: false, message: '상품을 찾을 수 없습니다.' };
 
@@ -525,11 +343,11 @@ export async function adminUpdateProduct(productId, patch) {
 }
 
 export async function adminDeleteProduct(productId) {
-   await sleep(80);
+   await sleep(50);
    const id = String(productId || '').trim();
    if (!id) return { ok: false, message: '상품 ID가 필요합니다.' };
 
-   const list = ensureSeeded();
+   const list = await ensureSeeded();
    const exists = list.some((p) => p.id === id);
    if (!exists) return { ok: false, message: '상품을 찾을 수 없습니다.' };
 
@@ -540,8 +358,14 @@ export async function adminDeleteProduct(productId) {
 }
 
 export async function adminResetProducts() {
-   await sleep(80);
+   await sleep(50);
+   // ✅ 완전 초기화 후 JSON으로 다시 seed
    removeRaw(STORAGE_KEY);
-   ensureSeeded();
-   return { ok: true };
+   removeRaw(STORAGE_META_KEY);
+   try {
+      await seedFromJsonOrThrow();
+      return { ok: true };
+   } catch (e) {
+      return { ok: false, message: e?.message || 'reset 실패' };
+   }
 }

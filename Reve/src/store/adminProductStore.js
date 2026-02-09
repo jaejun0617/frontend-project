@@ -65,12 +65,21 @@ function normalizeItem(raw) {
    // ✅ Product 시스템의 category(키) + Admin의 categoryMain/Sub(표시용) 동시 지원
    // - category: product 페이지/검색/필터에서 쓰는 "키"
    // - categoryMain/Sub: Admin 분류 UI용 "라벨"
-   const category = normalizeText(raw?.category || raw?.categoryKey || '');
-   // ✅ 더 넓게 호환 (seed/products.js가 어떤 키를 쓰든 최대한 살림)
+   // ✅ Product 시스템에서 쓰는 키(category)도 products.json의 majorCategory를 살림
+   const category = normalizeText(
+      raw?.category || raw?.majorCategory || raw?.categoryKey || '',
+   );
+   // ✅ products.json 호환: majorCategoryLabel / majorCategory 지원
+   // - majorCategoryLabel: '상의' 같은 라벨
+   // - majorCategory: 'top' 같은 키
    const categoryMain = normalizeText(
       raw?.categoryMain ||
+         raw?.majorCategoryLabel ||
+         raw?.mainCategoryLabel ||
          raw?.mainCategory ||
          raw?.categoryMainLabel ||
+         raw?.categoryLabel ||
+         raw?.majorCategory ||
          raw?.category ||
          raw?.categoryKey ||
          '-',
