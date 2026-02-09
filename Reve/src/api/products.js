@@ -8,6 +8,10 @@
  * - localStorage는 운영 DB(수정/삭제/추가 반영)
  * - products.json version이 바뀌면 localStorage를 자동으로 JSON으로 덮어쓰기(마이그레이션)
  * - fetch 금지, import 기반으로만 seed 로드 (빌드/번들 안정)
+ *
+ * ✅ 이번 패치 포인트
+ * - getProducts()/CRUD 결과는 항상 "최신순(createdAt desc, updatedAt desc)" 정렬 보장
+ * - update 시 createdAt 보존(패치에 createdAt이 없으면 기존값 유지)
  * =============================================
  */
 
@@ -60,6 +64,22 @@ function now() {
 }
 
 /* ==============================
+   1.5) Sorting (최신순 보장)
+============================== */
+function sortLatestFirst(list) {
+   const arr = Array.isArray(list) ? [...list] : [];
+   return arr.sort((a, b) => {
+      const ac = Number(a?.createdAt || 0) || 0;
+      const bc = Number(b?.createdAt || 0) || 0;
+      if (bc !== ac) return bc - ac;
+
+      const au = Number(a?.updatedAt || 0) || 0;
+      const bu = Number(b?.updatedAt || 0) || 0;
+      return bu - au;
+   });
+}
+
+/* ==============================
    2) JSON seed loader (import 방식)
    - fetch 금지
 ============================== */
@@ -92,7 +112,6 @@ function normalizeJsonSeed(json) {
          const id = String(raw?.id ?? '').trim();
          if (!id) return null;
 
-         // products.json 스키마
          const category = String(
             raw?.category ?? raw?.majorCategory ?? raw?.categoryKey ?? '',
          ).trim();
@@ -113,6 +132,9 @@ function normalizeJsonSeed(json) {
 
          const price = Number(raw?.price ?? 0);
          const basePrice = Number(raw?.basePrice ?? raw?.price ?? 0);
+
+         const createdAt = Number(raw?.createdAt || now());
+         const updatedAt = Number(raw?.updatedAt || createdAt);
 
          return {
             ...raw,
@@ -146,8 +168,8 @@ function normalizeJsonSeed(json) {
             couponRateCap: Number(raw?.couponRateCap ?? 0),
             couponTags: Array.isArray(raw?.couponTags) ? raw.couponTags : [],
 
-            createdAt: Number(raw?.createdAt || now()),
-            updatedAt: Number(raw?.updatedAt || now()),
+            createdAt,
+            updatedAt,
          };
       })
       .filter(Boolean);
@@ -164,6 +186,9 @@ function normalizeProduct(p) {
 
    const price = Number(p?.price ?? 0);
    const basePrice = Number(p?.basePrice ?? price);
+
+   const createdAt = Number(p?.createdAt || 0) || now();
+   const updatedAt = Number(p?.updatedAt || 0) || createdAt;
 
    return {
       ...p,
@@ -189,19 +214,20 @@ function normalizeProduct(p) {
       shoeSizes: Array.isArray(p?.shoeSizes) ? p.shoeSizes : [],
 
       image: String(p?.image ?? '').trim(),
-      createdAt: Number(p?.createdAt || now()),
-      updatedAt: Number(p?.updatedAt || now()),
+      createdAt,
+      updatedAt,
    };
 }
 
 function readDb() {
    const raw = safeParse(readRaw(STORAGE_KEY) || '');
    if (!raw || !Array.isArray(raw)) return [];
-   return raw.map(normalizeProduct).filter(Boolean);
+   return sortLatestFirst(raw.map(normalizeProduct).filter(Boolean));
 }
 
 function writeDb(list) {
-   writeRaw(STORAGE_KEY, JSON.stringify(list));
+   // ✅ 저장 시에도 최신순 정렬 고정
+   writeRaw(STORAGE_KEY, JSON.stringify(sortLatestFirst(list)));
 }
 
 function readMeta() {
@@ -227,7 +253,10 @@ async function seedFromJsonOrThrow() {
    const json = await readProductsJson();
    const norm = normalizeJsonSeed(json);
 
-   const items = (norm?.items || []).map(normalizeProduct).filter(Boolean);
+   const items = sortLatestFirst(
+      (norm?.items || []).map(normalizeProduct).filter(Boolean),
+   );
+
    if (!items.length) {
       throw new Error(
          'products.json seed가 비어있거나 형식이 올바르지 않습니다.',
@@ -242,7 +271,7 @@ async function seedFromJsonOrThrow() {
 async function ensureSeeded() {
    const existing = readDb();
 
-   // ✅ JSON 버전 확인
+   // ✅ JSON 버전 확인(마이그레이션 판단)
    const json = await readProductsJson();
    const norm = normalizeJsonSeed(json);
    const nextVersion = String(norm?.version ?? '0');
@@ -260,7 +289,8 @@ async function ensureSeeded() {
       return await seedFromJsonOrThrow();
    }
 
-   return existing;
+   // ✅ 3) 그 외: 운영 DB 최신순 반환
+   return sortLatestFirst(existing);
 }
 
 /* ==============================
@@ -299,11 +329,13 @@ export async function adminCreateProduct(draft) {
    const list = await ensureSeeded();
 
    const id = String(draft?.id || `p-${Date.now()}`).trim();
+
+   const createdAt = now();
    const next = normalizeProduct({
       ...draft,
       id,
-      createdAt: now(),
-      updatedAt: now(),
+      createdAt,
+      updatedAt: createdAt,
    });
 
    if (!next) return { ok: false, message: '상품 데이터가 올바르지 않습니다.' };
@@ -311,13 +343,16 @@ export async function adminCreateProduct(draft) {
       return { ok: false, message: '이미 존재하는 상품 ID입니다.' };
    }
 
+   // ✅ 최신순 저장(앞에 prepend + writeDb에서 정렬 고정)
    const out = [next, ...list];
    writeDb(out);
+
    return { ok: true, item: next };
 }
 
 export async function adminUpdateProduct(productId, patch) {
    await sleep(50);
+
    const id = String(productId || '').trim();
    if (!id) return { ok: false, message: '상품 ID가 필요합니다.' };
 
@@ -325,10 +360,16 @@ export async function adminUpdateProduct(productId, patch) {
    const idx = list.findIndex((p) => p.id === id);
    if (idx < 0) return { ok: false, message: '상품을 찾을 수 없습니다.' };
 
+   const prev = list[idx];
+
+   // ✅ createdAt은 무조건 기존값 보존(패치로 덮어쓰기 금지)
+   const createdAt = Number(prev?.createdAt || 0) || now();
+
    const merged = normalizeProduct({
-      ...list[idx],
+      ...prev,
       ...patch,
       id,
+      createdAt,
       updatedAt: now(),
    });
 
@@ -344,6 +385,7 @@ export async function adminUpdateProduct(productId, patch) {
 
 export async function adminDeleteProduct(productId) {
    await sleep(50);
+
    const id = String(productId || '').trim();
    if (!id) return { ok: false, message: '상품 ID가 필요합니다.' };
 
@@ -362,6 +404,7 @@ export async function adminResetProducts() {
    // ✅ 완전 초기화 후 JSON으로 다시 seed
    removeRaw(STORAGE_KEY);
    removeRaw(STORAGE_META_KEY);
+
    try {
       await seedFromJsonOrThrow();
       return { ok: true };
