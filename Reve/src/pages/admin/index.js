@@ -4,22 +4,14 @@
  * 역할: 관리자(Admin) 페이지 엔트리 + 운영 탭 UI
  * 경로: /admin (app.js에서 requireAdmin 가드 적용됨)
  *
- * 포함 기능
- * - 탭: Products / Orders / Coupons / Audit / Backup
- * - Products: 등록/수정/삭제 + 대/중분류 + 검증 + 검색/필터 + 활성 토글
- * - Orders: (로컬스토리지 prefix 스캔) 전체 주문 조회 + 상태 변경(전이 검증)
- * - Coupons: (운영용 Catalog) 쿠폰 등록/수정/삭제 + 기간/최소금액/사용제한 등
- * - Audit: 관리자 액션 로그 기록/조회/삭제
- * - Backup: products/coupons/audit/orders(전체 스캔) 내보내기/가져오기
+ * ✅ 이번 패치(첨부파일 업로드 + 최신순)
+ * - 상품 등록/수정: 이미지 URL + 파일 첨부 둘 다 지원
+ * - 파일 첨부 시 DataURL(base64)로 변환하여 image 필드에 자동 반영
+ * - 최신순 정렬(기본): createdAt/updatedAt 내림차순
  *
- * 설계 포인트
- * - root 내부 이벤트 위임(data-bound)으로 중복 init 방지
- * - localStorage 파손 대비: store가 normalize & repair 수행
- *
- * ✅ 이번 수정 포인트
- * - 비동기 store 호출(await) 누락으로 성공 작업이 실패 토스트로 보이던 문제 수정
- * - 상품 등록/수정 모달에 대/중분류 select 옵션 + main 변경 시 sub 자동 갱신
- * - 상품 이미지 URL 필드 추가(미입력 시 placeholder 자동 생성)
+ * ⚠️ 주의
+ * - LocalStorage에 base64 이미지를 저장하므로 용량 제한이 있음(브라우저마다 다름).
+ *   기본 2MB 제한을 걸어둠. (Firebase 연결 시 업로드 방식으로 교체 추천)
  * =============================================
  */
 
@@ -306,10 +298,6 @@ function statusLabel(s) {
    4) Category + Image helpers
 ============================== */
 
-/**
- * adminProductStore.getCategories() 기반으로
- * 모달에서 쓸 옵션 배열을 만들어준다.
- */
 function getAdminCategoryOptions() {
    const cats = adminProductStore.getCategories();
    const mainOptions = (cats.main || []).map((m) => ({ value: m, label: m }));
@@ -320,15 +308,28 @@ function getAdminCategoryOptions() {
    return { cats, mainOptions, subAllOptions };
 }
 
-/**
- * 이미지 URL 미입력 시 기본 placeholder 생성
- * (외부 이미지 정책이 싫으면 나중에 로컬 에셋 방식으로 교체 가능)
- */
 function buildPlaceholderImage({ id, categoryMain, categorySub }) {
    const text = encodeURIComponent(
       `${categoryMain || 'product'}${categorySub ? `/${categorySub}` : ''}\n${id || ''}`,
    );
    return `https://placehold.co/800x800?text=${text}`;
+}
+
+function readFileAsDataUrl(file) {
+   return new Promise((resolve) => {
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+   });
+}
+
+function getFileFromInput(el) {
+   if (!el) return null;
+   const files = el.files;
+   if (!files || !files.length) return null;
+   return files[0] || null;
 }
 
 /* ==============================
@@ -394,6 +395,19 @@ function openFormModal({ title, fields, initial = {}, submitText = '저장' }) {
             `;
          }
 
+         if (type === 'file') {
+            const accept = String(f.accept || 'image/*');
+            return `
+              <label class="form-field">
+                <span class="k">${escapeHtml(label)}</span>
+                <input type="file" data-f="${escapeHtml(key)}" accept="${escapeHtml(
+                   accept,
+                )}" />
+                ${hint}
+              </label>
+            `;
+         }
+
          return `
            <label class="form-field">
              <span class="k">${escapeHtml(label)}</span>
@@ -448,14 +462,11 @@ function openFormModal({ title, fields, initial = {}, submitText = '저장' }) {
                   .join('');
          };
 
-         // 최초 1회
          renderSubs(String(mainSel.value || '').trim());
 
-         // initial sub 유효하면 유지
          const initSub = String(initial?.categorySub || '').trim();
          if (initSub) subSel.value = initSub;
 
-         // main 변경 시 sub 갱신
          mainSel.addEventListener('change', () => {
             renderSubs(String(mainSel.value || '').trim());
             subSel.value = '';
@@ -466,6 +477,7 @@ function openFormModal({ title, fields, initial = {}, submitText = '저장' }) {
          const el = overlay.querySelector(`[data-f="${key}"]`);
          if (!el) return '';
          if (type === 'checkbox') return Boolean(el.checked);
+         if (type === 'file') return ''; // file은 submit에서 따로 읽음
          return String(el.value ?? '').trim();
       };
 
@@ -485,6 +497,18 @@ function openFormModal({ title, fields, initial = {}, submitText = '저장' }) {
             fields.forEach((f) => {
                out[f.key] = getValue(f.key, f.type);
             });
+
+            // file input은 여기서 넘기지 않고, caller에서 overlay를 못 보니
+            // file은 out.__fileInputs 로 참조만 넘겨준다.
+            out.__fileInputs = {};
+            fields
+               .filter((f) => f.type === 'file')
+               .forEach((f) => {
+                  out.__fileInputs[f.key] = overlay.querySelector(
+                     `[data-f="${f.key}"]`,
+                  );
+               });
+
             close(out);
          }
       });
@@ -579,7 +603,6 @@ function fillCategorySelects(root) {
    const main = cats.main || [];
    const subByMain = cats.subByMain || {};
 
-   // main options
    const currentMain = String(mainSel.value || '').trim();
    mainSel.innerHTML =
       `<option value="">대분류(전체)</option>` +
@@ -588,10 +611,8 @@ function fillCategorySelects(root) {
             (m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`,
          )
          .join('');
-
    mainSel.value = currentMain;
 
-   // sub options depends on main
    const mKey = String(mainSel.value || '').trim();
    const subs = mKey ? subByMain[mKey] || [] : cats.subAll || [];
 
@@ -604,7 +625,6 @@ function fillCategorySelects(root) {
          )
          .join('');
 
-   // currentSub 유지 (없으면 초기화)
    if (subs.includes(currentSub)) subSel.value = currentSub;
    else subSel.value = '';
 }
@@ -803,7 +823,6 @@ export function initAdminPage() {
    const root = document.querySelector('[data-admin]');
    if (!root) return;
 
-   // ✅ 중복 바인딩 방지
    if (root.dataset.bound === '1') return;
    root.dataset.bound = '1';
 
@@ -834,10 +853,6 @@ export function initAdminPage() {
    const couponQ = root.querySelector('[data-admin-coupon-q]');
    const couponActive = root.querySelector('[data-admin-coupon-active]');
 
-   /* ------------------------------
-      A) Tab control
-   ------------------------------ */
-
    const setActiveTab = (key) => {
       const next = String(key || 'products').trim();
 
@@ -858,23 +873,30 @@ export function initAdminPage() {
       return next;
    };
 
-   /* ------------------------------
-      B) Paint functions
-   ------------------------------ */
-
    const state = {
       products: { q: '', main: '', sub: '', status: 'ALL' },
       orders: { q: '', status: 'ALL' },
       coupons: { q: '', active: 'ALL' },
    };
 
+   const sortProductsLatestFirst = (list) => {
+      const arr = Array.isArray(list) ? [...list] : [];
+      return arr.sort((a, b) => {
+         const at = Number(a?.createdAt || 0) || 0;
+         const bt = Number(b?.createdAt || 0) || 0;
+         if (bt !== at) return bt - at;
+         const au = Number(a?.updatedAt || 0) || 0;
+         const bu = Number(b?.updatedAt || 0) || 0;
+         return bu - au;
+      });
+   };
+
    const paintProducts = () => {
       if (!productsWrap) return;
 
-      // select options sync
       fillCategorySelects(root);
 
-      const list = adminProductStore.getProducts();
+      const list = sortProductsLatestFirst(adminProductStore.getProducts());
       const q = String(state.products.q || '').toLowerCase();
       const main = String(state.products.main || '').trim();
       const sub = String(state.products.sub || '').trim();
@@ -976,10 +998,6 @@ export function initAdminPage() {
       auditWrap.innerHTML = renderAuditList(rows);
    };
 
-   /* ------------------------------
-      C) Initial paint + subscriptions
-   ------------------------------ */
-
    const syncFiltersFromDOM = () => {
       state.products.q = String(productQ?.value || '');
       state.products.main = String(productMain?.value || '');
@@ -1003,10 +1021,6 @@ export function initAdminPage() {
    adminProductStore.subscribe(() => paintProducts());
    adminCouponStore.subscribe(() => paintCoupons());
    auditLog.subscribe(() => paintAudit());
-
-   /* ------------------------------
-      D) Events
-   ------------------------------ */
 
    root.addEventListener('input', (e) => {
       if (e.target.closest('[data-admin-product-q]')) {
@@ -1054,19 +1068,12 @@ export function initAdminPage() {
    });
 
    root.addEventListener('click', async (e) => {
-      /* ==============================
-         1) Tab change
-      ============================== */
       const tabBtn = e.target.closest('[data-admin-tab]');
       if (tabBtn) {
          const key = tabBtn.getAttribute('data-admin-tab');
          setActiveTab(key);
          return;
       }
-
-      /* ==============================
-         2) Products actions
-      ============================== */
 
       if (e.target.closest('[data-admin-product-reset]')) {
          if (productQ) productQ.value = '';
@@ -1081,9 +1088,6 @@ export function initAdminPage() {
          return;
       }
 
-      /* ---------
-         Seed Products
-      --------- */
       if (e.target.closest('[data-admin-seed-products]')) {
          const ok = await confirmModal({
             title: '더미 상품 생성',
@@ -1146,8 +1150,15 @@ export function initAdminPage() {
             {
                key: 'image',
                label: '이미지 URL(선택)',
-               placeholder: 'https://... (미입력 시 자동 생성)',
-               hint: '비워두면 placeholder 이미지가 자동으로 생성됩니다.',
+               placeholder: 'https://... 또는 비워두기',
+               hint: '파일 첨부가 있으면 URL보다 파일이 우선됩니다.',
+            },
+            {
+               key: 'imageFile',
+               label: '이미지 파일 첨부(선택)',
+               type: 'file',
+               accept: 'image/*',
+               hint: '최대 2MB 권장. (Firebase 연결 시 업로드 방식으로 교체 가능)',
             },
             { key: 'active', label: '활성', type: 'checkbox' },
             {
@@ -1181,6 +1192,29 @@ export function initAdminPage() {
          });
          if (!form) return;
 
+         // ✅ 파일 처리: file이 있으면 image(DataURL)로 주입
+         const fileEl = form.__fileInputs?.imageFile;
+         const file = getFileFromInput(fileEl);
+
+         if (file) {
+            const maxBytes = 2 * 1024 * 1024;
+            if (file.size > maxBytes) {
+               toast.show('이미지 파일은 2MB 이하로 올려주세요.', {
+                  duration: 1600,
+               });
+               return;
+            }
+            const dataUrl = await readFileAsDataUrl(file);
+            if (!dataUrl) {
+               toast.show('이미지 파일을 읽지 못했습니다.', { duration: 1600 });
+               return;
+            }
+            form.image = dataUrl;
+         }
+
+         delete form.__fileInputs;
+         delete form.imageFile;
+
          const v = validateProductDraft(form);
          if (!v.ok) {
             toast.show(v.message, { duration: 1600 });
@@ -1195,7 +1229,6 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         // ✅ 이미지 미입력 시 자동 생성
          if (!String(form.image || '').trim()) {
             form.image = buildPlaceholderImage({
                id: form.id,
@@ -1259,8 +1292,15 @@ export function initAdminPage() {
             {
                key: 'image',
                label: '이미지 URL(선택)',
-               placeholder: 'https://... (미입력 시 자동 생성)',
-               hint: '비워두면 placeholder 이미지가 자동으로 생성됩니다.',
+               placeholder: 'https://... 또는 비워두기',
+               hint: '파일 첨부가 있으면 URL보다 파일이 우선됩니다.',
+            },
+            {
+               key: 'imageFile',
+               label: '이미지 파일 첨부(선택)',
+               type: 'file',
+               accept: 'image/*',
+               hint: '최대 2MB 권장. (Firebase 연결 시 업로드 방식으로 교체 가능)',
             },
             { key: 'active', label: '활성', type: 'checkbox' },
             {
@@ -1296,6 +1336,29 @@ export function initAdminPage() {
          // ID는 수정 금지
          form.id = current.id;
 
+         // ✅ 파일 처리
+         const fileEl = form.__fileInputs?.imageFile;
+         const file = getFileFromInput(fileEl);
+
+         if (file) {
+            const maxBytes = 2 * 1024 * 1024;
+            if (file.size > maxBytes) {
+               toast.show('이미지 파일은 2MB 이하로 올려주세요.', {
+                  duration: 1600,
+               });
+               return;
+            }
+            const dataUrl = await readFileAsDataUrl(file);
+            if (!dataUrl) {
+               toast.show('이미지 파일을 읽지 못했습니다.', { duration: 1600 });
+               return;
+            }
+            form.image = dataUrl;
+         }
+
+         delete form.__fileInputs;
+         delete form.imageFile;
+
          const v = validateProductDraft(form, { allowIdExisting: true });
          if (!v.ok) {
             toast.show(v.message, { duration: 1600 });
@@ -1310,7 +1373,6 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         // ✅ 이미지 미입력 시 자동 생성
          if (!String(form.image || '').trim()) {
             form.image = buildPlaceholderImage({
                id: form.id,
@@ -1585,6 +1647,8 @@ export function initAdminPage() {
          });
          if (!form) return;
 
+         delete form.__fileInputs;
+
          const v = validateCouponDraft(form);
          if (!v.ok) {
             toast.show(v.message, { duration: 1600 });
@@ -1648,6 +1712,7 @@ export function initAdminPage() {
          if (!form) return;
 
          form.code = current.code;
+         delete form.__fileInputs;
 
          const v = validateCouponDraft(form, { allowCodeExisting: true });
          if (!v.ok) {
