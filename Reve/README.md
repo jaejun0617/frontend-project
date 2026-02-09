@@ -1,7 +1,7 @@
 # REVE MVP 기능 구현 기록 (Auth / Cart / Product / Search)
 
 목적: MVP 전자상거래 흐름을 **라우터 기반 SPA + localStorage 기반 스토어**로 구현  
-범위: 인증/권한, 쿠폰, 장바구니(옵션), 상품리스트 UX, 전역 이벤트 위임, 검색 구조, 멤버십(등급/적립)
+범위: 인증/권한, 쿠폰, 장바구니(옵션), 상품리스트 UX, 전역 이벤트 위임, 검색 구조, 멤버십(등급/적립), 주문/배송
 
 ---
 
@@ -37,11 +37,12 @@
 - 전역 이벤트 위임(상품 리스트 사이즈 선택, 장바구니 토글)
 - `sessionStorage` 기반 “회원가입 후 메인 모달” 플로우 처리
 - `authStore` 구독으로 store owner 스위칭
-- `cartStore.setOwner(userId || 'guest')`
-- `couponStore.setOwner(userId || 'guest')`
-- `orderStore.setOwner(userId || 'guest')`
-- `addressStore.setOwner(userId || 'guest')`
+   - `cartStore.setOwner(userId || 'guest')`
+   - `couponStore.setOwner(userId || 'guest')`
+   - `orderStore.setOwner(userId || 'guest')`
+   - `addressStore.setOwner(userId || 'guest')`
 - `cartStore` 구독으로 헤더 뱃지 및 리스트 상태 동기화
+- 상품 카드 UI 동기화(`syncProductCardsWithCart`)
 
 ### 페이지
 
@@ -69,7 +70,7 @@
 - `src/store/couponStore.js`  
   유저별 쿠폰 등록/적용/사용 처리, persist + owner 스위칭
 - `src/store/orderStore.js`  
-  유저별 주문 저장소, 결제 완료 시 주문 생성
+  유저별 주문 저장소, 결제 완료 시 주문 생성 + 주문 상태 관리
 - `src/store/addressStore.js`  
   유저별 배송지 CRUD, 기본 배송지 지정, persist + owner 스위칭
 
@@ -99,7 +100,7 @@
 ### Search Page (`/search`)
 
 - 라우트 등록 완료
-- `'/search': { render: SearchPage, afterRender: initSearchPage }`
+   - `'/search': { render: SearchPage, afterRender: initSearchPage }`
 
 #### 확장 작업(후속)
 
@@ -348,27 +349,32 @@
 
 ### 딥링크(탭/자동 액션) + 1회성 소비(consume)
 
-마이페이지는 URL 쿼리로 특정 탭을 직접 열고, 특정 동작을 1회성으로 트리거할 수 있다.
-
 - `/mypage?tab=address&open=add`  
-  배송지 탭으로 진입 후 “배송지 추가” 입력 모달을 자동 오픈한다.
-
+  배송지 탭 진입 후 “배송지 추가” 모달 자동 오픈(1회)
 - `/mypage?tab=orders&open=detail&orderId=...`  
-  주문내역 탭으로 진입 후 해당 주문의 상세 모달을 자동 오픈한다.
-
+  주문내역 탭 진입 후 주문 상세 모달 자동 오픈(1회)
 - `/mypage?tab=coupon&focus=register`  
-  쿠폰 탭으로 진입 후 쿠폰 입력창을 자동 포커스한다.
+  쿠폰 탭 진입 후 쿠폰 입력창 자동 포커스(1회)
 
-또한 `open / focus / orderId`는 실행 직후 URL에서 제거(consume)되어,
-새로고침/뒤로가기에서도 반복 트리거되지 않는다. (`replaceState` 기반)
+> `open / focus / orderId`는 실행 직후 URL에서 제거(consume)되어  
+> 새로고침/뒤로가기에서도 반복 트리거되지 않는다. (`replaceState` 기반)
 
-### MyPage - 주문/배송(Delivery) 탭 구현
+### MyPage - 주문/배송(Delivery) 탭 구현 ✅
 
-- 주문 상태별 필터(전체/결제완료/배송중/배송완료/취소) 제공
-- 주문 카드에 배송 타임라인 UI(결제→배송→완료) 표시
-- 운송장(가짜 코드) + 배송조회 모달(MVP) 제공
-- 주문 상세 모달 재사용으로 핵심 정보(결제/배송비/쿠폰/상태) 확인
-- (추가) statusHistory 기반으로 단계별 날짜(결제/배송/완료/취소) 기록 및 표시
+- 주문 상태별 필터 제공
+   - 전체 / 결제완료 / 배송중 / 배송완료 / 취소
+- 주문 카드 기반 배송 타임라인 UI
+   - 결제 → 배송 → 완료 (취소 시 멈춤 표시)
+- 운송장(가짜 코드) 생성 + 배송조회 모달(MVP)
+- “상세”는 기존 주문 상세 모달(confirmModal) 재사용
+- 배송지 스냅샷 표시(주문 당시 주소 유지)
+
+#### 배송 단계별 날짜(체크리스트) ✅
+
+- 주문에 `statusHistory`를 기록/표시하는 구조로 확장
+- 각 상태 전환 시점의 타임스탬프를 저장
+   - `PAID / SHIPPING / DELIVERED / CANCELED`
+- 타임라인 각 단계 아래 날짜 라벨로 노출 가능
 
 ---
 
@@ -394,6 +400,7 @@
 - `getOrders()` / `getOrder(orderId)`
 - `createOrder(orderPayload)`
 - `updateOrderStatus(orderId, status)`
+- (확장) `statusHistory` 기록을 위한 필드 지원
 
 ### 결제 → 주문 저장
 
@@ -422,7 +429,29 @@
 
 ## 17) 다음 작업 후보(TODO)
 
-- 주문/배송 탭 실 구현
-   - 상태 타임라인, 필터, 배송 추적 UI
-- 검색 `/search?q=` 연동 + 결과 렌더(ProductGrid)
-- 관리자 기능 확장(상품 등록/수정/삭제, 주문 상태 관리)
+### A. 검색(Search) 실구현 우선순위 🔍
+
+- `/search?q=` 쿼리 연동 + 입력 유지 정책 확정
+- 검색 결과 렌더(ProductGrid) + empty/로딩 상태
+- 최근 검색어(localStorage) + 추천 키워드
+- 필터(카테고리/가격대/정렬) 확장
+
+### B. 관리자 기능(Admin) 🧰
+
+- 상품 등록/수정/삭제(대분류/중분류)
+- 주문 상태 관리(ADMIN 전용)
+- 쿠폰/이벤트 관리(선택)
+
+### C. 주문/배송 고도화 🚚
+
+- `statusHistory`를 orderStore에 정식 반영(상태 전환 시 최초 1회 기록)
+- 취소 플로우(결제완료 상태에서 취소 가능) + 타임라인 반영
+- 배송지 변경 히스토리(주문 후 변경 불가 정책/안내)
+
+### D. 품질/안정성 🧪
+
+- 스토어 스키마 마이그레이션 유틸(버전업 대응)
+- 방어적 렌더링 강화(깨진 데이터 복구)
+- E2E 시나리오 체크리스트 문서화(guest → signup → checkout → mypage)
+
+---
