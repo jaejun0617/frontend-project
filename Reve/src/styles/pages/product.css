@@ -285,6 +285,7 @@
    border: 1px solid rgba(0, 0, 0, 0.08);
    border-radius: 16px;
    background: rgba(255, 255, 255, 0.9);
+   scroll-margin-top: 80px;
 }
 
 .product-toolbar__row {

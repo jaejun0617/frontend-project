@@ -14,8 +14,8 @@
  *
  * ✅ UX 정책
  * - 초기 진입 시: 필터를 "적용"하지 않아도 20개가 바로 보여야 함
- * - 정렬/가격 입력은 "즉시" 리스트에 반영
- * - 페이지 이동 시 URL(page=)도 함께 갱신
+ * - 정렬/가격 입력은 "즉시" 리스트에 반영 (page=1로 리셋)
+ * - 페이지 이동 시 URL(page=)도 함께 갱신 + 자동 스크롤
  *
  * ⚠️ 절대 규칙
  * - bindSizePills()는 수정하지 않는다 (ProductCard + CSS 활성화 영향)
@@ -53,7 +53,6 @@ const SELECTORS = {
    summary: '[data-filter-summary]',
 
    pagerSlot: '[data-product-pager-slot]',
-   pager: '[data-product-pager]',
    pagerPrev: '[data-page-prev]',
    pagerNext: '[data-page-next]',
    pagerNums: '[data-page-numbers]',
@@ -268,7 +267,7 @@ function renderControls(state) {
 
 function renderPager({ page, totalPages }) {
    return `
-    <nav class="product-pager" data-product-pager aria-label="상품 페이지네이션">
+    <nav class="product-pager" aria-label="상품 페이지네이션">
       <button type="button" class="btn subtle" data-page-prev ${page <= 1 ? 'disabled' : ''}>
         이전
       </button>
@@ -316,17 +315,14 @@ export const ProductPage = () => {
       </header>
 
       <div class='page__content'>
-        <!-- ✅ 필터/정렬/요약 -->
         <div data-product-controls-slot>
           ${renderControls(qs)}
         </div>
 
-        <!-- ✅ 리스트 -->
         <div class='product-grid' data-product-grid>
           <p class='loading'>불러오는 중...</p>
         </div>
 
-        <!-- ✅ 페이지네이션 -->
         <div data-product-pager-slot></div>
       </div>
     </section>
@@ -350,6 +346,19 @@ export async function initProductPage() {
    const pagerSlot = root.querySelector(SELECTORS.pagerSlot);
 
    /* ==============================
+      ✅ Page change UX: 자동 스크롤
+      - 페이지네이션 이동 시 상단으로 올려서 다음 상품이 바로 보이게
+      ============================== */
+   function scrollToTopOfList() {
+      const anchor =
+         root.querySelector(SELECTORS.controls) ||
+         root.querySelector('[data-product-controls-slot]') ||
+         root;
+
+      anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+   }
+
+   /* ==============================
       ✅ Cart UI Sync
       ============================== */
    const syncCartUi = () => {
@@ -359,7 +368,6 @@ export async function initProductPage() {
          if (!productId) return;
 
          const inCart = cartStore.hasLine(productId);
-
          card.classList.toggle('is-in-cart', inCart);
          card.dataset.inCart = inCart ? '1' : '0';
       });
@@ -536,7 +544,6 @@ export async function initProductPage() {
    root.addEventListener('click', (e) => {
       const applyBtn = e.target.closest(SELECTORS.applyBtn);
       if (applyBtn) {
-         // ✅ 버튼은 남겨두되, 즉시 반영 UX에서도 동작은 동일하게 유지
          paint({ page: 1 });
          return;
       }
@@ -555,9 +562,11 @@ export async function initProductPage() {
          return;
       }
 
+      // ✅ 페이지네이션: 이동 시 자동 스크롤
       const prevBtn = e.target.closest(SELECTORS.pagerPrev);
       if (prevBtn && !prevBtn.disabled) {
          const qs = getQueryState();
+         scrollToTopOfList();
          paint({ page: Math.max(1, qs.page - 1) });
          return;
       }
@@ -565,6 +574,7 @@ export async function initProductPage() {
       const nextBtn = e.target.closest(SELECTORS.pagerNext);
       if (nextBtn && !nextBtn.disabled) {
          const qs = getQueryState();
+         scrollToTopOfList();
          paint({ page: qs.page + 1 });
          return;
       }
@@ -576,6 +586,8 @@ export async function initProductPage() {
             max: 9999,
          });
          if (!p) return;
+
+         scrollToTopOfList();
          paint({ page: p });
       }
    });
@@ -585,16 +597,13 @@ export async function initProductPage() {
       const sortEl = e.target.closest(SELECTORS.sortSelect);
       if (sortEl) {
          paint({ page: 1 });
-         return;
       }
    });
 
    root.addEventListener('input', (e) => {
       const minEl = e.target.closest(SELECTORS.minInput);
       const maxEl = e.target.closest(SELECTORS.maxInput);
-
       if (minEl || maxEl) {
-         // ✅ 가격 입력은 즉시 반영 + page 1로 리셋
          paint({ page: 1 });
       }
    });
@@ -619,7 +628,7 @@ export async function initProductPage() {
       const products = await getProducts();
       allProducts = Array.isArray(products) ? products : [];
 
-      // ✅ controls는 렌더 타이밍 이슈 대비: 한번 더 확정 렌더
+      // ✅ controls 렌더 타이밍 안정화(1회 확정 렌더)
       if (controlsSlot)
          controlsSlot.innerHTML = renderControls(getQueryState());
 
