@@ -5,56 +5,6 @@
 
 ---
 
-## ✅ 오늘 작업 로그 (2026-02-10)
-
-> 오늘은 “상품(사이즈 제거 + 할인 UI)”와 “Admin(할인 등록 + 주문 상태/취소 정책 + 상세 이력/타임라인 + Users 탭 안정화)”까지 **운영 완성도**를 끌어올린 날.
-
-### 🧩 Product UX / Pricing
-
-- **ProductCard**
-   - 사이즈 pill UI 제거
-   - 사이즈 없이 장바구니 담기 허용
-   - 정가/할인가/할인율 표기 순서 고정: **할인율 → 할인가 → 정가**
-   - 할인 조건(`discountRate > 0 && basePrice > price`)일 때만 3요소 노출
-
-- **ProductDetail**
-   - 사이즈 선택 가드 제거
-   - 장바구니/바로구매 플로우 단순화
-
-- **Products**
-   - `discountRate` 정규화 로직 버그 수정(반환값에 실제 적용)
-
-### 🛠️ Admin (상품/쿠폰/주문/유저)
-
-- **상품**
-   - 상품 등록/수정 폼에 `discountRate(0~1)` 추가
-   - `price + discountRate → basePrice` 자동 계산(공통화)
-   - 모달 폼을 섹션 구조로 리팩터링(가독성/입력 UX 개선)
-   - 이미지 URL + 파일 업로드(DataURL) 지원(2MB 제한 유지)
-   - 최신순 정렬 유지(`updatedAt desc → createdAt desc`)
-
-- **쿠폰**
-   - 운영(Admin) 쿠폰을 storefront 공용 카탈로그로 연결
-   - active/기간 유효성 반영
-   - 운영 필드(minOrderTotal/maxUses/period/desc) 보관
-
-- **주문**
-   - 상태 정책 확정: **PAID에서만 CANCELED 허용**
-   - 관리자 주문 테이블에서 취소 버튼 비활성화로 정책/UX 일치
-   - 상태 변경 시 `reve:orders-changed` 이벤트로 즉시 동기화
-   - 주문 상세 모달에 statusHistory 이력/날짜 표시(필드명 방어 처리)
-   - **주문 타임라인 패널 추가** + `renderTimeline` 미정의 오류 수정
-
-- **유저(Users)**
-   - ✅ Admin Users 탭에서 **POINTS 표시/동기화 불일치 해결**
-      - `reve_users_v1`의 `points`가 0/누락으로 보이는 케이스 방어/정규화 반영
-      - 표시 파이프(deriveUsers)에서 숫자 필드 강제 정렬 및 안전 처리
-   - ✅ **회원 탈퇴(remove) UI 액션 연결 완료**
-      - 테이블 버튼 → confirm → toast → repaint 흐름 완성
-      - ADMIN 계정은 버튼 비활성/보호
-
----
-
 ## 목차
 
 - [0) 프로젝트 구조 개요](#0-프로젝트-구조-개요)
@@ -77,6 +27,7 @@
 - [17) 관리자(Admin) 운영툴](#17-관리자admin-운영툴)
 - [17.1) Admin 쿠폰 배포/유저 관리](#171-admin-쿠폰-배포유저-관리-운영툴-고도화)
 - [17.2) Admin Users Patch](#172-admin-users-patch)
+- [17.3) Admin 이벤트/쿠폰 운영 고도화](#173-admin-이벤트쿠폰-운영-고도화)
 - [18) 품질/안정성 체크리스트(P2)](#18-품질안정성-체크리스트p2)
 - [19) 다음 작업 후보(TODO)](#19-다음-작업-후보todo)
 - [20) 진행률(체감)](#20-진행률체감)
@@ -116,7 +67,7 @@
 - `src/pages/mypage/index.js`  
   마이페이지(내정보, 배송지 CRUD, 주문내역, 주문·배송, 등급, 쿠폰)
 - `src/pages/admin/index.js`  
-  관리자 운영 툴(상품/주문/쿠폰/감사로그/백업 + 주문 타임라인 + 유저 + 쿠폰 배포)
+  관리자 운영 툴(상품/주문/쿠폰/감사로그/백업 + 주문 타임라인 + 유저 + 쿠폰 배포 + 이벤트/통계/원장)
 
 ### 스토어
 
@@ -151,6 +102,8 @@
 - `src/utils/exportImport.js` : Admin 데이터 번들 Export/Import
 - `src/utils/orderTimeline.js` : statusHistory 파싱(toStatusTimeline) + label(statusKo)
 - `src/utils/user/deriveUsers.js` : Admin Users 표시 파이프(검색/필터/정렬/누적구매 합산/등급 재계산)
+- `src/utils/couponLedger.js` : ✅ 쿠폰 발급/사용 원장 + 통계(신규)
+- `src/utils/couponTargeting.js` : ✅ 쿠폰 타겟팅 규칙(신규)
 - `src/components/Toast.js` : 토스트
 - `src/components/ConfirmModal.js` : 확인/취소 모달
 - `src/components/ProductCard.js` : 상품 카드(장바구니 아이콘 + 태그 + 가격/할인 + 안전 이미지)
@@ -238,7 +191,7 @@
 - `register(code)` : 쿠폰 등록
 - `apply(code)` : 쿠폰 적용
 - `clearApplied()` : 적용 해제
-- `markUsed(code)` : 결제 시 사용 처리
+- `markUsed(code, meta?)` : 결제 시 사용 처리 (+ 사용 이력 기록)
 
 ### 웰컴 쿠폰
 
@@ -374,12 +327,19 @@
 - recent searches: `reve_recent_searches_v1`
 - after signup modal: `sessionStorage.reve_after_signup_modal`
 
+### ✅ Admin 이벤트/쿠폰 확장 키(추가)
+
+- coupon ledger: `reve_admin_coupon_ledger_v1`
+   - type: `ISSUE`(발급) / `USE`(사용)
+   - 최대 적재: (예) 2000개로 제한 가능
+
 ### 전역 커스텀 이벤트
 
 - navigate: `app:navigate` (detail: `{ href }`)
 - recent search sync: `recent-search:changed`
 - search drawer close bridge: `app:searchDrawerClose`
 - orders changed: `reve:orders-changed`
+- coupon ledger changed: `reve:coupon-ledger-changed`
 
 ---
 
@@ -552,22 +512,76 @@
 
 ---
 
+## 17.3) Admin 이벤트/쿠폰 운영 고도화 ✅
+
+> “운영자가 실제로 굴릴 수 있는” 쿠폰/이벤트 운영을 목표로  
+> **타겟팅 규칙 + 발급 이력 + 사용 이력 + 사용 통계**를 Admin에 정식 탑재.
+
+### ✅ 기능 요약
+
+1. **타겟팅 규칙(Targeting Rules)**
+
+- 배포 모드 확장
+   - `ALL`: 전체 지급
+   - `GRADE`: 특정 등급 지급
+   - `USER`: 특정 유저 id 목록 지급
+- 조건형 필터(AND로 적용)
+   - `minPoints`: 최소 보유 포인트
+   - `minTotalSpent`: 최소 누적 구매
+   - `joinedAfter / joinedBefore`: 가입 기간 필터(ms 기준)
+   - (기존) `minOrderTotal`: 최소 주문금액 조건은 쿠폰 자체 정책으로 유지
+
+2. **발급 원장(ISSUE Ledger)**
+
+- “누가(OwnerKey) / 어떤 쿠폰을 / 언제 / 어떤 타겟팅으로” 지급받았는지 기록
+- 중복 지급 방지(이미 보유 시 skip) 결과도 배포 결과(granted/skipped)로 확인
+
+3. **사용 원장(USE Ledger)**
+
+- 결제 성공 시 `couponStore.markUsed(code, meta)`를 통해 사용 기록 저장
+- meta 예시: `{ orderId, total }`
+
+4. **사용 통계(Stats)**
+
+- 기간 선택: `ALL / 7D / 30D`
+- 집계:
+   - 총 발급수, 총 사용수, 사용률
+   - 쿠폰별 발급/사용/사용률 Top 리스트
+
+### ✅ 데이터 설계 (storage)
+
+- ledger key: `reve_admin_coupon_ledger_v1`
+- row type:
+   - `ISSUE`: `{ type, at, ownerKey, couponCode, mode, meta(targeting) }`
+   - `USE`: `{ type, at, ownerKey, couponCode, orderId, total, meta }`
+- 원장 변경 이벤트:
+   - `reve:coupon-ledger-changed`
+
+### ✅ Admin UI 동작
+
+- Admin 쿠폰/이벤트 탭에서:
+   - 통계 패널(기간 선택 + 새로고침)
+   - 원장 테이블(최근순)
+   - 원장 비우기(Confirm 포함 가능)
+- 운영 효율:
+   - “배포 후 실제 사용률”을 숫자로 확인 가능
+   - 타겟팅 정책을 점진적으로 강화 가능
+
+---
+
 ## 18) 품질/안정성 체크리스트(P2)
 
 - 입력 검증: 상품/쿠폰/주문 상태 전이
 - 안전 렌더링: `escapeHtml` + 이미지 allowlist + fallback
 - 데이터 정규화: load 시 normalize/repair + `createdAt/updatedAt` 보장
 - 운영 편의: 감사 로그 + Export/Import
+- ✅ 운영 데이터 가시성: 쿠폰 ledger + stats 추가
 
 ---
 
 ## 19) 다음 작업 후보(TODO)
 
 > 완료된 항목은 제거하고, 남은 것만 유지
-
-### P1. 관리자(Admin) 🧰 (운영 고도화)
-
-- (고도화) 이벤트/쿠폰 관리 확장(타겟팅 규칙/발급 이력/사용 통계)
 
 ### P2. 주문/배송 고도화 🚚 (현실감 강화)
 
@@ -586,10 +600,11 @@
 
 ## 20) 진행률(체감)
 
-**현재 작업 완료도: 약 88~90%** ✅
+**현재 작업 완료도: 약 92~94%** ✅
 
 - ✅ 핵심 쇼핑몰 흐름(검색 → 상품 → 장바구니 → 쿠폰 → 결제(mock) → 주문 → 마이페이지) 완성
-- ✅ Admin 운영툴(상품/주문/쿠폰/감사/백업 + 타임라인 + 유저/배포 + 탈퇴)까지 MVP 범위 충족
-- ⏳ 남은 건 “현실감/정책의 정식화 + 운영 안정화” 쪽
+- ✅ Admin 운영툴(상품/주문/쿠폰/감사/백업 + 타임라인 + 유저/배포/탈퇴) 완성
+- ✅ Admin 쿠폰 운영 고도화(타겟팅 + 발급/사용 원장 + 통계)까지 반영 완료
+- ⏳ 남은 건 “현실감/정책 정식화 + 운영 안정화” 영역
    - orderStore 레벨에서 statusHistory 규칙을 더 강하게 보장
-   - 배송/운송장/통계 같은 운영 디테일 채우기
+   - 배송/운송장/통계(배송단) 같은 운영 디테일 채우기
