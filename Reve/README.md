@@ -78,7 +78,7 @@
 - `src/store/couponStore.js`  
   유저별 쿠폰 등록/적용/사용 처리, persist + owner 스위칭
 - `src/store/orderStore.js`  
-  유저별 주문 저장소, 결제 완료 시 주문 생성 + 주문 상태 관리
+  유저별 주문 저장소, 결제 완료 시 주문 생성 + 주문 상태 관리(+ statusHistory 정식 반영)
 - `src/store/addressStore.js`  
   유저별 배송지 CRUD, 기본 배송지 지정, persist + owner 스위칭
 - `src/store/adminProductStore.js`  
@@ -406,10 +406,24 @@
 
 ---
 
-## 15) 주문(Order) 시스템
+## 15) 주문(Order) 시스템 ✅ (statusHistory 정식 반영 완료)
 
 - `orderStore.createOrder()`로 결제 후 주문 저장
-- 상태 변경 + (확장) statusHistory 구조 지원
+- 주문 상태: `PAID | SHIPPING | DELIVERED | CANCELED`
+- **statusHistory 정식 반영**
+   - 상태 전환 순간의 타임스탬프를 `order.statusHistory`에 기록
+      - `{ PAID, SHIPPING, DELIVERED, CANCELED } (ms)`
+   - 단계별 최초 1회 기록 규칙을 **API 레벨(create/update)에서 강제**
+   - 기존 데이터(히스토리 없는 주문)는 `readState()`에서 **1회 마이그레이션**
+- 동기화 안정화
+   - storage/reload 흐름은 `emit-only`
+   - 실제 액션에서만 `persist + emit`
+
+### (현실감 강화) 운송장/배송조회 템플릿 ✅
+
+- MyPage “주문/배송” 탭에서
+   - 운송장 코드 템플릿: `REVE-xxxxxx` (orderId tail 기반)
+   - “배송조회” 모달 제공(택배사 연동 없이 UI 템플릿만)
 
 ---
 
@@ -620,11 +634,9 @@
 
 ---
 
-### P2. 주문/배송 고도화 🚚 (현실감 강화)
+## 19) 다음 작업 후보(TODO)
 
-- `statusHistory`를 **orderStore에 정식 반영**
-   - 단계별 최초 1회 기록 규칙을 생성/변경 API 레벨에서 강제
-- (선택) 운송장 번호/택배사 필드, 배송 조회 링크 템플릿
+> 완료된 항목은 제거하고, 남은 것만 유지
 
 ### P3. 운영/안정성 🌿
 
@@ -632,16 +644,20 @@
 - import/export 스키마 버전업 및 마이그레이션 가이드
 - 에러 리포팅(개발 모드 로그/프로덕션 최소 로그)
 
+(선택) 더 고도화하고 싶을 때
+
+- 운송장/택배사 “실데이터 필드” 추가 + 실제 조회 링크(택배사 URL) 연동
+- 주문 상태 전이 validate를 user store에도 공통 유틸로 적용(권한 액션이 없으면 생략 가능)
+
 ---
 
 ## 20) 진행률(체감)
 
-**현재 작업 완료도: 약 93~95%** ✅
+**현재 작업 완료도: 약 95~97%** ✅
 
 - ✅ 핵심 쇼핑몰 흐름(검색 → 상품 → 장바구니 → 쿠폰 → 결제(mock) → 주문 → 마이페이지) 완성
-- ✅ Admin 운영툴(상품/주문/쿠폰/감사/백업 + 타임라인 + 유저/배포/탈퇴) 완성
+- ✅ orderStore: statusHistory 정식 반영(최초 1회 기록 + 마이그레이션 + 동기화 루프 방지) 완료
 - ✅ MyPage 최종 통합/안정화(딥링크 1회 실행 가드 + 유저 주문 상태 변경 제거 + 탭 기준 렌더 최적화) 완료
-- ⏳ 남은 건 “정책 정식화 + 운영 안정화” 영역
-   - orderStore 레벨 statusHistory 규칙 강제(최초 1회 기록/전이 검증)
-   - (선택) 운송장/택배사/배송조회 템플릿 등 현실감 강화
-   - 저장소 용량/백업 스키마/리포팅 등 운영 안정화
+- ✅ Admin 운영툴(상품/주문/쿠폰/감사/백업 + 타임라인 + 유저/배포/탈퇴 + 원장/통계) 완성
+- ⏳ 남은 건 “운영 안정화” 영역
+   - 저장소 용량/백업 스키마/리포팅 등 운영 안정성 강화
