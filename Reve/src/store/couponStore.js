@@ -17,6 +17,8 @@
  * =============================================
  */
 
+import { adminCouponLedgerStore } from './adminCouponLedgerStore.js';
+
 const STORAGE_PREFIX = 'reve_coupons_v1:'; // ✅ 유저별 키 prefix
 const LEGACY_KEY_V2 = 'eclat_coupons_v2'; // ✅ 기존 글로벌 키(레거시)
 const LEGACY_KEY_V1 = 'eclat_coupons_v1';
@@ -530,7 +532,7 @@ export const couponStore = {
       notify();
    },
 
-   markUsed(codeInput) {
+   markUsed(codeInput, meta = null) {
       const code = normalizeCode(codeInput);
       if (!code) return;
 
@@ -544,6 +546,14 @@ export const couponStore = {
          ),
          appliedCode: state.appliedCode === code ? '' : state.appliedCode,
       };
+
+      // ✅ 사용 이력(정답 루트)
+      adminCouponLedgerStore.addUse({
+         code,
+         ownerKey,
+         meta: meta && typeof meta === 'object' ? meta : null,
+      });
+
       notify();
    },
 

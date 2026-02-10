@@ -8,6 +8,8 @@
  * =============================================
  */
 
+import { adminCouponLedgerStore } from '../store/adminCouponLedgerStore.js';
+
 const couponKeyOf = (ownerKey) => `reve_coupons_v1:${ownerKey}`;
 
 function safeParse(json, fallback) {
@@ -124,9 +126,24 @@ export function distributeCoupon({ users, couponDraft, mode, grade, userIds }) {
    targets.forEach((u) => {
       const ownerKey = String(u.id || '').trim();
       if (!ownerKey) return;
+
       const r = upsertCouponForOwner(ownerKey, couponDraft);
+
       if (r.ok && r.skipped) skipped += 1;
-      if (r.ok && !r.skipped) granted += 1;
+
+      if (r.ok && !r.skipped) {
+         granted += 1;
+
+         // ✅ 발급 이력(정답 루트)
+         adminCouponLedgerStore.addIssue({
+            code,
+            ownerKey,
+            meta: {
+               source: 'ADMIN_DISTRIBUTE',
+               mode: String(mode || '').toUpperCase(),
+            },
+         });
+      }
    });
 
    return { ok: true, granted, skipped, targetCount: targets.length };

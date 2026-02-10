@@ -14,6 +14,8 @@
  * =============================================
  */
 
+const ADMIN_COUPON_LEDGER_KEY = 'reve_admin_coupon_ledger_v1';
+
 const ADMIN_PRODUCTS_KEY = 'reve_admin_products_v1';
 const ADMIN_COUPONS_KEY = 'reve_admin_coupons_v1';
 const ADMIN_AUDIT_KEY = 'reve_admin_audit_v1';
@@ -50,7 +52,7 @@ export function exportAdminBundle() {
    const productsRaw = readRaw(ADMIN_PRODUCTS_KEY);
    const couponsRaw = readRaw(ADMIN_COUPONS_KEY);
    const auditRaw = readRaw(ADMIN_AUDIT_KEY);
-
+   const ledgerRaw = readRaw(ADMIN_COUPON_LEDGER_KEY);
    const orderKeys = scanKeysByPrefix(ORDER_PREFIX);
    const orders = orderKeys.map((k) => ({
       key: k,
@@ -92,6 +94,14 @@ export function exportAdminBundle() {
          prefix: ORDER_PREFIX,
          total: orders.length,
          items: orders,
+      },
+      ledger: {
+         key: ADMIN_COUPON_LEDGER_KEY,
+         value: ledgerRaw || '',
+         items: (() => {
+            const parsed = ledgerRaw ? safeParse(ledgerRaw) : null;
+            return Array.isArray(parsed?.items) ? parsed.items : [];
+         })(),
       },
    };
 }
@@ -145,6 +155,11 @@ export function importAdminBundle(bundle) {
          restored.orders += 1;
       });
    }
-
+   // ledger
+   if (bundle.ledger && typeof bundle.ledger === 'object') {
+      const v = String(bundle.ledger.value || '');
+      writeRaw(ADMIN_COUPON_LEDGER_KEY, v);
+      restored.ledger = true;
+   }
    return { ok: true, restored };
 }

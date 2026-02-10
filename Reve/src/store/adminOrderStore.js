@@ -14,6 +14,7 @@
  * - updateOrderStatus(orderId, nextStatus)
  * =============================================
  */
+import { validateOrderStatusTransition } from '../utils/validate.js';
 
 const STORAGE_PREFIX = 'reve_orders_v1:';
 

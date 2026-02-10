@@ -48,6 +48,8 @@ import { toStatusTimeline, statusKo } from '../../utils/orderTimeline.js';
 import { distributeCoupon } from '../../utils/couponDistribution.js';
 import { deriveUsers } from '../../utils/user/deriveUsers.js';
 
+import { adminCouponLedgerStore } from '../../store/adminCouponLedgerStore.js';
+
 /* ==============================
    1) Page Template
 ============================== */
@@ -206,13 +208,13 @@ function renderPanelCoupons() {
            <h2 class="admin-title">쿠폰/이벤트 관리</h2>
            <p class="admin-desc">운영용 쿠폰 Catalog를 관리합니다(로컬 기준)</p>
          </div>
-
+ 
          <div class="admin-head__actions">
            <button type="button" class="btn" data-admin-seed-coupons>더미 쿠폰 생성</button>
            <button type="button" class="btn primary" data-admin-add-coupon>+ 쿠폰 등록</button>
          </div>
        </div>
-
+ 
        <div class="admin-toolbar" aria-label="Coupons Toolbar">
          <input class="admin-input" type="text" placeholder="검색: 코드/타이틀" data-admin-coupon-q />
          <select class="admin-select" data-admin-coupon-active>
@@ -221,14 +223,74 @@ function renderPanelCoupons() {
            <option value="INACTIVE">비활성</option>
          </select>
        </div>
-
+ 
        <div class="admin-card" data-admin-coupons-wrap>
          <p class="loading">불러오는 중...</p>
        </div>
-
+ 
+       <!-- ✅ NEW: 발급/사용 이력 + 통계 -->
+       <section class="admin-subsection" aria-label="Coupon Ledger">
+         <div class="admin-head" style="margin-top:16px;">
+           <div>
+             <h3 class="admin-title">발급/사용 이력</h3>
+             <p class="admin-desc">쿠폰 배포(ISSUE) / 사용(USE) 이벤트 원장</p>
+           </div>
+           <div class="admin-head__actions">
+             <button type="button" class="btn" data-admin-ledger-refresh>새로고침</button>
+             <button type="button" class="btn danger" data-admin-ledger-clear>원장 비우기</button>
+           </div>
+         </div>
+ 
+         <div class="admin-toolbar" aria-label="Ledger Toolbar">
+           <select class="admin-select" data-admin-ledger-type>
+             <option value="ALL">전체</option>
+             <option value="ISSUE">발급(ISSUE)</option>
+             <option value="USE">사용(USE)</option>
+           </select>
+ 
+           <input class="admin-input" type="text" placeholder="필터: 쿠폰 코드" data-admin-ledger-code />
+           <input class="admin-input" type="text" placeholder="필터: 유저ID(ownerKey)" data-admin-ledger-owner />
+           <select class="admin-select" data-admin-ledger-range>
+             <option value="7d">최근 7일</option>
+             <option value="30d">최근 30일</option>
+             <option value="all">전체</option>
+           </select>
+         </div>
+ 
+         <div class="admin-card" data-admin-ledger-wrap>
+           <p class="loading">불러오는 중...</p>
+         </div>
+       </section>
+ 
+       <section class="admin-subsection" aria-label="Coupon Stats">
+         <div class="admin-head" style="margin-top:16px;">
+           <div>
+             <h3 class="admin-title">사용 통계</h3>
+             <p class="admin-desc">발급 대비 사용률 / Top 쿠폰 / 최근 추이</p>
+           </div>
+         </div>
+ 
+         <div class="admin-toolbar" aria-label="Stats Toolbar">
+           <select class="admin-select" data-admin-stats-range>
+             <option value="7d">최근 7일</option>
+             <option value="30d">최근 30일</option>
+             <option value="all">전체</option>
+           </select>
+           <select class="admin-select" data-admin-stats-sort>
+             <option value="use:desc">사용 많은순</option>
+             <option value="rate:desc">사용률 높은순</option>
+             <option value="issue:desc">발급 많은순</option>
+             <option value="code:asc">코드 A→Z</option>
+           </select>
+         </div>
+ 
+         <div class="admin-card" data-admin-stats-wrap>
+           <p class="loading">불러오는 중...</p>
+         </div>
+       </section>
+ 
        <p class="admin-note muted">
-         ※ 현재 storefront의 couponStore는 내부 카탈로그(상수) 기반입니다.
-         운영 카탈로그를 storefront에 연결하려면 couponStore를 Catalog store로 교체하는 단계가 필요합니다.
+         ※ storefront의 couponStore는 운영(Admin) 카탈로그와 병합 조회합니다.
        </p>
      </section>
    `;
@@ -1141,6 +1203,130 @@ function renderCouponsTable(coupons) {
    `;
 }
 
+function renderLedgerTable(rows) {
+   const list = Array.isArray(rows) ? rows : [];
+   if (!list.length) {
+      return `
+       <div class="empty">
+         <p class="empty__title">이력이 없습니다.</p>
+         <p class="empty__desc">쿠폰 배포/사용이 발생하면 여기에 쌓입니다.</p>
+       </div>
+     `;
+   }
+
+   return `
+     <div class="admin-table-wrap">
+       <table class="admin-table" aria-label="Coupon Ledger Table">
+         <thead>
+           <tr>
+             <th>AT</th>
+             <th>TYPE</th>
+             <th>CODE</th>
+             <th>OWNER</th>
+             <th>META</th>
+           </tr>
+         </thead>
+         <tbody>
+           ${list
+              .map((r) => {
+                 const meta = r.meta ? JSON.stringify(r.meta) : '';
+                 return `
+                 <tr>
+                   <td class="muted">${escapeHtml(fmtDate(r.at))}</td>
+                   <td><span class="pill ${r.type === 'USE' ? 'pill--off' : 'pill--on'}">${escapeHtml(r.type)}</span></td>
+                   <td><code>${escapeHtml(r.code)}</code></td>
+                   <td>${escapeHtml(r.ownerKey)}</td>
+                   <td class="muted" style="max-width:420px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                     ${escapeHtml(meta)}
+                   </td>
+                 </tr>
+               `;
+              })
+              .join('')}
+         </tbody>
+       </table>
+     </div>
+   `;
+}
+
+function renderCouponStatsTable(rows) {
+   const list = Array.isArray(rows) ? rows : [];
+   if (!list.length) {
+      return `
+       <div class="empty">
+         <p class="empty__title">통계가 없습니다.</p>
+         <p class="empty__desc">발급/사용 이력이 쌓이면 통계가 생성됩니다.</p>
+       </div>
+     `;
+   }
+
+   return `
+     <div class="admin-table-wrap">
+       <table class="admin-table" aria-label="Coupon Stats Table">
+         <thead>
+           <tr>
+             <th>CODE</th>
+             <th>ISSUE</th>
+             <th>USE</th>
+             <th>USAGE RATE</th>
+           </tr>
+         </thead>
+         <tbody>
+           ${list
+              .map((r) => {
+                 const pct =
+                    r.issue > 0 ? Math.round((r.use / r.issue) * 100) : 0;
+                 return `
+                 <tr>
+                   <td><code>${escapeHtml(r.code)}</code></td>
+                   <td>${escapeHtml(String(r.issue))}</td>
+                   <td>${escapeHtml(String(r.use))}</td>
+                   <td>
+                     <span class="pill">${pct}%</span>
+                     <span class="muted" style="margin-left:8px;">(${r.use}/${r.issue})</span>
+                   </td>
+                 </tr>
+               `;
+              })
+              .join('')}
+         </tbody>
+       </table>
+     </div>
+   `;
+}
+
+function renderCouponTrendTable(days) {
+   const list = Array.isArray(days) ? days : [];
+   if (!list.length) return '';
+
+   return `
+     <div class="admin-table-wrap" style="margin-top:12px;">
+       <table class="admin-table" aria-label="Coupon Trend Table">
+         <thead>
+           <tr>
+             <th>DAY</th>
+             <th>ISSUE</th>
+             <th>USE</th>
+           </tr>
+         </thead>
+         <tbody>
+           ${list
+              .map((d) => {
+                 return `
+                 <tr>
+                   <td class="muted">${escapeHtml(d.day)}</td>
+                   <td>${escapeHtml(String(d.issue))}</td>
+                   <td>${escapeHtml(String(d.use))}</td>
+                 </tr>
+               `;
+              })
+              .join('')}
+         </tbody>
+       </table>
+     </div>
+   `;
+}
+
 /* ==============================
    8.5) Users UI
 ============================== */
@@ -1340,6 +1526,17 @@ export function initAdminPage() {
    const userGrade = root.querySelector('[data-admin-user-grade]');
    const userSort = root.querySelector('[data-admin-user-sort]');
 
+   const ledgerWrap = root.querySelector('[data-admin-ledger-wrap]');
+   const statsWrap = root.querySelector('[data-admin-stats-wrap]');
+
+   const ledgerType = root.querySelector('[data-admin-ledger-type]');
+   const ledgerCode = root.querySelector('[data-admin-ledger-code]');
+   const ledgerOwner = root.querySelector('[data-admin-ledger-owner]');
+   const ledgerRange = root.querySelector('[data-admin-ledger-range]');
+
+   const statsRange = root.querySelector('[data-admin-stats-range]');
+   const statsSort = root.querySelector('[data-admin-stats-sort]');
+
    /* ==============================
       10.1) Tab switching
    ============================== */
@@ -1380,6 +1577,8 @@ export function initAdminPage() {
       orders: { q: '', status: 'ALL' },
       coupons: { q: '', active: 'ALL' },
       users: { q: '', grade: 'ALL', sort: 'createdAt:desc' },
+      couponsLedger: { type: 'ALL', code: '', ownerKey: '', range: '7d' },
+      couponStats: { range: '7d', sort: 'use:desc' },
    };
 
    /* ==============================
@@ -1506,7 +1705,117 @@ export function initAdminPage() {
 
       couponsWrap.innerHTML = renderCouponsTable(filtered);
    };
+   function rangeToFromMs(range) {
+      const r = String(range || '7d');
+      if (r === 'all') return 0;
+      const days = r === '30d' ? 30 : 7;
+      return Date.now() - days * 24 * 60 * 60 * 1000;
+   }
 
+   function buildStatsFromLedger(rows) {
+      const map = new Map(); // code -> {issue,use}
+      rows.forEach((r) => {
+         const code = String(r.code || '').toUpperCase();
+         if (!code) return;
+         if (!map.has(code)) map.set(code, { code, issue: 0, use: 0 });
+         const box = map.get(code);
+         if (r.type === 'ISSUE') box.issue += 1;
+         if (r.type === 'USE') box.use += 1;
+      });
+      return Array.from(map.values());
+   }
+
+   function buildDailyTrend(rows, days = 7) {
+      const out = [];
+      const dayMs = 24 * 60 * 60 * 1000;
+      const end = Date.now();
+      const start = end - days * dayMs;
+
+      const bucket = new Map(); // YYYY-MM-DD -> {issue,use}
+      rows.forEach((r) => {
+         const at = Number(r.at || 0) || 0;
+         if (!at || at < start) return;
+
+         const d = new Date(at);
+         const y = d.getFullYear();
+         const m = String(d.getMonth() + 1).padStart(2, '0');
+         const dd = String(d.getDate()).padStart(2, '0');
+         const key = `${y}-${m}-${dd}`;
+
+         if (!bucket.has(key)) bucket.set(key, { day: key, issue: 0, use: 0 });
+         const box = bucket.get(key);
+         if (r.type === 'ISSUE') box.issue += 1;
+         if (r.type === 'USE') box.use += 1;
+      });
+
+      // 최근 n일을 빈 값까지 채워서 보기 좋게
+      for (let i = days - 1; i >= 0; i -= 1) {
+         const t = end - i * dayMs;
+         const d = new Date(t);
+         const y = d.getFullYear();
+         const m = String(d.getMonth() + 1).padStart(2, '0');
+         const dd = String(d.getDate()).padStart(2, '0');
+         const key = `${y}-${m}-${dd}`;
+         out.push(bucket.get(key) || { day: key, issue: 0, use: 0 });
+      }
+
+      return out;
+   }
+
+   const paintLedger = () => {
+      if (!ledgerWrap) return;
+
+      const from = rangeToFromMs(state.couponsLedger.range);
+      const type = String(state.couponsLedger.type || 'ALL').toUpperCase();
+      const code = String(state.couponsLedger.code || '')
+         .trim()
+         .toUpperCase();
+      const ownerKey = String(state.couponsLedger.ownerKey || '').trim();
+
+      const rows = adminCouponLedgerStore.list({
+         type,
+         code,
+         ownerKey,
+         from,
+         to: 0,
+      });
+
+      ledgerWrap.innerHTML = renderLedgerTable(rows.slice(0, 200));
+   };
+
+   const paintCouponStats = () => {
+      if (!statsWrap) return;
+
+      const from = rangeToFromMs(state.couponStats.range);
+      const rows = adminCouponLedgerStore.list({ type: 'ALL', from });
+
+      let stats = buildStatsFromLedger(rows);
+
+      const sortRaw = String(state.couponStats.sort || 'use:desc');
+      const [k, dir] = sortRaw.split(':');
+
+      stats.sort((a, b) => {
+         if (k === 'code') return String(a.code).localeCompare(String(b.code));
+         if (k === 'issue') return b.issue - a.issue;
+         if (k === 'rate') {
+            const ar = a.issue > 0 ? a.use / a.issue : 0;
+            const br = b.issue > 0 ? b.use / b.issue : 0;
+            return br - ar;
+         }
+         // default: use
+         return b.use - a.use;
+      });
+
+      if (dir === 'asc') stats.reverse();
+
+      const days = state.couponStats.range === '30d' ? 14 : 7;
+      const trend = buildDailyTrend(rows, days);
+
+      statsWrap.innerHTML = `
+        ${renderCouponStatsTable(stats)}
+        ${renderCouponTrendTable(trend)}
+      `;
+   };
    /* ==============================
       ✅ 10.6) Users paint (P1-1 정답 루트)
    ============================== */
@@ -1569,6 +1878,14 @@ export function initAdminPage() {
       state.users.q = String(userQ?.value || '');
       state.users.grade = String(userGrade?.value || 'ALL');
       state.users.sort = String(userSort?.value || 'createdAt:desc');
+
+      state.couponsLedger.type = String(ledgerType?.value || 'ALL');
+      state.couponsLedger.code = String(ledgerCode?.value || '');
+      state.couponsLedger.ownerKey = String(ledgerOwner?.value || '');
+      state.couponsLedger.range = String(ledgerRange?.value || '7d');
+
+      state.couponStats.range = String(statsRange?.value || '7d');
+      state.couponStats.sort = String(statsSort?.value || 'use:desc');
    };
 
    /* ==============================
@@ -1580,6 +1897,8 @@ export function initAdminPage() {
    paintProducts();
    paintOrders();
    paintCoupons();
+   paintLedger();
+   paintCouponStats();
    paintUsers();
    paintAudit();
    paintTimeline();
@@ -1587,6 +1906,10 @@ export function initAdminPage() {
    // ✅ “변경”에 반응하는 구독: 해당 store가 바뀌면 화면 자동 갱신
    adminProductStore.subscribe(() => paintProducts());
    adminCouponStore.subscribe(() => paintCoupons());
+   adminCouponLedgerStore.subscribe?.(() => {
+      paintLedger();
+      paintCouponStats();
+   });
 
    // ✅ 주문이 바뀌면: 주문/타임라인/유저(누적구매)도 같이 갱신
    adminOrderStore.subscribe?.(() => {
@@ -1624,6 +1947,14 @@ export function initAdminPage() {
       if (e.target.closest('[data-admin-user-q]')) {
          syncFiltersFromDOM();
          paintUsers();
+         return;
+      }
+      if (
+         e.target.closest('[data-admin-ledger-code]') ||
+         e.target.closest('[data-admin-ledger-owner]')
+      ) {
+         syncFiltersFromDOM();
+         paintLedger();
          return;
       }
    });
@@ -1665,6 +1996,23 @@ export function initAdminPage() {
       if (e.target.closest('[data-admin-user-sort]')) {
          syncFiltersFromDOM();
          paintUsers();
+         return;
+      }
+      if (
+         e.target.closest('[data-admin-ledger-type]') ||
+         e.target.closest('[data-admin-ledger-range]')
+      ) {
+         syncFiltersFromDOM();
+         paintLedger();
+         return;
+      }
+
+      if (
+         e.target.closest('[data-admin-stats-range]') ||
+         e.target.closest('[data-admin-stats-sort]')
+      ) {
+         syncFiltersFromDOM();
+         paintCouponStats();
          return;
       }
    });
@@ -2677,7 +3025,31 @@ export function initAdminPage() {
          paintUsers();
          return;
       }
+      if (e.target.closest('[data-admin-ledger-refresh]')) {
+         paintLedger();
+         paintCouponStats();
+         toast.show('원장/통계를 갱신했습니다.', { duration: 1200 });
+         return;
+      }
 
+      if (e.target.closest('[data-admin-ledger-clear]')) {
+         const ok = await confirmModal({
+            title: '원장 비우기',
+            message:
+               '쿠폰 발급/사용 원장을 모두 삭제할까요?\n(쿠폰 보유 데이터는 삭제되지 않습니다)',
+            confirmText: '삭제',
+            cancelText: '취소',
+         });
+         if (!ok) return;
+
+         adminCouponLedgerStore.clear();
+         auditLog.add('COUPON_LEDGER_CLEAR', '쿠폰 원장 비우기');
+         paintAudit();
+         paintLedger();
+         paintCouponStats();
+         toast.show('원장을 비웠습니다.', { duration: 1200 });
+         return;
+      }
       /* ==============================
          Audit actions
       ============================== */
