@@ -4,10 +4,12 @@
  * 역할: 관리자(Admin) 페이지 엔트리 + 운영 탭 UI
  * 경로: /admin (app.js에서 requireAdmin 가드 적용됨)
  *
- * ✅ 이번 패치(첨부파일 업로드 + 최신순)
+ * ✅ 이번 패치(첨부파일 업로드 + 최신순 + 모달 UX 정리 + 가격 자동계산)
  * - 상품 등록/수정: 이미지 URL + 파일 첨부 둘 다 지원
  * - 파일 첨부 시 DataURL(base64)로 변환하여 image 필드에 자동 반영
- * - 최신순 정렬(기본): createdAt/updatedAt 내림차순
+ * - 최신순 정렬(기본): updatedAt → createdAt 내림차순
+ * - 상품 등록 모달: 섹션(그룹) 구조로 입력 폼 가독성 개선
+ * - 판매가(price) + 할인율(discountRate) 입력 시 정가(basePrice) 자동 계산
  *
  * ⚠️ 주의
  * - LocalStorage에 base64 이미지를 저장하므로 용량 제한이 있음(브라우저마다 다름).
@@ -333,15 +335,15 @@ function getFileFromInput(el) {
 }
 
 /* ==============================
-   4.5) Brand/Tags helpers (NEW)
+   4.5) Brand/Tags helpers
 ============================== */
 
 function slugifyBrand(brand) {
    return String(brand || '')
       .trim()
       .toLowerCase()
-      .replace(/\s+/g, '') // 공백 제거
-      .replace(/[^a-z0-9가-힣]/g, ''); // 특수문자 제거
+      .replace(/\s+/g, '')
+      .replace(/[^a-z0-9가-힣]/g, '');
 }
 
 function uniq(arr) {
@@ -368,7 +370,7 @@ function buildTagsFromForm(form) {
 }
 
 function getNextIdByBrandSlug(brandSlug) {
-   const list = adminProductStore.getProducts(); // 전체 상품
+   const list = adminProductStore.getProducts();
    const nums = list
       .map((p) => String(p.id || ''))
       .filter((id) => id.startsWith(`${brandSlug}-`))
@@ -380,7 +382,169 @@ function getNextIdByBrandSlug(brandSlug) {
 }
 
 /* ==============================
+   4.6) Price auto-calc (NEW)
+   - price + discountRate -> basePrice
+============================== */
+
+function mountPriceAutoCalc(overlay) {
+   const priceEl = overlay.querySelector('[data-f="price"]');
+   const rateEl = overlay.querySelector('[data-f="discountRate"]');
+   const baseEl = overlay.querySelector('[data-f="basePrice"]');
+   if (!priceEl || !rateEl || !baseEl) return;
+
+   let userTouchedBase = false;
+   const roundTo10 = (n) => Math.round(n / 10) * 10;
+
+   const computeBase = () => {
+      if (userTouchedBase) return;
+
+      const price = Number(priceEl.value || 0);
+      const rate = Number(rateEl.value || 0);
+
+      if (!Number.isFinite(price) || price <= 0) return;
+
+      if (!Number.isFinite(rate) || rate <= 0) {
+         baseEl.value = String(Math.floor(price));
+         return;
+      }
+
+      const safeRate = Math.max(0, Math.min(0.99, rate));
+      const denom = 1 - safeRate;
+      if (denom <= 0) return;
+
+      const base = price / denom;
+      if (!Number.isFinite(base) || base <= 0) return;
+
+      baseEl.value = String(roundTo10(base));
+   };
+
+   baseEl.addEventListener('input', () => {
+      userTouchedBase = String(baseEl.value || '').trim() !== '';
+   });
+
+   priceEl.addEventListener('input', computeBase);
+   rateEl.addEventListener('input', computeBase);
+
+   computeBase();
+}
+
+/* ==============================
+   4.7) Product fields builder (NEW)
+   - 모달 구조 섹션화
+============================== */
+
+function buildProductFields({ mainOptions, subAllOptions, brands, isEdit }) {
+   const brandOptions = [
+      { value: '', label: '선택' },
+      ...(brands || []).map((b) => ({ value: b, label: b })),
+   ];
+
+   return [
+      { type: 'section', label: '기본 정보' },
+      {
+         key: 'id',
+         label: '상품 ID',
+         placeholder: 'prod_001 (고유)',
+         hint: isEdit ? 'ID는 수정 불가' : '고유값이어야 합니다.',
+         type: 'text',
+      },
+      { key: 'name', label: '상품명', placeholder: '상품 이름' },
+      {
+         key: 'brand',
+         label: '브랜드',
+         type: 'select',
+         options: brandOptions,
+         hint: '브랜드 선택 시 ID 추천값이 자동으로 채워집니다.',
+      },
+
+      { type: 'section', label: '분류' },
+      {
+         key: 'categoryMain',
+         label: '대분류',
+         type: 'select',
+         options: [{ value: '', label: '선택' }, ...mainOptions],
+         hint: '대분류 선택 시 중분류 옵션이 자동으로 변경됩니다.',
+      },
+      {
+         key: 'categorySub',
+         label: '중분류',
+         type: 'select',
+         options: [{ value: '', label: '선택' }, ...subAllOptions],
+      },
+
+      {
+         type: 'section',
+         label: '가격/할인',
+         hint: '판매가 + 할인율 입력 시 정가가 자동 계산됩니다.',
+      },
+      {
+         key: 'price',
+         label: '판매가(원)',
+         type: 'number',
+         placeholder: '10000',
+      },
+      {
+         key: 'discountRate',
+         label: '할인율(0~1)',
+         type: 'number',
+         placeholder: '0.2',
+         hint: '0.2 = 20% (0~1 사이 값만 허용)',
+      },
+      {
+         key: 'basePrice',
+         label: '정가(원)',
+         type: 'number',
+         placeholder: '12000',
+         hint: '직접 입력하면 자동 계산이 멈춥니다.',
+      },
+
+      { type: 'section', label: '이미지' },
+      {
+         key: 'image',
+         label: '이미지 URL(선택)',
+         placeholder: 'https://... 또는 비워두기',
+         hint: '파일 첨부가 있으면 URL보다 파일이 우선됩니다.',
+      },
+      {
+         key: 'imageFile',
+         label: '이미지 파일 첨부(선택)',
+         type: 'file',
+         accept: 'image/*',
+         hint: '최대 2MB 권장. (Firebase 연결 시 업로드 방식으로 교체 가능)',
+      },
+
+      { type: 'section', label: '옵션/상태' },
+      { key: 'active', label: '활성', type: 'checkbox' },
+      { key: 'couponEligible', label: '쿠폰 적용 가능', type: 'checkbox' },
+
+      { type: 'section', label: '사이즈/설명' },
+      { key: 'apparelSizes', label: '의류 사이즈(쉼표)', placeholder: 'S,M,L' },
+      {
+         key: 'shoeSizes',
+         label: '신발 사이즈(쉼표)',
+         placeholder: '230,240,250',
+      },
+      {
+         key: 'desc',
+         label: '설명',
+         type: 'textarea',
+         placeholder: '상품 설명(선택)',
+      },
+
+      ...(isEdit
+         ? []
+         : [
+              { type: 'section', label: '운영 태그(자동 생성용)' },
+              { key: 'isHot', label: 'HOT', type: 'checkbox' },
+              { key: 'isBest', label: '베스트', type: 'checkbox' },
+              { key: 'isNew', label: '신상', type: 'checkbox' },
+           ]),
+   ];
+}
+
+/* ==============================
    5) Modals
+   - section type 지원(모달 폼 구조 정리)
 ============================== */
 
 function openFormModal({
@@ -398,6 +562,22 @@ function openFormModal({
       overlay.setAttribute('aria-label', title);
 
       const renderField = (f) => {
+         // ✅ NEW: section header
+         if (f.type === 'section') {
+            return `
+              <div class="form-section">
+                <h4 class="form-section__title">${escapeHtml(f.label || '')}</h4>
+                ${
+                   f.hint
+                      ? `<p class="form-section__hint muted">${escapeHtml(
+                           f.hint,
+                        )}</p>`
+                      : ''
+                }
+              </div>
+            `;
+         }
+
          const key = f.key;
          const label = f.label;
          const type = f.type || 'text';
@@ -411,7 +591,11 @@ function openFormModal({
             return `
               <label class="form-field">
                 <span class="k">${escapeHtml(label)}</span>
-                <textarea rows="3" data-f="${escapeHtml(key)}" placeholder="${escapeHtml(placeholder)}">${escapeHtml(value)}</textarea>
+                <textarea rows="3" data-f="${escapeHtml(
+                   key,
+                )}" placeholder="${escapeHtml(placeholder)}">${escapeHtml(
+                   value,
+                )}</textarea>
                 ${hint}
               </label>
             `;
@@ -428,7 +612,9 @@ function openFormModal({
                         const ov = String(o?.value ?? '');
                         const ot = String(o?.label ?? ov);
                         const selected = String(value) === ov ? 'selected' : '';
-                        return `<option value="${escapeHtml(ov)}" ${selected}>${escapeHtml(ot)}</option>`;
+                        return `<option value="${escapeHtml(
+                           ov,
+                        )}" ${selected}>${escapeHtml(ot)}</option>`;
                      })
                      .join('')}
                 </select>
@@ -453,9 +639,9 @@ function openFormModal({
             return `
               <label class="form-field">
                 <span class="k">${escapeHtml(label)}</span>
-                <input type="file" data-f="${escapeHtml(key)}" accept="${escapeHtml(
-                   accept,
-                )}" />
+                <input type="file" data-f="${escapeHtml(
+                   key,
+                )}" accept="${escapeHtml(accept)}" />
                 ${hint}
               </label>
             `;
@@ -464,7 +650,12 @@ function openFormModal({
          return `
            <label class="form-field">
              <span class="k">${escapeHtml(label)}</span>
-             <input type="${escapeHtml(type)}" data-f="${escapeHtml(key)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" />
+             <input
+               type="${escapeHtml(type)}"
+               data-f="${escapeHtml(key)}"
+               value="${escapeHtml(value)}"
+               placeholder="${escapeHtml(placeholder)}"
+             />
              ${hint}
            </label>
          `;
@@ -491,12 +682,14 @@ function openFormModal({
           </div>
         </div>
       `;
-      // ✅ 여기 추가: DOM 준비된 시점에 caller가 overlay를 만질 수 있게
+
+      // ✅ DOM 준비된 시점에 caller가 overlay를 만질 수 있게
       try {
          if (typeof onMount === 'function') onMount(overlay);
       } catch (e) {
          console.warn('[admin] onMount failed:', e);
       }
+
       /* --------------------------------
          ✅ categoryMain/categorySub 연동
       -------------------------------- */
@@ -535,7 +728,7 @@ function openFormModal({
          const el = overlay.querySelector(`[data-f="${key}"]`);
          if (!el) return '';
          if (type === 'checkbox') return Boolean(el.checked);
-         if (type === 'file') return ''; // file은 submit에서 따로 읽음
+         if (type === 'file') return '';
          return String(el.value ?? '').trim();
       };
 
@@ -553,11 +746,11 @@ function openFormModal({
          if (e.target.closest('[data-submit]')) {
             const out = {};
             fields.forEach((f) => {
+               if (f.type === 'section') return;
                out[f.key] = getValue(f.key, f.type);
             });
 
-            // file input은 여기서 넘기지 않고, caller에서 overlay를 못 보니
-            // file은 out.__fileInputs 로 참조만 넘겨준다.
+            // file input은 out.__fileInputs 로 참조만 넘김
             out.__fileInputs = {};
             fields
                .filter((f) => f.type === 'file')
@@ -946,13 +1139,6 @@ export function initAdminPage() {
          return (
             (Number(b?.createdAt || 0) || 0) - (Number(a?.createdAt || 0) || 0)
          );
-         //최신순
-         // const at = Number(a?.createdAt || 0) || 0;
-         // const bt = Number(b?.createdAt || 0) || 0;
-         // if (bt !== at) return bt - at;
-         // const au = Number(a?.updatedAt || 0) || 0;
-         // const bu = Number(b?.updatedAt || 0) || 0;
-         // return bu - au;
       });
    };
 
@@ -1178,133 +1364,49 @@ export function initAdminPage() {
       if (e.target.closest('[data-admin-add-product]')) {
          const { mainOptions, subAllOptions } = getAdminCategoryOptions();
 
-         const fields = [
-            {
-               key: 'id',
-               label: '상품 ID',
-               placeholder: 'prod_001 (고유)',
-               hint: '고유값이어야 합니다.',
-            },
-            { key: 'name', label: '상품명', placeholder: '상품 이름' },
-            {
-               key: 'categoryMain',
-               label: '대분류',
-               type: 'select',
-               options: [{ value: '', label: '선택' }, ...mainOptions],
-               hint: '대분류 선택 시 중분류 옵션이 자동으로 변경됩니다.',
-            },
-            {
-               key: 'categorySub',
-               label: '중분류',
-               type: 'select',
-               options: [{ value: '', label: '선택' }, ...subAllOptions],
-            },
-            {
-               key: 'price',
-               label: '판매가(원)',
-               type: 'number',
-               placeholder: '10000',
-            },
-            {
-               key: 'discountRate',
-               label: '할인율(0~1)',
-               type: 'number',
-               placeholder: '0.2',
-               hint: '0.2 = 20% (0~1 사이 값만 허용)',
-            },
-            {
-               key: 'basePrice',
-               label: '정가(원)',
-               type: 'number',
-               placeholder: '12000',
-               hint: '세일 전 가격(선택)',
-            },
-            {
-               key: 'image',
-               label: '이미지 URL(선택)',
-               placeholder: 'https://... 또는 비워두기',
-               hint: '파일 첨부가 있으면 URL보다 파일이 우선됩니다.',
-            },
-            {
-               key: 'imageFile',
-               label: '이미지 파일 첨부(선택)',
-               type: 'file',
-               accept: 'image/*',
-               hint: '최대 2MB 권장. (Firebase 연결 시 업로드 방식으로 교체 가능)',
-            },
-            { key: 'active', label: '활성', type: 'checkbox' },
-            {
-               key: 'couponEligible',
-               label: '쿠폰 적용 가능',
-               type: 'checkbox',
-            },
-            {
-               key: 'apparelSizes',
-               label: '의류 사이즈(쉼표)',
-               placeholder: 'S,M,L',
-            },
-            {
-               key: 'shoeSizes',
-               label: '신발 사이즈(쉼표)',
-               placeholder: '230,240,250',
-            },
-            {
-               key: 'desc',
-               label: '설명',
-               type: 'textarea',
-               placeholder: '상품 설명(선택)',
-            },
-            {
-               key: 'brand',
-               label: '브랜드',
-               type: 'select',
-               options: [
-                  { value: '', label: '선택' } /* 여기 브랜드 옵션 채울 예정 */,
-               ],
-               hint: '브랜드 선택 시 ID 추천값이 자동으로 채워집니다.',
-            },
-            { key: 'isHot', label: 'HOT', type: 'checkbox' },
-            { key: 'isBest', label: '베스트', type: 'checkbox' },
-            { key: 'isNew', label: '신상', type: 'checkbox' },
-         ];
-         // ✅ 브랜드 옵션 자동 채우기 (기존 상품들에서 추출)
          const brands = uniq(
             adminProductStore
                .getProducts()
                .map((p) => String(p.brand || '').trim()),
-         ).sort((a, b) => a.localeCompare(b));
+         )
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b));
 
-         const brandField = fields.find((f) => f.key === 'brand');
-         if (brandField) {
-            brandField.options = [
-               { value: '', label: '선택' },
-               ...brands.map((b) => ({ value: b, label: b })),
-            ];
-         }
+         const fields = buildProductFields({
+            mainOptions,
+            subAllOptions,
+            brands,
+            isEdit: false,
+         });
+
          const form = await openFormModal({
             title: '상품 등록',
             fields,
             initial: { active: true, couponEligible: true, discountRate: 0 },
             submitText: '등록',
             onMount: (overlay) => {
+               // ✅ brand -> id 추천
                const brandEl = overlay.querySelector('[data-f="brand"]');
                const idEl = overlay.querySelector('[data-f="id"]');
-               if (!brandEl || !idEl) return;
 
-               const updateIdPreview = () => {
-                  const brand = String(brandEl.value || '').trim();
-                  if (!brand) return;
+               if (brandEl && idEl) {
+                  const updateIdPreview = () => {
+                     const brand = String(brandEl.value || '').trim();
+                     if (!brand) return;
 
-                  // 사용자가 이미 id를 직접 입력했다면 덮어쓰지 않기
-                  const typed = String(idEl.value || '').trim();
-                  if (typed) return;
+                     const typed = String(idEl.value || '').trim();
+                     if (typed) return;
 
-                  const slug = slugifyBrand(brand);
-                  idEl.value = getNextIdByBrandSlug(slug);
-               };
+                     const slug = slugifyBrand(brand);
+                     idEl.value = getNextIdByBrandSlug(slug);
+                  };
 
-               brandEl.addEventListener('change', updateIdPreview);
-               updateIdPreview();
+                  brandEl.addEventListener('change', updateIdPreview);
+                  updateIdPreview();
+               }
+
+               // ✅ price + discountRate -> basePrice 자동 계산
+               mountPriceAutoCalc(overlay);
             },
          });
          if (!form) return;
@@ -1342,11 +1444,12 @@ export function initAdminPage() {
 
          form.tags = buildTagsFromForm(form);
 
+         // 운영 태그 토글은 tags로만 쓰고 제거
          delete form.isHot;
          delete form.isBest;
          delete form.isNew;
 
-         // ✅ 기존 URL 검사 (그대로)
+         // ✅ 이미지 URL 검사
          const url = String(form.image || '').trim();
          if (
             url &&
@@ -1367,9 +1470,9 @@ export function initAdminPage() {
          // ✅ discountRate 정규화 (0~1)
          const drRaw = String(form.discountRate ?? '').trim();
          const dr = drRaw === '' ? 0 : Number(drRaw);
-         form.discountRate = Number.isFinite(dr) ? dr : form.discountRate;
+         form.discountRate = Number.isFinite(dr) ? dr : 0;
 
-         // ✅ 할인율이 있는데 정가가 비어있으면 자동 계산해서 채움
+         // ✅ basePrice 정규화 + 자동 보정(비어있을 때만)
          const priceNum = Number(form.price ?? 0);
          const baseRaw = String(form.basePrice ?? '').trim();
          const hasBase = baseRaw !== '';
@@ -1380,11 +1483,8 @@ export function initAdminPage() {
             Number.isFinite(priceNum) &&
             priceNum > 0
          ) {
-            // basePrice = price / (1 - rate)
             const denom = 1 - form.discountRate;
-            if (denom > 0) {
-               form.basePrice = String(Math.round(priceNum / denom));
-            }
+            if (denom > 0) form.basePrice = Math.round(priceNum / denom);
          }
 
          const v = validateProductDraft(form);
@@ -1438,67 +1538,20 @@ export function initAdminPage() {
 
          const { mainOptions, subAllOptions } = getAdminCategoryOptions();
 
-         const fields = [
-            {
-               key: 'id',
-               label: '상품 ID',
-               placeholder: 'prod_001',
-               hint: 'ID는 수정 불가',
-               type: 'text',
-            },
-            { key: 'name', label: '상품명' },
-            {
-               key: 'categoryMain',
-               label: '대분류',
-               type: 'select',
-               options: [{ value: '', label: '선택' }, ...mainOptions],
-            },
-            {
-               key: 'categorySub',
-               label: '중분류',
-               type: 'select',
-               options: [{ value: '', label: '선택' }, ...subAllOptions],
-            },
-            { key: 'price', label: '판매가(원)', type: 'number' },
-            { key: 'basePrice', label: '정가(원)', type: 'number' },
-            {
-               key: 'discountRate',
-               label: '할인율(0~1)',
-               type: 'number',
-               placeholder: '0.2',
-               hint: '0.2 = 20% (0~1 사이 값만 허용)',
-            },
-            {
-               key: 'image',
-               label: '이미지 URL(선택)',
-               placeholder: 'https://... 또는 비워두기',
-               hint: '파일 첨부가 있으면 URL보다 파일이 우선됩니다.',
-            },
-            {
-               key: 'imageFile',
-               label: '이미지 파일 첨부(선택)',
-               type: 'file',
-               accept: 'image/*',
-               hint: '최대 2MB 권장. (Firebase 연결 시 업로드 방식으로 교체 가능)',
-            },
-            { key: 'active', label: '활성', type: 'checkbox' },
-            {
-               key: 'couponEligible',
-               label: '쿠폰 적용 가능',
-               type: 'checkbox',
-            },
-            {
-               key: 'apparelSizes',
-               label: '의류 사이즈(쉼표)',
-               placeholder: 'S,M,L',
-            },
-            {
-               key: 'shoeSizes',
-               label: '신발 사이즈(쉼표)',
-               placeholder: '230,240,250',
-            },
-            { key: 'desc', label: '설명', type: 'textarea' },
-         ];
+         const brands = uniq(
+            adminProductStore
+               .getProducts()
+               .map((p) => String(p.brand || '').trim()),
+         )
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b));
+
+         const fields = buildProductFields({
+            mainOptions,
+            subAllOptions,
+            brands,
+            isEdit: true,
+         });
 
          const form = await openFormModal({
             title: '상품 수정',
@@ -1509,6 +1562,14 @@ export function initAdminPage() {
                shoeSizes: (current.shoeSizes || []).join(','),
             },
             submitText: '수정',
+            onMount: (overlay) => {
+               // ✅ 수정에서는 ID 잠금(UX)
+               const idEl = overlay.querySelector('[data-f="id"]');
+               if (idEl) idEl.setAttribute('disabled', 'disabled');
+
+               // ✅ basePrice 자동계산도 동일 적용
+               mountPriceAutoCalc(overlay);
+            },
          });
          if (!form) return;
 
@@ -1538,7 +1599,7 @@ export function initAdminPage() {
          delete form.__fileInputs;
          delete form.imageFile;
 
-         // ✅ 여기! (validate 전에)
+         // ✅ 이미지 URL 검사 (validate 전에)
          const url = String(form.image || '').trim();
          if (
             url &&
@@ -1555,12 +1616,13 @@ export function initAdminPage() {
             });
             return;
          }
-         // ✅ discountRate 정규화 (0~1)
+
+         // ✅ discountRate 정규화
          const drRaw = String(form.discountRate ?? '').trim();
          const dr = drRaw === '' ? 0 : Number(drRaw);
-         form.discountRate = Number.isFinite(dr) ? dr : form.discountRate;
+         form.discountRate = Number.isFinite(dr) ? dr : 0;
 
-         // ✅ 할인율이 있는데 정가가 비어있으면 자동 계산해서 채움
+         // ✅ basePrice 자동 보정(비어있을 때만)
          const priceNum = Number(form.price ?? 0);
          const baseRaw = String(form.basePrice ?? '').trim();
          const hasBase = baseRaw !== '';
@@ -1571,12 +1633,10 @@ export function initAdminPage() {
             Number.isFinite(priceNum) &&
             priceNum > 0
          ) {
-            // basePrice = price / (1 - rate)
             const denom = 1 - form.discountRate;
-            if (denom > 0) {
-               form.basePrice = String(Math.round(priceNum / denom));
-            }
+            if (denom > 0) form.basePrice = Math.round(priceNum / denom);
          }
+
          const v = validateProductDraft(form, { allowIdExisting: true });
          if (!v.ok) {
             toast.show(v.message, { duration: 1600 });
@@ -1735,9 +1795,7 @@ export function initAdminPage() {
 
          const ok = await confirmModal({
             title: '주문 상태 변경',
-            message: `주문(${orderId})\n${statusLabel(currentStatus)} → ${statusLabel(
-               nextStatus,
-            )}\n변경할까요?`,
+            message: `주문(${orderId})\n${statusLabel(currentStatus)} → ${statusLabel(nextStatus)}\n변경할까요?`,
             confirmText: '변경',
             cancelText: '취소',
          });
@@ -1780,9 +1838,7 @@ export function initAdminPage() {
 
          const ok = await confirmModal({
             title: '주문 취소',
-            message: `주문(${orderId})을 취소할까요?\n${statusLabel(currentStatus)} → ${statusLabel(
-               nextStatus,
-            )}`,
+            message: `주문(${orderId})을 취소할까요?\n${statusLabel(currentStatus)} → ${statusLabel(nextStatus)}`,
             confirmText: '취소',
             cancelText: '닫기',
          });
