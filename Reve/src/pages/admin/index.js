@@ -29,6 +29,7 @@ import { confirmModal } from '../../components/ConfirmModal.js';
 import { adminProductStore } from '../../store/adminProductStore.js';
 import { adminOrderStore } from '../../store/adminOrderStore.js';
 import { adminCouponStore } from '../../store/adminCouponStore.js';
+import { adminUserStore } from '../../store/adminUserStore.js';
 
 import {
    validateProductDraft,
@@ -44,9 +45,7 @@ import {
 import { auditLog } from '../../utils/auditLog.js';
 import { toStatusTimeline, statusKo } from '../../utils/orderTimeline.js';
 
-import { adminUserStore } from '../../store/adminUserStore.js';
 import { distributeCoupon } from '../../utils/couponDistribution.js';
-
 import { deriveUsers } from '../../utils/user/deriveUsers.js';
 
 /* ==============================
@@ -70,10 +69,10 @@ export function AdminPage() {
            ${renderPanelProducts()}
            ${renderPanelOrders()}
            ${renderPanelCoupons()}
+           ${renderPanelUsers()}
            ${renderPanelAudit()}
            ${renderPanelBackup()}
            ${renderTimeline()}
-           ${renderPanelUsers()}
          </div>
        </div>
      </section>
@@ -131,7 +130,7 @@ function renderTabs(activeKey) {
 
 function renderPanelProducts() {
    return `
-     <section class="admin-panel" role="tabpanel" data-admin-panel="products" aria-hidden="false">
+     <section class="admin-panel is-active" role="tabpanel" data-admin-panel="products" aria-hidden="false">
        <div class="admin-head">
          <div>
            <h2 class="admin-title">상품 관리</h2>
@@ -344,55 +343,6 @@ function renderTimeline() {
    `;
 }
 
-function renderTimelineList(rows) {
-   if (!rows.length) {
-      return `
-        <div class="empty">
-          <p class="empty__title">타임라인이 없습니다.</p>
-          <p class="empty__desc">주문 상태가 변경되면 이력이 쌓입니다.</p>
-        </div>
-      `;
-   }
-
-   return `
-     <ul class="audit-list" aria-label="Timeline List">
-       ${rows
-          .map((r) => {
-             return `
-               <li class="audit-item">
-                 <div class="audit-item__top">
-                   <span class="pill">${escapeHtml(r.orderId)}</span>
-                   <span class="muted">${escapeHtml(fmtDate(r.at))}</span>
-                 </div>
-                 <p class="audit-item__msg">
-                   <strong>${escapeHtml(r.owner || '-')}</strong> · ${escapeHtml(
-                      statusKo(r.status) || statusLabel(r.status),
-                   )}
-                 </p>
-               </li>
-             `;
-          })
-          .join('')}
-     </ul>
-   `;
-}
-
-function buildTimelineRowsFromOrders(orders) {
-   const list = Array.isArray(orders) ? orders : [];
-
-   const rows = list.flatMap((o) => {
-      const timeline = toStatusTimeline(o?.statusHistory);
-      return timeline.map((t) => ({
-         orderId: o.orderId,
-         owner: o.__ownerKey,
-         status: t.status,
-         at: t.at,
-      }));
-   });
-
-   return rows.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
-}
-
 /* ==============================
    3) Render helpers
 ============================== */
@@ -423,8 +373,6 @@ function statusLabel(s) {
 
 /* ==============================
    ✅ (중요) 유저 등급 규칙(정답 루트: totalSpent 기반)
-   - deriveUsers가 만든 totalSpent를 기준으로 grade를 재계산
-   - 표시/필터/배포 모두 동일 규칙을 쓰게 만듦
 ============================== */
 
 function computeGradeEnumFromTotalSpent(totalSpent = 0) {
@@ -440,11 +388,7 @@ function applySpentBasedGrade(rows) {
    const list = Array.isArray(rows) ? rows : [];
    return list.map((r) => {
       const grade = computeGradeEnumFromTotalSpent(r?.totalSpent || 0);
-      return {
-         ...r,
-         grade,
-         gradeLabel: grade,
-      };
+      return { ...r, grade, gradeLabel: grade };
    });
 }
 
@@ -564,8 +508,7 @@ function getNextIdByBrandSlug(brandSlug) {
 }
 
 /* ==============================
-   4.6) Price auto-calc (NEW)
-   - price + discountRate -> basePrice
+   4.6) Price auto-calc
 ============================== */
 
 function mountPriceAutoCalc(overlay) {
@@ -611,8 +554,7 @@ function mountPriceAutoCalc(overlay) {
 }
 
 /* ==============================
-   4.7) Product fields builder (NEW)
-   - 모달 구조 섹션화
+   4.7) Product fields builder
 ============================== */
 
 function buildProductFields({ mainOptions, subAllOptions, brands, isEdit }) {
@@ -726,7 +668,6 @@ function buildProductFields({ mainOptions, subAllOptions, brands, isEdit }) {
 
 /* ==============================
    5) Modals
-   - section type 지원(모달 폼 구조 정리)
 ============================== */
 
 function openFormModal({
@@ -750,9 +691,7 @@ function openFormModal({
                 <h4 class="form-section__title">${escapeHtml(f.label || '')}</h4>
                 ${
                    f.hint
-                      ? `<p class="form-section__hint muted">${escapeHtml(
-                           f.hint,
-                        )}</p>`
+                      ? `<p class="form-section__hint muted">${escapeHtml(f.hint)}</p>`
                       : ''
                 }
               </div>
@@ -772,11 +711,9 @@ function openFormModal({
             return `
               <label class="form-field">
                 <span class="k">${escapeHtml(label)}</span>
-                <textarea rows="3" data-f="${escapeHtml(
-                   key,
-                )}" placeholder="${escapeHtml(placeholder)}">${escapeHtml(
-                   value,
-                )}</textarea>
+                <textarea rows="3" data-f="${escapeHtml(key)}" placeholder="${escapeHtml(
+                   placeholder,
+                )}">${escapeHtml(value)}</textarea>
                 ${hint}
               </label>
             `;
@@ -793,9 +730,9 @@ function openFormModal({
                         const ov = String(o?.value ?? '');
                         const ot = String(o?.label ?? ov);
                         const selected = String(value) === ov ? 'selected' : '';
-                        return `<option value="${escapeHtml(
-                           ov,
-                        )}" ${selected}>${escapeHtml(ot)}</option>`;
+                        return `<option value="${escapeHtml(ov)}" ${selected}>${escapeHtml(
+                           ot,
+                        )}</option>`;
                      })
                      .join('')}
                 </select>
@@ -820,9 +757,9 @@ function openFormModal({
             return `
               <label class="form-field">
                 <span class="k">${escapeHtml(label)}</span>
-                <input type="file" data-f="${escapeHtml(
-                   key,
-                )}" accept="${escapeHtml(accept)}" />
+                <input type="file" data-f="${escapeHtml(key)}" accept="${escapeHtml(
+                   accept,
+                )}" />
                 ${hint}
               </label>
             `;
@@ -1206,7 +1143,6 @@ function renderCouponsTable(coupons) {
 
 /* ==============================
    8.5) Users UI
-   - deriveUsers 결과(표시용 row)를 그대로 렌더
 ============================== */
 
 function renderUsersTable(users) {
@@ -1263,6 +1199,7 @@ function renderUsersTable(users) {
      </div>
    `;
 }
+
 /* ==============================
    9) Audit UI
 ============================== */
@@ -1305,6 +1242,59 @@ function renderAuditList(rows) {
 }
 
 /* ==============================
+   Timeline helpers
+============================== */
+
+function renderTimelineList(rows) {
+   if (!rows.length) {
+      return `
+        <div class="empty">
+          <p class="empty__title">타임라인이 없습니다.</p>
+          <p class="empty__desc">주문 상태가 변경되면 이력이 쌓입니다.</p>
+        </div>
+      `;
+   }
+
+   return `
+     <ul class="audit-list" aria-label="Timeline List">
+       ${rows
+          .map((r) => {
+             return `
+               <li class="audit-item">
+                 <div class="audit-item__top">
+                   <span class="pill">${escapeHtml(r.orderId)}</span>
+                   <span class="muted">${escapeHtml(fmtDate(r.at))}</span>
+                 </div>
+                 <p class="audit-item__msg">
+                   <strong>${escapeHtml(r.owner || '-')}</strong> · ${escapeHtml(
+                      statusKo(r.status) || statusLabel(r.status),
+                   )}
+                 </p>
+               </li>
+             `;
+          })
+          .join('')}
+     </ul>
+   `;
+}
+
+function buildTimelineRowsFromOrders(orders) {
+   const list = Array.isArray(orders) ? orders : [];
+
+   const rows = list.flatMap((o) => {
+      const timeline = toStatusTimeline(o?.statusHistory);
+      return timeline.map((t) => ({
+         orderId: o.orderId,
+         owner: o.__ownerKey,
+         status: t.status,
+         at: t.at,
+      }));
+   });
+
+   return rows.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+}
+
+/* ==============================
    10) Init
 ============================== */
 
@@ -1330,6 +1320,7 @@ export function initAdminPage() {
    const productsWrap = root.querySelector('[data-admin-products-wrap]');
    const ordersWrap = root.querySelector('[data-admin-orders-wrap]');
    const couponsWrap = root.querySelector('[data-admin-coupons-wrap]');
+   const usersWrap = root.querySelector('[data-admin-users-wrap]');
    const auditWrap = root.querySelector('[data-admin-audit-wrap]');
    const backupText = root.querySelector('[data-admin-backup-text]');
    const timelineWrap = root.querySelector('[data-admin-timeline-wrap]');
@@ -1345,7 +1336,6 @@ export function initAdminPage() {
    const couponQ = root.querySelector('[data-admin-coupon-q]');
    const couponActive = root.querySelector('[data-admin-coupon-active]');
 
-   const usersWrap = root.querySelector('[data-admin-users-wrap]');
    const userQ = root.querySelector('[data-admin-user-q]');
    const userGrade = root.querySelector('[data-admin-user-grade]');
    const userSort = root.querySelector('[data-admin-user-sort]');
@@ -1355,7 +1345,7 @@ export function initAdminPage() {
    ============================== */
 
    const setActiveTab = (key) => {
-      const next = String(key || 'products').trim();
+      const next = String(key || 'products').trim() || 'products';
 
       root.querySelectorAll('[data-admin-tab]').forEach((btn) => {
          const k = btn.getAttribute('data-admin-tab');
@@ -1375,8 +1365,14 @@ export function initAdminPage() {
    };
 
    /* ==============================
+      ✅ 초기 탭 고정 (재발 방지 핵심)
+      - CSS가 .is-active 의존하는 케이스에서
+        “상품 관리가 안 보인다” 이슈를 근본 차단
+   ============================== */
+   setActiveTab('products');
+
+   /* ==============================
       10.2) Local UI State
-      - 중복 key(users) 제거: 하나로 통합
    ============================== */
 
    const state = {
@@ -1513,10 +1509,6 @@ export function initAdminPage() {
 
    /* ==============================
       ✅ 10.6) Users paint (P1-1 정답 루트)
-      - users: adminUserStore.getUsers()
-      - orders: adminOrderStore.getAllOrders()
-      - deriveUsers()로 필터/정렬
-      - totalSpent 기반 grade 재계산(applySpentBasedGrade)
    ============================== */
 
    const paintUsers = () => {
@@ -1538,7 +1530,6 @@ export function initAdminPage() {
       });
 
       const rows = applySpentBasedGrade(derived);
-
       usersWrap.innerHTML = renderUsersTable(rows);
    };
 
@@ -1593,9 +1584,22 @@ export function initAdminPage() {
    paintAudit();
    paintTimeline();
 
+   // ✅ “변경”에 반응하는 구독: 해당 store가 바뀌면 화면 자동 갱신
    adminProductStore.subscribe(() => paintProducts());
    adminCouponStore.subscribe(() => paintCoupons());
-   auditLog.subscribe(() => paintAudit());
+
+   // ✅ 주문이 바뀌면: 주문/타임라인/유저(누적구매)도 같이 갱신
+   adminOrderStore.subscribe?.(() => {
+      paintOrders();
+      paintTimeline();
+      paintUsers();
+   });
+
+   // ✅ 유저가 바뀌면: 유저 탭 갱신
+   adminUserStore.subscribe?.(() => paintUsers());
+
+   // ✅ auditLog는 구현체마다 subscribe가 없을 수 있으니 방어
+   auditLog.subscribe?.(() => paintAudit());
 
    /* ==============================
       10.10) Events: input/change
@@ -1710,6 +1714,7 @@ export function initAdminPage() {
          const r = await adminProductStore.seed();
          if (r?.ok) {
             auditLog.add('PRODUCT_SEED', '더미 상품 생성', { count: r.count });
+            paintAudit(); // ✅ auditLog subscribe가 없어도 즉시 갱신
             toast.show(`더미 상품 ${r.count}개 생성`, { duration: 1400 });
          } else {
             toast.show(r?.message || '생성 실패', { duration: 1400 });
@@ -1880,6 +1885,7 @@ export function initAdminPage() {
          auditLog.add('PRODUCT_CREATE', `상품 등록: ${form.id}`, {
             id: form.id,
          });
+         paintAudit();
          toast.show('상품이 등록되었습니다.', { duration: 1200 });
          return;
       }
@@ -2023,6 +2029,7 @@ export function initAdminPage() {
          auditLog.add('PRODUCT_UPDATE', `상품 수정: ${current.id}`, {
             id: current.id,
          });
+         paintAudit();
          toast.show('상품이 수정되었습니다.', { duration: 1200 });
          return;
       }
@@ -2053,6 +2060,7 @@ export function initAdminPage() {
             id,
             active: next,
          });
+         paintAudit();
          toast.show('상태가 변경되었습니다.', { duration: 1200 });
          return;
       }
@@ -2084,12 +2092,13 @@ export function initAdminPage() {
          }
 
          auditLog.add('PRODUCT_DELETE', `상품 삭제: ${id}`, { id });
+         paintAudit();
          toast.show('상품이 삭제되었습니다.', { duration: 1200 });
          return;
       }
 
       /* ==============================
-         3) Orders actions
+         Orders actions
       ============================== */
 
       if (e.target.closest('[data-admin-refresh-orders]')) {
@@ -2143,7 +2152,9 @@ export function initAdminPage() {
 
          const ok = await confirmModal({
             title: '주문 상태 변경',
-            message: `주문(${orderId})\n${statusLabel(currentStatus)} → ${statusLabel(nextStatus)}\n변경할까요?`,
+            message: `주문(${orderId})\n${statusLabel(currentStatus)} → ${statusLabel(
+               nextStatus,
+            )}\n변경할까요?`,
             confirmText: '변경',
             cancelText: '취소',
          });
@@ -2161,6 +2172,7 @@ export function initAdminPage() {
             to: nextStatus,
             owner: order.__ownerKey,
          });
+         paintAudit();
 
          toast.show('주문 상태가 변경되었습니다.', { duration: 1200 });
          paintOrders();
@@ -2188,7 +2200,9 @@ export function initAdminPage() {
 
          const ok = await confirmModal({
             title: '주문 취소',
-            message: `주문(${orderId})을 취소할까요?\n${statusLabel(currentStatus)} → ${statusLabel(nextStatus)}`,
+            message: `주문(${orderId})을 취소할까요?\n${statusLabel(currentStatus)} → ${statusLabel(
+               nextStatus,
+            )}`,
             confirmText: '취소',
             cancelText: '닫기',
          });
@@ -2206,6 +2220,7 @@ export function initAdminPage() {
             to: nextStatus,
             owner: order.__ownerKey,
          });
+         paintAudit();
 
          toast.show('주문이 취소되었습니다.', { duration: 1200 });
          paintOrders();
@@ -2215,7 +2230,7 @@ export function initAdminPage() {
       }
 
       /* ==============================
-         4) Coupons actions
+         Coupons actions (seed/add/edit/toggle/delete)
       ============================== */
 
       if (e.target.closest('[data-admin-seed-coupons]')) {
@@ -2230,12 +2245,17 @@ export function initAdminPage() {
          const r = await adminCouponStore.seed();
          if (r?.ok) {
             auditLog.add('COUPON_SEED', '더미 쿠폰 생성', { count: r.count });
+            paintAudit();
             toast.show(`더미 쿠폰 ${r.count}개 생성`, { duration: 1400 });
          } else {
             toast.show(r?.message || '생성 실패', { duration: 1400 });
          }
          return;
       }
+
+      // ---- 쿠폰 등록/수정/토글/삭제 (원문 로직 유지) ----
+      // (여기 아래는 네가 올린 코드와 동일 패턴이며, 길이 때문에 “핵심 변경”만 반영)
+      // ✅ 변경점: auditLog.add 이후 paintAudit() 호출만 추가됨
 
       if (e.target.closest('[data-admin-add-coupon]')) {
          const fields = [
@@ -2298,6 +2318,7 @@ export function initAdminPage() {
          auditLog.add('COUPON_CREATE', `쿠폰 등록: ${form.code}`, {
             code: form.code,
          });
+         paintAudit();
          toast.show('쿠폰이 등록되었습니다.', { duration: 1200 });
          return;
       }
@@ -2363,6 +2384,7 @@ export function initAdminPage() {
          auditLog.add('COUPON_UPDATE', `쿠폰 수정: ${current.code}`, {
             code: current.code,
          });
+         paintAudit();
          toast.show('쿠폰이 수정되었습니다.', { duration: 1200 });
          return;
       }
@@ -2389,6 +2411,7 @@ export function initAdminPage() {
             code,
             active: next,
          });
+         paintAudit();
          toast.show('상태가 변경되었습니다.', { duration: 1200 });
          return;
       }
@@ -2416,15 +2439,13 @@ export function initAdminPage() {
          }
 
          auditLog.add('COUPON_DELETE', `쿠폰 삭제: ${code}`, { code });
+         paintAudit();
          toast.show('쿠폰이 삭제되었습니다.', { duration: 1200 });
          return;
       }
 
       /* ==============================
-         ✅ Users: 쿠폰 배포
-         - GRADE 배포 시 "정답 루트(totalSpent 기반 grade)"로 대상 선정
-         - distributeCoupon 유틸을 그대로 쓰되,
-           등급 배포는 USER 모드로 변환해서 userIds로 전달
+         ✅ Users: 쿠폰 배포 / 회원 탈퇴
       ============================== */
 
       if (e.target.closest('[data-admin-open-distribute]')) {
@@ -2587,15 +2608,14 @@ export function initAdminPage() {
             granted: r.granted,
             skipped: r.skipped,
          });
+         paintAudit();
 
          toast.show(`배포 완료 ✅ 지급 ${r.granted} / 중복 ${r.skipped}`, {
             duration: 1600,
          });
          return;
       }
-      // ==============================
-      // Users: 회원 탈퇴(삭제)
-      // ==============================
+
       const delUserBtn = e.target.closest('[data-admin-user-delete]');
       if (delUserBtn) {
          const userId = String(
@@ -2626,7 +2646,6 @@ export function initAdminPage() {
          });
          if (!ok) return;
 
-         // ✅ store API 이름이 프로젝트마다 달라서 3단 방어
          let r = null;
 
          if (typeof adminUserStore.remove === 'function')
@@ -2636,7 +2655,6 @@ export function initAdminPage() {
          else if (typeof adminUserStore.removeUser === 'function')
             r = await adminUserStore.removeUser(userId);
          else {
-            // 최후: 직접 삭제(스토어에 없을 때만) -> 이건 비추천이라 경고만
             toast.show(
                'adminUserStore에 remove/delete API가 없습니다. 스토어에 삭제 메서드를 추가하세요.',
                { duration: 1800 },
@@ -2653,15 +2671,15 @@ export function initAdminPage() {
             userId,
             username: u.username,
          });
+         paintAudit();
 
          toast.show('회원 탈퇴 처리 완료', { duration: 1200 });
-
-         // ✅ 화면 갱신
          paintUsers();
          return;
       }
+
       /* ==============================
-         5) Audit actions
+         Audit actions
       ============================== */
 
       if (e.target.closest('[data-admin-refresh-audit]')) {
@@ -2680,12 +2698,13 @@ export function initAdminPage() {
          if (!ok) return;
 
          auditLog.clear();
+         paintAudit();
          toast.show('감사 로그를 비웠습니다.', { duration: 1200 });
          return;
       }
 
       /* ==============================
-         6) Backup actions
+         Backup actions
       ============================== */
 
       if (e.target.closest('[data-admin-export]')) {
@@ -2699,6 +2718,7 @@ export function initAdminPage() {
             audit: bundle.audit?.items?.length || 0,
             orders: bundle.orders?.total || 0,
          });
+         paintAudit();
 
          toast.show('Export JSON을 생성했습니다.', { duration: 1200 });
          return;
@@ -2737,6 +2757,8 @@ export function initAdminPage() {
          auditLog.add('IMPORT', '관리자 데이터 Import', {
             restored: r.restored,
          });
+         paintAudit();
+
          toast.show('Import 완료', { duration: 1200 });
 
          fillCategorySelects(root);
@@ -2744,14 +2766,7 @@ export function initAdminPage() {
          paintCoupons();
          paintOrders();
          paintUsers();
-         paintAudit();
          paintTimeline();
       }
    });
 }
-
-/* =========================================================
-   ⚠️ renderTimeline()는 네 프로젝트에 이미 존재한다고 가정
-   - 이 파일에 실제 정의가 있다면 그대로 두면 됨
-   - 만약 없다면, 여기 아래에 정의를 추가해야 함
-========================================================= */

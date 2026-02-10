@@ -59,7 +59,14 @@ function normalizeUser(u) {
    const role = String(u?.role || 'MEMBER').toUpperCase();
 
    const totalSpent = Number(u?.totalSpent || 0) || 0;
-   const points = Number(u?.points || 0) || 0;
+   const points =
+      Number(
+         u?.points ??
+            u?.point ?? // 과거 키 대응
+            u?.mileage ?? // 과거 키 대응
+            u?.rewardPoints ?? // 혹시 남아있을 수 있는 키
+            0,
+      ) || 0;
 
    const grade = String(u?.grade || computeGrade(totalSpent)).toUpperCase();
 
@@ -148,7 +155,10 @@ export const adminUserStore = {
       }
 
       writeUsersRaw(next);
-
+      try {
+         localStorage.removeItem(`reve_coupons_v1:${key}`);
+         localStorage.removeItem(`reve_orders_v1:${key}`);
+      } catch {}
       // ✅ UI 갱신용 이벤트(원하면 AdminPage에서 subscribe로도 받을 수 있음)
       emit();
 
