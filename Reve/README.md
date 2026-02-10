@@ -102,8 +102,8 @@
 - `src/utils/exportImport.js` : Admin 데이터 번들 Export/Import
 - `src/utils/orderTimeline.js` : statusHistory 파싱(toStatusTimeline) + label(statusKo)
 - `src/utils/user/deriveUsers.js` : Admin Users 표시 파이프(검색/필터/정렬/누적구매 합산/등급 재계산)
-- `src/utils/couponLedger.js` : ✅ 쿠폰 발급/사용 원장 + 통계(신규)
-- `src/utils/couponTargeting.js` : ✅ 쿠폰 타겟팅 규칙(신규)
+- `src/utils/couponLedger.js` : ✅ 쿠폰 발급/사용 원장 + 통계
+- `src/utils/couponTargeting.js` : ✅ 쿠폰 타겟팅 규칙
 - `src/components/Toast.js` : 토스트
 - `src/components/ConfirmModal.js` : 확인/취소 모달
 - `src/components/ProductCard.js` : 상품 카드(장바구니 아이콘 + 태그 + 가격/할인 + 안전 이미지)
@@ -350,11 +350,52 @@
 
 ---
 
-## 13) 마이페이지(MyPage)
+## 13) 마이페이지(MyPage) ✅ (최종 통합본 반영)
+
+마이페이지를 “탭 기반 운영 화면”으로 구성하고, 스토어 구독으로 자동 동기화되도록 설계했습니다.
+
+### 탭 구성
 
 - 내 정보 / 배송지 / 주문내역 / 주문·배송 / 회원등급 / 쿠폰·혜택
-- 딥링크(탭/자동 액션) + 1회성 consume(`replaceState`)
-- 주문/배송 탭: 상태 필터 + 타임라인 + 운송장 모달(MVP)
+
+### 딥링크(탭/자동 액션) 지원
+
+- `/mypage?tab=address&open=add`
+   - 배송지 추가 모달을 **1회 자동 오픈**
+- `/mypage?tab=orders&open=detail&orderId=...`
+   - 주문 상세 모달을 **1회 자동 오픈**
+- `/mypage?tab=coupon&focus=register`
+   - 쿠폰 입력창을 **1회 자동 포커스**
+
+### UX 규칙(최종)
+
+- 탭 클릭 시 URL의 `tab` 쿼리를 `pushState`로 동기화
+- `popstate(뒤로/앞으로가기)`에서도 탭 + 딥링크 상태 복원
+- `open/focus/orderId`는 1회 실행 후 URL에서 consume(`replaceState`)하여 **반복 트리거 방지**
+
+### MyPage 최종 안정화 작업 기록 ✅
+
+1. **전체 파일 완전 통합본으로 정리**
+
+- `src/pages/mypage/index.js`를 “단일 파일”로 완전 통합(중간 함수 포함)
+- 탭/렌더/이벤트/딥링크/모달/유틸 함수까지 한 덩어리로 유지
+
+2. **딥링크 중복 트리거 방지 강화**
+
+- `runDeepLinkOnce()` 가드(키 기반)로
+   - `popstate` / 재렌더 / subscribe 타이밍에서 모달이 반복 실행되는 현상을 차단
+
+3. **유저 주문내역에서 테스트 상태 변경 버튼 제거**
+
+- 주문내역의 `배송 시작(테스트)` / `배송 완료(테스트)` 버튼 제거
+- 유저 영역은 조회 전용
+- 상태 변경은 Admin에서만 수행(권한 경계/UX 정합성 개선)
+
+4. **구독 렌더 최적화(탭 기준)**
+
+- store subscribe 시 현재 활성 탭 기준으로만 paint
+   - 불필요한 DOM 갱신 감소
+   - 딥링크 모달/포커스와의 충돌 가능성 최소화
 
 ---
 
@@ -579,15 +620,10 @@
 
 ---
 
-## 19) 다음 작업 후보(TODO)
-
-> 완료된 항목은 제거하고, 남은 것만 유지
-
 ### P2. 주문/배송 고도화 🚚 (현실감 강화)
 
 - `statusHistory`를 **orderStore에 정식 반영**
    - 단계별 최초 1회 기록 규칙을 생성/변경 API 레벨에서 강제
-- 주문 후 배송지 변경 불가 정책/안내 문구 정리
 - (선택) 운송장 번호/택배사 필드, 배송 조회 링크 템플릿
 
 ### P3. 운영/안정성 🌿
@@ -600,11 +636,12 @@
 
 ## 20) 진행률(체감)
 
-**현재 작업 완료도: 약 92~94%** ✅
+**현재 작업 완료도: 약 93~95%** ✅
 
 - ✅ 핵심 쇼핑몰 흐름(검색 → 상품 → 장바구니 → 쿠폰 → 결제(mock) → 주문 → 마이페이지) 완성
 - ✅ Admin 운영툴(상품/주문/쿠폰/감사/백업 + 타임라인 + 유저/배포/탈퇴) 완성
-- ✅ Admin 쿠폰 운영 고도화(타겟팅 + 발급/사용 원장 + 통계)까지 반영 완료
-- ⏳ 남은 건 “현실감/정책 정식화 + 운영 안정화” 영역
-   - orderStore 레벨에서 statusHistory 규칙을 더 강하게 보장
-   - 배송/운송장/통계(배송단) 같은 운영 디테일 채우기
+- ✅ MyPage 최종 통합/안정화(딥링크 1회 실행 가드 + 유저 주문 상태 변경 제거 + 탭 기준 렌더 최적화) 완료
+- ⏳ 남은 건 “정책 정식화 + 운영 안정화” 영역
+   - orderStore 레벨 statusHistory 규칙 강제(최초 1회 기록/전이 검증)
+   - (선택) 운송장/택배사/배송조회 템플릿 등 현실감 강화
+   - 저장소 용량/백업 스키마/리포팅 등 운영 안정화

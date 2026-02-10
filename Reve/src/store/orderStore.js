@@ -16,6 +16,10 @@
  * 상태 규칙
  * - status는 PAID | SHIPPING | DELIVERED | CANCELED 만 허용
  * - createdAt/updatedAt은 number(ms)로 정규화
+ *
+ * ✅ 최종본 안정화 포인트
+ * - storage/reload 흐름에서는 writeState 금지 (emit-only)
+ * - 실제 상태 변경 액션에서만 persist+emit
  * =============================================
  */
 
@@ -46,18 +50,11 @@ function writeState(next) {
    2) Normalizers
 ============================== */
 
-/**
- * ✅ ms 타임스탬프 안전 변환
- * - 숫자 아니면 null
- */
 function toMs(v) {
    const n = Number(v);
    return Number.isFinite(n) ? n : null;
 }
 
-/**
- * ✅ 주문 상태 정규화
- */
 function normalizeStatus(s) {
    const v = String(s || '').toUpperCase();
    if (
@@ -70,11 +67,6 @@ function normalizeStatus(s) {
    return 'PAID';
 }
 
-/**
- * ✅ statusHistory 보장(마이그레이션 포함)
- * - 기존 주문에 history가 없으면 생성
- * - 현재 status가 SHIPPING/DELIVERED/CANCELED인데 해당 시각이 없으면 채움
- */
 function ensureStatusHistory(order) {
    const createdAt = toMs(order?.createdAt) ?? Date.now();
 
@@ -110,23 +102,26 @@ function readState() {
 
    const orders = Array.isArray(parsed?.orders) ? parsed.orders : [];
 
-   // ✅ 과거 데이터도 한 번에 정리: createdAt/updatedAt ms 보장 + statusHistory 주입
-   const normalizedOrders = orders.map((o) => {
-      const createdAt = toMs(o?.createdAt) ?? Date.now();
-      const updatedAt = toMs(o?.updatedAt) ?? createdAt;
+   const normalizedOrders = orders
+      .map((o) => {
+         const createdAt = toMs(o?.createdAt) ?? Date.now();
+         const updatedAt = toMs(o?.updatedAt) ?? createdAt;
 
-      const base = {
-         ...o,
-         status: normalizeStatus(o?.status),
-         createdAt,
-         updatedAt,
-      };
+         const base = {
+            ...o,
+            // ✅ user 주문에도 __ownerKey 보장 (admin/user 정합성)
+            __ownerKey: String(o?.__ownerKey || ownerKey),
+            status: normalizeStatus(o?.status),
+            createdAt,
+            updatedAt,
+         };
 
-      return {
-         ...base,
-         statusHistory: ensureStatusHistory(base),
-      };
-   });
+         return {
+            ...base,
+            statusHistory: ensureStatusHistory(base),
+         };
+      })
+      .filter((o) => Boolean(o?.orderId));
 
    return { orders: normalizedOrders };
 }
@@ -138,14 +133,25 @@ function readState() {
 let state = readState();
 const listeners = new Set();
 
-function notify() {
-   writeState(state);
+/**
+ * ✅ emit-only: 저장(write) 없이 UI만 갱신
+ * - storage 이벤트/owner 전환 시 루프 방지
+ */
+function emit() {
    listeners.forEach((fn) => fn(state));
+}
+
+/**
+ * ✅ persist + emit: 실제 상태 변경 액션에서만 사용
+ */
+function persistAndEmit() {
+   writeState(state);
+   emit();
 }
 
 function reloadFromStorage() {
    state = readState();
-   notify(); // notify가 writeState도 하지만, 동일 값이면 큰 문제 없음
+   emit(); // ✅ write 금지 (storage sync 루프 방지)
 }
 
 // ✅ 같은 탭 이벤트(관리자 페이지에서 쏨)
@@ -164,20 +170,12 @@ window.addEventListener('storage', (e) => {
 ============================== */
 
 export const orderStore = {
-   /**
-    * ✅ 유저 전환(소유자 키 변경)
-    * - ownerKey 바뀌면 저장소도 분리됨
-    */
    setOwner(nextOwner) {
       ownerKey = String(nextOwner || 'guest');
       state = readState();
-      notify();
+      emit(); // ✅ owner 전환은 read+emit만
    },
 
-   /**
-    * ✅ 구독/해제
-    * - listener는 최초 1회 즉시 호출
-    */
    subscribe(listener) {
       listeners.add(listener);
       listener(state);
@@ -188,9 +186,6 @@ export const orderStore = {
       return state;
    },
 
-   /**
-    * ✅ 최신 주문이 위로 오도록 정렬해서 반환
-    */
    getOrders() {
       const list = Array.isArray(state.orders) ? state.orders : [];
       return [...list].sort(
@@ -204,26 +199,18 @@ export const orderStore = {
       return state.orders.find((o) => o.orderId === id) || null;
    },
 
-   /**
-    * ✅ 주문 생성
-    * - createdAt/updatedAt 정규화
-    * - statusHistory 생성(PAID 시각 기본 기록)
-    */
    createOrder(orderPayload) {
       const payload =
          orderPayload && typeof orderPayload === 'object' ? orderPayload : null;
 
-      if (!payload?.orderId) {
+      if (!payload?.orderId)
          return { ok: false, message: 'orderId가 필요해요.' };
-      }
-
       if (state.orders.some((o) => o.orderId === payload.orderId)) {
          return { ok: false, message: '이미 존재하는 주문이에요.' };
       }
 
       const now = Date.now();
 
-      // ✅ createdAt은 number(ms) 우선, 그 외 문자열이면 Date.parse 시도
       const createdAt =
          typeof payload.createdAt === 'number'
             ? payload.createdAt
@@ -235,24 +222,20 @@ export const orderStore = {
 
       const next = {
          ...payload,
+         __ownerKey: String(payload.__ownerKey || ownerKey), // ✅ 강제 주입
          status: normalizeStatus(payload.status || 'PAID'),
          createdAt,
          updatedAt: now,
       };
 
-      // ✅ statusHistory 세팅(기본: PAID 기록)
       next.statusHistory = ensureStatusHistory(next);
 
       state = { ...state, orders: [next, ...state.orders] };
-      notify();
+      persistAndEmit();
 
       return { ok: true, orderId: next.orderId };
    },
 
-   /**
-    * ✅ 주문 상태 변경
-    * - statusHistory에 해당 단계 시각을 "처음 1회만" 기록(이미 있으면 유지)
-    */
    updateOrderStatus(orderId, status) {
       const id = String(orderId || '').trim();
       if (!id) return { ok: false, message: 'orderId가 필요해요.' };
@@ -268,7 +251,6 @@ export const orderStore = {
             const history = ensureStatusHistory(o);
             const patched = { ...history };
 
-            // ✅ 상태 전환 "순간"을 찍는 느낌 (이미 찍혔으면 유지)
             if (nextStatus === 'PAID' && !patched.PAID) patched.PAID = now;
             if (nextStatus === 'SHIPPING' && !patched.SHIPPING)
                patched.SHIPPING = now;
@@ -279,6 +261,7 @@ export const orderStore = {
 
             return {
                ...o,
+               __ownerKey: String(o.__ownerKey || ownerKey),
                status: nextStatus,
                updatedAt: now,
                statusHistory: patched,
@@ -286,7 +269,7 @@ export const orderStore = {
          }),
       };
 
-      notify();
+      persistAndEmit();
       return { ok: true };
    },
 };

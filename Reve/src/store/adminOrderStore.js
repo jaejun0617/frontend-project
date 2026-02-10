@@ -2,16 +2,6 @@
  * =============================================
  * 📍 위치: src/store/adminOrderStore.js
  * 역할: 관리자용 전체 주문 조회/상태 변경
- *
- * 핵심 아이디어
- * - 기존 orderStore는 owner별 key로 분리 저장됨: reve_orders_v1:<owner>
- * - Admin은 localStorage에서 prefix를 스캔해서 모든 owner 주문을 합쳐 조회
- * - 상태 변경 시 해당 owner 키의 저장소를 직접 업데이트(원본 유지)
- *
- * ✅ 기능
- * - getAllOrders(): 전체 주문 목록(최신순) + __ownerKey 포함
- * - getOrder(orderId)
- * - updateOrderStatus(orderId, nextStatus)
  * =============================================
  */
 import { validateOrderStatusTransition } from '../utils/validate.js';
@@ -47,9 +37,6 @@ function normalizeStatus(s) {
    return 'PAID';
 }
 
-/**
- * statusHistory 보장(주문 스키마 방어)
- */
 function ensureStatusHistory(order) {
    const createdAt = toMs(order?.createdAt) ?? nowMs();
 
@@ -89,6 +76,7 @@ function readOrdersByOwner(ownerKey) {
 
          const base = {
             ...o,
+            __ownerKey: String(o?.__ownerKey || ownerKey), // ✅ 보강
             status: normalizeStatus(o?.status),
             createdAt,
             updatedAt,
@@ -107,19 +95,14 @@ function writeOrdersByOwner(ownerKey, orders) {
    localStorage.setItem(key, JSON.stringify({ orders }));
 }
 
-/**
- * localStorage key scan
- */
 function scanOwnerKeys() {
-   const keys = [];
+   const set = new Set();
    for (let i = 0; i < localStorage.length; i += 1) {
       const k = localStorage.key(i);
       if (!k) continue;
-      if (k.startsWith(STORAGE_PREFIX)) {
-         keys.push(k.slice(STORAGE_PREFIX.length));
-      }
+      if (k.startsWith(STORAGE_PREFIX)) set.add(k.slice(STORAGE_PREFIX.length));
    }
-   return keys;
+   return [...set];
 }
 
 function ok(extra = {}) {
@@ -154,7 +137,6 @@ export const adminOrderStore = {
          const hit = orders.find((o) => o.orderId === id);
          if (hit) return { ...hit, __ownerKey: owner };
       }
-
       return null;
    },
 
@@ -175,7 +157,6 @@ export const adminOrderStore = {
       const now = nowMs();
       const current = orders[idx];
 
-      // 상태 반영 + history 기록
       const history = ensureStatusHistory(current);
       const patched = { ...history };
 
@@ -190,6 +171,7 @@ export const adminOrderStore = {
 
       const nextOrder = {
          ...current,
+         __ownerKey: String(current.__ownerKey || owner),
          status: next,
          updatedAt: now,
          statusHistory: patched,
@@ -199,7 +181,6 @@ export const adminOrderStore = {
       nextOrders[idx] = nextOrder;
       writeOrdersByOwner(owner, nextOrders);
 
-      // ✅ 같은 탭에서도 orderStore 구독 UI 갱신 트리거
       window.dispatchEvent(
          new CustomEvent('reve:orders-changed', {
             detail: { ownerKey: owner, orderId: id, status: next },

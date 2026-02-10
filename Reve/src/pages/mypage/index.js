@@ -20,6 +20,11 @@
  * - 중복 init 방지(data-bound)
  * - 스토어 변화는 subscribe로 UI 동기화
  * - 입력 폼은 confirmModal이 아닌 별도 모달로 처리(입력 UX)
+ *
+ * ✅ 최종 안정화
+ * - 딥링크(open/focus/orderId) URL 1회 실행 가드로 중복 모달 방지
+ * - 초기 렌더는 "현재 탭만 paint"로 최적화 + 중복 트리거 감소
+ * - 주문내역의 (테스트) 상태 변경 버튼 제거: 유저 영역은 조회 전용
  * =============================================
  */
 
@@ -35,7 +40,6 @@ import {
    getMembershipSnapshot,
    formatPercent,
 } from '../../utils/membership.js';
-
 import { toStatusTimeline, statusKo } from '../../utils/orderTimeline.js';
 
 /* ==============================
@@ -107,10 +111,6 @@ function formatKRW(n) {
    return new Intl.NumberFormat('ko-KR').format(Math.max(0, safe));
 }
 
-/**
- * ✅ 현재 URL 쿼리 읽기
- * - tab/open/focus/orderId는 딥링크 트리거로 사용
- */
 function readQuery() {
    const params = new URLSearchParams(window.location.search);
    return {
@@ -121,17 +121,11 @@ function readQuery() {
    };
 }
 
-/**
- * ✅ 유효한 탭인지 검증 후 반환
- */
 function normalizeTab(tabKey) {
    const allowed = new Set(TABS.filter((t) => t.enabled).map((t) => t.key));
    return allowed.has(tabKey) ? tabKey : DEFAULT_TAB;
 }
 
-/**
- * ✅ 초기 탭 결정 (URL tab 기반)
- */
 function getInitialTabKey() {
    const q = readQuery();
    const tab = q.tab;
@@ -139,9 +133,6 @@ function getInitialTabKey() {
    return normalizeTab(tab);
 }
 
-/**
- * ✅ URL 쿼리 업데이트 (pushState / replaceState)
- */
 function setQuery(paramsPatch, { replace = false } = {}) {
    const url = new URL(window.location.href);
    const sp = url.searchParams;
@@ -159,9 +150,6 @@ function setQuery(paramsPatch, { replace = false } = {}) {
    else window.history.pushState({}, '', next);
 }
 
-/**
- * ✅ 탭 렌더
- */
 function renderTabs(activeKey = DEFAULT_TAB) {
    return `
     <ul class="mypage__tabs" role="tablist" aria-label="MyPage Menu">
@@ -543,9 +531,6 @@ function formatStatusLabel(status) {
    return '결제완료';
 }
 
-/**
- * ✅ 주문 상세 라인에 statusHistory도 포함 (객체 기반)
- */
 function buildOrderDetailLines(order) {
    if (!order) return '';
 
@@ -598,7 +583,6 @@ function renderOrdersList(orders = []) {
             const itemCount = Array.isArray(o?.items) ? o.items.length : 0;
             const total = Number(o?.pricing?.total || 0);
             const couponCode = String(o?.coupon?.code || '').trim();
-            const status = String(o?.status || '').toUpperCase();
 
             return `
           <li class="order-card">
@@ -618,14 +602,6 @@ function renderOrdersList(orders = []) {
 
             <div class="order-card__actions">
               <button type="button" class="btn subtle" data-order-detail="${escapeHtml(orderId)}">상세 보기</button>
-
-              ${
-                 status === 'PAID'
-                    ? `<button type="button" class="btn" data-order-status="${escapeHtml(orderId)}" data-next-status="SHIPPING">배송 시작(테스트)</button>`
-                    : status === 'SHIPPING'
-                      ? `<button type="button" class="btn" data-order-status="${escapeHtml(orderId)}" data-next-status="DELIVERED">배송 완료(테스트)</button>`
-                      : `<button type="button" class="btn" disabled>상태 변경</button>`
-              }
             </div>
           </li>
         `;
@@ -678,9 +654,6 @@ function renderShippingSnapshot(order) {
   `;
 }
 
-/**
- * ✅ 배송 카드용 타임라인 (order 없으면 호출하지 않는다!)
- */
 function renderDeliveryTimeline(order) {
    const s = normalizeOrderStatus(order?.status);
    const h = order?.statusHistory || {};
@@ -1044,12 +1017,11 @@ export function initMyPage() {
    const gradeWrap = root.querySelector('[data-grade-wrap]');
    const ordersWrap = root.querySelector('[data-orders-wrap]');
    const addressWrap = root.querySelector('[data-address-wrap]');
-
    const deliveryListEl = root.querySelector('[data-delivery-list]');
 
    /* ------------------------------
       A) Tab control
-   ------------------------------ */
+  ------------------------------ */
 
    const setActiveTab = (tabKey) => {
       const next = normalizeTab(String(tabKey || '').trim());
@@ -1073,7 +1045,7 @@ export function initMyPage() {
 
    /* ------------------------------
       B) Paint functions
-   ------------------------------ */
+  ------------------------------ */
 
    const paintOwned = () => {
       if (!ownedWrap) return;
@@ -1128,8 +1100,8 @@ export function initMyPage() {
    };
 
    /* ------------------------------
-      C) Deep link actions
-   ------------------------------ */
+      C) Deep link (FINAL)
+  ------------------------------ */
 
    const consumeQuery = ({ remove = ['open', 'focus', 'orderId'] } = {}) => {
       const url = new URL(window.location.href);
@@ -1140,17 +1112,33 @@ export function initMyPage() {
       window.history.replaceState({}, '', next);
    };
 
-   const runDeepLink = async () => {
-      const q = readQuery();
-      const tab = getInitialTabKey();
+   let lastDeepLinkKey = '';
 
-      setActiveTab(tab);
+   const buildDeepLinkKey = (q, activeTab) => {
+      return [
+         window.location.pathname,
+         activeTab,
+         q.open || '',
+         q.focus || '',
+         q.orderId || '',
+         window.location.search,
+      ].join('|');
+   };
+
+   const runDeepLinkOnce = async () => {
+      const q = readQuery();
+      const tab = normalizeTab(q.tab || getInitialTabKey());
+
+      const active = setActiveTab(tab);
+      paintByTab(active);
+
+      const key = buildDeepLinkKey(q, active);
+      if (key === lastDeepLinkKey) return;
+      lastDeepLinkKey = key;
 
       let didConsume = false;
 
-      if (tab === 'coupon') {
-         paintOwned();
-
+      if (active === 'coupon') {
          if (q.focus === 'register') {
             didConsume = true;
             setTimeout(() => {
@@ -1159,18 +1147,11 @@ export function initMyPage() {
          }
       }
 
-      if (tab === 'profile') paintProfile();
-      if (tab === 'grade') paintGrade();
-
-      if (tab === 'orders') {
-         paintOrders();
-
+      if (active === 'orders') {
          if (q.open === 'detail' && q.orderId) {
             didConsume = true;
-
             setTimeout(async () => {
                const order = orderStore.getOrder?.(q.orderId);
-
                if (!order) {
                   toast.show('주문을 찾을 수 없습니다.', { duration: 1300 });
                   return;
@@ -1186,9 +1167,7 @@ export function initMyPage() {
          }
       }
 
-      if (tab === 'address') {
-         paintAddress();
-
+      if (active === 'address') {
          if (q.open === 'add') {
             didConsume = true;
             setTimeout(() => {
@@ -1203,51 +1182,54 @@ export function initMyPage() {
    };
 
    /* ------------------------------
-      D) Initial render
-   ------------------------------ */
+      D) Initial render (FINAL)
+  ------------------------------ */
 
-   paintOwned();
-   paintProfile();
-   paintGrade();
-   paintOrders();
-   paintDelivery();
-   paintAddress();
-
-   runDeepLink();
+   const initialTab = setActiveTab(getInitialTabKey());
+   paintByTab(initialTab);
+   runDeepLinkOnce();
 
    /* ------------------------------
-      E) Store subscriptions
-   ------------------------------ */
+      E) Store subscriptions (탭 최적화)
+  ------------------------------ */
 
-   couponStore.subscribe?.(() => paintOwned());
+   couponStore.subscribe?.(() => {
+      const tab = normalizeTab(readQuery().tab || getInitialTabKey());
+      if (tab === 'coupon') paintOwned();
+   });
 
    authStore.subscribe?.(() => {
-      paintProfile();
-      paintGrade();
+      const tab = normalizeTab(readQuery().tab || getInitialTabKey());
+      if (tab === 'profile') paintProfile();
+      if (tab === 'grade') paintGrade();
    });
 
    orderStore.subscribe?.(() => {
-      paintOrders();
-      paintDelivery();
+      const tab = normalizeTab(readQuery().tab || getInitialTabKey());
+      if (tab === 'orders') paintOrders();
+      if (tab === 'delivery') paintDelivery();
    });
 
-   addressStore.subscribe?.(() => paintAddress());
+   addressStore.subscribe?.(() => {
+      const tab = normalizeTab(readQuery().tab || getInitialTabKey());
+      if (tab === 'address') paintAddress();
+   });
 
    /* ------------------------------
-      F) popstate
-   ------------------------------ */
+      F) popstate (FINAL)
+  ------------------------------ */
 
    const onPopState = () => {
       const tab = setActiveTab(getInitialTabKey());
       paintByTab(tab);
-      runDeepLink();
+      runDeepLinkOnce(); // 가드로 중복 모달 방지
    };
 
    window.addEventListener('popstate', onPopState);
 
    /* ------------------------------
       G) Events (root delegation)
-   ------------------------------ */
+  ------------------------------ */
 
    root.addEventListener('click', async (e) => {
       // 1) Tab change
@@ -1260,16 +1242,13 @@ export function initMyPage() {
          setActiveTab(tabKey);
          paintByTab(tabKey);
 
+         // 탭 이동 시 딥링크 가드 초기화(새 쿼리에서 정상 동작)
+         lastDeepLinkKey = '';
+
          setQuery(
-            {
-               tab: tabKey,
-               open: '',
-               focus: '',
-               orderId: '',
-            },
+            { tab: tabKey, open: '', focus: '', orderId: '' },
             { replace: false },
          );
-
          return;
       }
 
@@ -1380,8 +1359,8 @@ export function initMyPage() {
       }
 
       /* ==============================
-         X) Delivery: filter / actions
-      ============================== */
+       X) Delivery: filter / actions
+    ============================== */
 
       const filterBtn = e.target.closest('[data-delivery-filter]');
       if (filterBtn) {
@@ -1407,7 +1386,7 @@ export function initMyPage() {
          const tabKey = 'orders';
          setActiveTab(tabKey);
          paintByTab(tabKey);
-
+         lastDeepLinkKey = '';
          setQuery(
             { tab: tabKey, open: '', focus: '', orderId: '' },
             { replace: false },
@@ -1468,8 +1447,8 @@ export function initMyPage() {
       }
 
       /* ==============================
-         7) Address CRUD
-      ============================== */
+       7) Address CRUD
+    ============================== */
 
       if (e.target.closest('[data-address-add]')) {
          const first = (addressStore.getAddresses?.() ?? []).length === 0;
@@ -1600,8 +1579,8 @@ export function initMyPage() {
       }
 
       /* ==============================
-         8) Order detail / status update
-      ============================== */
+       8) Order detail
+    ============================== */
 
       const detailBtn = e.target.closest('[data-order-detail]');
       if (detailBtn) {
@@ -1625,41 +1604,11 @@ export function initMyPage() {
 
          return;
       }
-
-      const statusBtn = e.target.closest('[data-order-status]');
-      if (statusBtn) {
-         const orderId = String(
-            statusBtn.getAttribute('data-order-status') || '',
-         ).trim();
-         const next = String(
-            statusBtn.getAttribute('data-next-status') || '',
-         ).trim();
-
-         const ok = await confirmModal({
-            title: '주문 상태 변경',
-            message: `상태를 ${formatStatusLabel(next)}(으)로 변경할까요?`,
-            confirmText: '변경',
-            cancelText: '취소',
-         });
-
-         if (!ok) return;
-
-         const r = orderStore.updateOrderStatus?.(orderId, next);
-
-         if (r?.ok)
-            toast.show('주문 상태가 변경되었습니다.', { duration: 1200 });
-         else
-            toast.show(r?.message || '변경에 실패했습니다.', {
-               duration: 1200,
-            });
-
-         return;
-      }
    });
 
    /* ------------------------------
       H) Coupon: Enter to register
-   ------------------------------ */
+  ------------------------------ */
 
    inputEl?.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
