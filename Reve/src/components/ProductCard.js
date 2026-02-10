@@ -89,85 +89,77 @@ export function ProductCard(product) {
    const basePrice = Number(product?.basePrice ?? price);
    const discountRate = Number(product?.discountRate ?? 0);
 
-   // ✅ 할인 표기 규칙: discountRate > 0 && basePrice > price 일 때만
+   // ✅ 할인 표기 규칙
    const isDiscounted = discountRate > 0 && basePrice > price;
    const percent = calcDiscountPercent(discountRate);
 
    const displayTags = getDisplayTags(product);
 
-   // ✅ 안전한 이미지 src
    const imgSrc = getSafeImageSrc(product);
    const safeImgSrc = escapeHtml(imgSrc);
 
-   // ✅ 이미지 로딩 실패 시 placeholder로 대체 (dataURL/blob/http 모두 대응)
    const fallback = buildPlaceholderImage({ id: rawId, name: rawName });
    const safeFallback = escapeHtml(fallback);
 
    return `
-<article
-class="product-card"
-data-product-id="${safeId}"
->
-<a
-  class="product-card__thumb"
-  href="/product/${safeId}"
-  data-link
-  aria-label="${escapeHtml(rawName)} 상세 보기"
->
-  <img
-    class="product-card__img"
-    src="${safeImgSrc}"
-    alt="${safeName}"
-    loading="lazy"
-    decoding="async"
-    onerror="this.onerror=null; this.src='${safeFallback}';"
-  />
-</a>
+<article class="product-card" data-product-id="${safeId}">
+  <a
+    class="product-card__thumb"
+    href="/product/${safeId}"
+    data-link
+    aria-label="${escapeHtml(rawName)} 상세 보기"
+  >
+    <img
+      class="product-card__img"
+      src="${safeImgSrc}"
+      alt="${safeName}"
+      loading="lazy"
+      decoding="async"
+      onerror="this.onerror=null; this.src='${safeFallback}';"
+    />
+  </a>
 
-<div class="product-card__body">
-  <h3 class="product-card__name">
-    <a href="/product/${safeId}" data-link>${safeName}</a>
-  </h3>
+  <div class="product-card__body">
+    <h3 class="product-card__name">
+      <a href="/product/${safeId}" data-link>${safeName}</a>
+    </h3>
 
-  <div class="product-card__pricebox">
-    ${
-       isDiscounted
-          ? `
-          <p class="product-card__base" aria-label="정가">₩ ${formatKRW(basePrice)}</p>
-          <p class="product-card__price" aria-label="할인가">
-            ₩ ${formatKRW(price)}
+    <div class="product-card__pricebox" aria-label="가격 정보">
+      ${
+         isDiscounted
+            ? `
             <span class="product-card__discount" aria-label="할인율">-${percent}%</span>
-          </p>
-        `
-          : `<p class="product-card__price">₩ ${formatKRW(price)}</p>`
-    }
+            <p class="product-card__price" aria-label="할인가">₩ ${formatKRW(price)}</p>
+            <p class="product-card__base" aria-label="원가">₩ ${formatKRW(basePrice)}</p>
+          `
+            : `
+            <p class="product-card__price" aria-label="판매가">₩ ${formatKRW(price)}</p>
+          `
+      }
+    </div>
+
+    <ul class="product-card__tags" aria-label="Product Tags">
+      ${
+         displayTags.length
+            ? displayTags
+                 .map((t) => `<li class="product-tag">#${escapeHtml(t)}</li>`)
+                 .join('')
+            : ''
+      }
+    </ul>
+
+    <div class="product-card__floating">
+      <button
+        type="button"
+        class="cart-fav-btn"
+        data-add-cart
+        aria-label="장바구니 담기"
+        title="장바구니 담기"
+      >
+        <img src="/src/icons/favorite.svg" alt="" aria-hidden="true" />
+      </button>
+    </div>
   </div>
-
-  <ul class="product-card__tags" aria-label="Product Tags">
-    ${
-       displayTags.length
-          ? displayTags
-               .map((t) => `<li class="product-tag">#${escapeHtml(t)}</li>`)
-               .join('')
-          : ''
-    }
-  </ul>
-
-  <!-- ✅ 사이즈 UI 제거 -->
-
-  <!-- ✅ 하단 고정 액션 영역 -->
-  <div class="product-card__floating">
-    <button
-      type="button"
-      class="cart-fav-btn"
-      data-add-cart
-      aria-label="장바구니 담기"
-      title="장바구니 담기"
-    >
-      <img src="/src/icons/favorite.svg" alt="" aria-hidden="true" />
-    </button>
-  </div>
-</div>
 </article>
 `;
 }

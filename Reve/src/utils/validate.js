@@ -63,7 +63,27 @@ export function validateProductDraft(draft, { allowIdExisting = false } = {}) {
          };
       }
    }
+   // ✅ discountRate (0~1)
+   const drRaw = normalizeText(draft?.discountRate);
 
+   // 비어있으면 0으로 허용
+   if (drRaw === '') {
+      // no-op
+   } else {
+      const dr = toNumber(drRaw);
+      if (!Number.isFinite(dr)) {
+         return {
+            ok: false,
+            message: '할인율(discountRate)은 숫자여야 합니다.',
+         };
+      }
+      if (dr < 0 || dr > 1) {
+         return {
+            ok: false,
+            message: '할인율(discountRate)은 0~1 사이여야 합니다.',
+         };
+      }
+   }
    // 카테고리는 운영 정책상 선택이지만, 완전체에선 필수 권장
    const main = normalizeText(draft?.categoryMain);
    const sub = normalizeText(draft?.categorySub);

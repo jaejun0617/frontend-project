@@ -189,7 +189,8 @@ function normalizeProduct(p) {
 
    const createdAt = Number(p?.createdAt || 0) || now();
    const updatedAt = Number(p?.updatedAt || 0) || createdAt;
-
+   const discountRateRaw = Number(p?.discountRate ?? 0);
+   const discountRate = Number.isFinite(discountRateRaw) ? discountRateRaw : 0;
    return {
       ...p,
       id,
@@ -201,9 +202,13 @@ function normalizeProduct(p) {
       categorySub: String(p?.categorySub ?? '').trim(),
 
       price: Number.isFinite(price) ? price : 0,
-      basePrice: Number.isFinite(basePrice) ? basePrice : 0,
+      basePrice: Number.isFinite(basePrice)
+         ? basePrice
+         : Number.isFinite(price)
+           ? price
+           : 0,
 
-      discountRate: Number(p?.discountRate ?? 0),
+      discountRate,
       couponEligible: Boolean(p?.couponEligible ?? true),
       couponRateCap: Number(p?.couponRateCap ?? 0),
       couponTags: Array.isArray(p?.couponTags) ? p.couponTags : [],

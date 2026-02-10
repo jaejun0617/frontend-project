@@ -1206,6 +1206,13 @@ export function initAdminPage() {
                placeholder: '10000',
             },
             {
+               key: 'discountRate',
+               label: '할인율(0~1)',
+               type: 'number',
+               placeholder: '0.2',
+               hint: '0.2 = 20% (0~1 사이 값만 허용)',
+            },
+            {
                key: 'basePrice',
                label: '정가(원)',
                type: 'number',
@@ -1277,7 +1284,7 @@ export function initAdminPage() {
          const form = await openFormModal({
             title: '상품 등록',
             fields,
-            initial: { active: true, couponEligible: true },
+            initial: { active: true, couponEligible: true, discountRate: 0 },
             submitText: '등록',
             onMount: (overlay) => {
                const brandEl = overlay.querySelector('[data-f="brand"]');
@@ -1357,6 +1364,29 @@ export function initAdminPage() {
             return;
          }
 
+         // ✅ discountRate 정규화 (0~1)
+         const drRaw = String(form.discountRate ?? '').trim();
+         const dr = drRaw === '' ? 0 : Number(drRaw);
+         form.discountRate = Number.isFinite(dr) ? dr : form.discountRate;
+
+         // ✅ 할인율이 있는데 정가가 비어있으면 자동 계산해서 채움
+         const priceNum = Number(form.price ?? 0);
+         const baseRaw = String(form.basePrice ?? '').trim();
+         const hasBase = baseRaw !== '';
+
+         if (
+            form.discountRate > 0 &&
+            !hasBase &&
+            Number.isFinite(priceNum) &&
+            priceNum > 0
+         ) {
+            // basePrice = price / (1 - rate)
+            const denom = 1 - form.discountRate;
+            if (denom > 0) {
+               form.basePrice = String(Math.round(priceNum / denom));
+            }
+         }
+
          const v = validateProductDraft(form);
          if (!v.ok) {
             toast.show(v.message, { duration: 1600 });
@@ -1431,6 +1461,13 @@ export function initAdminPage() {
             },
             { key: 'price', label: '판매가(원)', type: 'number' },
             { key: 'basePrice', label: '정가(원)', type: 'number' },
+            {
+               key: 'discountRate',
+               label: '할인율(0~1)',
+               type: 'number',
+               placeholder: '0.2',
+               hint: '0.2 = 20% (0~1 사이 값만 허용)',
+            },
             {
                key: 'image',
                label: '이미지 URL(선택)',
@@ -1518,7 +1555,28 @@ export function initAdminPage() {
             });
             return;
          }
+         // ✅ discountRate 정규화 (0~1)
+         const drRaw = String(form.discountRate ?? '').trim();
+         const dr = drRaw === '' ? 0 : Number(drRaw);
+         form.discountRate = Number.isFinite(dr) ? dr : form.discountRate;
 
+         // ✅ 할인율이 있는데 정가가 비어있으면 자동 계산해서 채움
+         const priceNum = Number(form.price ?? 0);
+         const baseRaw = String(form.basePrice ?? '').trim();
+         const hasBase = baseRaw !== '';
+
+         if (
+            form.discountRate > 0 &&
+            !hasBase &&
+            Number.isFinite(priceNum) &&
+            priceNum > 0
+         ) {
+            // basePrice = price / (1 - rate)
+            const denom = 1 - form.discountRate;
+            if (denom > 0) {
+               form.basePrice = String(Math.round(priceNum / denom));
+            }
+         }
          const v = validateProductDraft(form, { allowIdExisting: true });
          if (!v.ok) {
             toast.show(v.message, { duration: 1600 });
