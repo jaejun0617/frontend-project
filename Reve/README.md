@@ -36,7 +36,7 @@
 
 - 라우터 및 레이아웃 조립
 - 전역 UI 초기화(사이드바, 검색 드로어, 토스트, 인증 UI)
-- 전역 이벤트 위임(상품 리스트 사이즈 선택, 장바구니 토글)
+- 전역 이벤트 위임(상품 리스트 CTA, 장바구니 토글 등)
 - `sessionStorage` 기반 “회원가입 후 메인 모달” 플로우 처리
 - `authStore` 구독으로 store owner 스위칭
    - `cartStore.setOwner(userId || 'guest')`
@@ -53,7 +53,7 @@
 - `src/pages/product/index.js`  
   상품 리스트(그리드) + 필터/정렬/페이지네이션
 - `src/pages/productDetail/index.js`  
-  상품 상세(옵션, 장바구니, 바로구매)
+  상품 상세(장바구니, 바로구매)
 - `src/pages/cart/index.js`  
   장바구니 + 쿠폰 + 결제(mock) + 멤버십/포인트/승급쿠폰 + 주문 저장 + 배송지 가드 + 배송지 요약 표시
 - `src/pages/checkoutSuccess/index.js`  
@@ -96,7 +96,7 @@
 - `src/utils/exportImport.js` : Admin 데이터 번들 Export/Import
 - `src/components/Toast.js` : 토스트
 - `src/components/ConfirmModal.js` : 확인/취소 모달
-- `src/components/ProductCard.js` : 상품 카드(사이즈 pill + 장바구니 아이콘 + 태그 + 안전 이미지)
+- `src/components/ProductCard.js` : 상품 카드(장바구니 아이콘 + 태그 + 가격/할인 + 안전 이미지)
 
 ---
 
@@ -221,13 +221,14 @@
 
 ## 6) 상품 리스트(ProductCard) UX
 
-### 카드 UX (ProductCard)
+### 카드 UX (ProductCard) ✅ (최신)
 
-- 컬러 제거, 사이즈만 지원
-- 사이즈 기본 선택 없음(실수 방지)
+- **사이즈 UI 제거**: 상품 카드에서 사이즈 선택을 노출하지 않음
+- **사이즈 없이 장바구니 담기 가능** (리스트 CTA 기준)
 - 장바구니는 아이콘 버튼(하단 floating)
 - 담김 상태 `.is-added` 유지
-- 담긴 사이즈 pill `is-in-cart` 표시 가능 구조
+- 가격 표현:
+   - 정가(`basePrice`) / 할인가(`price`) / 할인율(`discountRate`) 표시
 
 ### (P2) 안전한 이미지 렌더링 ✅
 
@@ -246,6 +247,7 @@
 #### 절대 규칙(안전장치)
 
 - `bindSizePills()` 로직은 **수정 금지**
+   - (현재는 사이즈 UI가 렌더되지 않아 이벤트가 발생하지 않음)
 
 ---
 
@@ -264,8 +266,9 @@
 3. mock 결제(`handleCheckout`)
 4. 완료 모달(요약 표시)
 5. 이동 분기
-   - 주문 확인: `/checkout/success?orderId=...`
-   - 계속 쇼핑: `/product`
+
+- 주문 확인: `/checkout/success?orderId=...`
+- 계속 쇼핑: `/product`
 
 ### 멤버십/포인트
 
@@ -291,11 +294,12 @@
 
 ---
 
-## 10) 상품 상세(ProductDetailPage)
+## 10) 상품 상세(ProductDetailPage) ✅ (최신)
 
-- 사이즈 미선택 시 장바구니 불가(토스트 안내)
-- 선택 후 다른 사이즈 클릭 시 변경 confirm
-- 바로구매: 장바구니로 이동 confirm 후 `/cart`
+- **사이즈 UI 제거**
+- **사이즈 선택 가드 제거**: 상세에서도 사이즈 없이 장바구니/바로구매 가능
+- 장바구니 담기 시 토스트
+- 바로구매 시 “장바구니로 이동” confirm → 확인 시 `/cart`
 
 ---
 
@@ -398,7 +402,8 @@
 
 ### 쿠폰/이벤트 ✅
 
-- 더미 생성 + 등록/수정/삭제 + 활성 토글 + 필터
+- 등록/수정/삭제 + 활성 토글 + 필터
+- (현재) 운영툴에서 쿠폰을 생성/관리 가능 (유저 지급/배포는 TODO)
 
 ### 감사 로그 ✅
 
@@ -425,7 +430,9 @@
 ### P1. 관리자(Admin) 🧰 (기능 확장)
 
 - 주문 상태 관리(ADMIN 전용)
-- 이벤트/쿠폰 관리 관리자가 사용 가능한 쿠폰을 등록하면 일반유저들이 코드를 알시 쿠폰지급 + 쿠폰사용가능하게
+- 이벤트/쿠폰 관리
+   - 관리자가 “사용 가능한 쿠폰”을 등록
+   - 일반유저가 코드를 알면 쿠폰 지급 + 사용 가능 처리(등록/지급 플로우 정식화)
 
 ### P2. 주문/배송 고도화 🚚 (현실감 강화)
 
