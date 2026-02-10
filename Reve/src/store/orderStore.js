@@ -217,20 +217,26 @@ export const orderStore = {
          return { ok: false, message: 'orderId가 필요해요.' };
       }
 
-      // 동일 orderId 중복 방지
       if (state.orders.some((o) => o.orderId === payload.orderId)) {
          return { ok: false, message: '이미 존재하는 주문이에요.' };
       }
 
-      const createdAt = payload.createdAt
-         ? Date.parse(payload.createdAt)
-         : Date.now();
       const now = Date.now();
+
+      // ✅ createdAt은 number(ms) 우선, 그 외 문자열이면 Date.parse 시도
+      const createdAt =
+         typeof payload.createdAt === 'number'
+            ? payload.createdAt
+            : typeof payload.createdAt === 'string'
+              ? Number.isFinite(Date.parse(payload.createdAt))
+                 ? Date.parse(payload.createdAt)
+                 : now
+              : now;
 
       const next = {
          ...payload,
          status: normalizeStatus(payload.status || 'PAID'),
-         createdAt: Number.isNaN(createdAt) ? now : createdAt,
+         createdAt,
          updatedAt: now,
       };
 
@@ -239,6 +245,7 @@ export const orderStore = {
 
       state = { ...state, orders: [next, ...state.orders] };
       notify();
+
       return { ok: true, orderId: next.orderId };
    },
 

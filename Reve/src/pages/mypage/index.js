@@ -36,6 +36,8 @@ import {
    formatPercent,
 } from '../../utils/membership.js';
 
+import { toStatusTimeline, statusKo } from '../../utils/orderTimeline.js';
+
 /* ==============================
    1) Tabs
 ============================== */
@@ -56,8 +58,6 @@ const DEFAULT_TAB = 'coupon';
 
 /* ==============================
    2) Page Template
-   - 패널 is-active 고정하지 않는다.
-   - 초기 탭은 initMyPage에서 URL 기반으로 결정한다.
 ============================== */
 
 export const MyPage = () => {
@@ -141,8 +141,6 @@ function getInitialTabKey() {
 
 /**
  * ✅ URL 쿼리 업데이트 (pushState / replaceState)
- * - 탭 클릭 시: pushState 권장
- * - open/focus 소비 시: replaceState 권장(히스토리 오염 방지)
  */
 function setQuery(paramsPatch, { replace = false } = {}) {
    const url = new URL(window.location.href);
@@ -162,30 +160,7 @@ function setQuery(paramsPatch, { replace = false } = {}) {
 }
 
 /**
- * ✅ open/focus 파라미터 소비(consume)
- * - 1회 실행 후 URL에서 제거
- * - 새로고침/뒤로가기에서 반복 트리거를 줄임
- */
-function consumeDeepLinkParams({
-   consumeOpen = false,
-   consumeFocus = false,
-} = {}) {
-   const q = readQuery();
-   const patch = {};
-
-   if (consumeOpen && q.open) patch.open = '';
-   if (consumeOpen && q.orderId) patch.orderId = '';
-   if (consumeFocus && q.focus) patch.focus = '';
-
-   // 아무것도 소비할 게 없으면 noop
-   if (!Object.keys(patch).length) return;
-
-   setQuery(patch, { replace: true });
-}
-
-/**
  * ✅ 탭 렌더
- * - 실제 활성탭은 initMyPage의 setActiveTab에서 반영
  */
 function renderTabs(activeKey = DEFAULT_TAB) {
    return `
@@ -568,15 +543,35 @@ function formatStatusLabel(status) {
    return '결제완료';
 }
 
+/**
+ * ✅ 주문 상세 라인에 statusHistory도 포함 (객체 기반)
+ */
 function buildOrderDetailLines(order) {
    if (!order) return '';
-   return [
+
+   const lines = [
       `주문번호: ${order.orderId}`,
       `상태: ${formatStatusLabel(order.status)}`,
       `결제: ₩ ${formatKRW(order?.pricing?.total || 0)}`,
       `배송비: ₩ ${formatKRW(order?.pricing?.shipping || 0)}`,
       `쿠폰: ${order?.coupon?.code ? order.coupon.code : '없음'}`,
-   ].join('\n');
+   ];
+
+   const rows = toStatusTimeline(order?.statusHistory);
+   if (rows.length) {
+      lines.push('');
+      lines.push('상태 이력:');
+      rows.forEach((r, i) => {
+         lines.push(
+            `${i + 1}. ${statusKo(r.status)} (${formatDateTime(r.at)})`,
+         );
+      });
+   } else {
+      lines.push('');
+      lines.push('상태 이력: 없음');
+   }
+
+   return lines.join('\n');
 }
 
 function renderOrdersList(orders = []) {
@@ -676,7 +671,6 @@ function renderShippingSnapshot(order) {
       <p class="ship__to"><strong>${escapeHtml(a.receiver)}</strong> ${label} · ${escapeHtml(a.phone)}</p>
       <p class="ship__addr muted">${line}</p>
 
-      <!-- ✅ 정책 안내 -->
       <p class="ship__policy muted">
         ※ 주문 생성 이후 배송지 변경은 불가합니다. (취소 후 재주문해 주세요.)
       </p>
@@ -684,15 +678,10 @@ function renderShippingSnapshot(order) {
   `;
 }
 
-/* ==============================
-   6-1) Delivery helpers (FIX)
-============================== */
-
 /**
- * ✅ 타임라인은 "order 객체"를 받아야 statusHistory를 쓸 수 있다.
- * @param {any} order
+ * ✅ 배송 카드용 타임라인 (order 없으면 호출하지 않는다!)
  */
-function renderTimeline(order) {
+function renderDeliveryTimeline(order) {
    const s = normalizeOrderStatus(order?.status);
    const h = order?.statusHistory || {};
 
@@ -739,7 +728,6 @@ function renderTimeline(order) {
 function filterOrdersByStatus(orders, filterKey) {
    const key = String(filterKey || 'ALL').toUpperCase();
    if (key === 'ALL') return orders;
-
    return orders.filter((o) => normalizeOrderStatus(o?.status) === key);
 }
 
@@ -781,7 +769,7 @@ function renderDeliveryList(orders, { filterKey = 'ALL' } = {}) {
                    </div>
                  </div>
 
-                  ${renderTimeline(o)}
+                 ${renderDeliveryTimeline(o)}
 
                  <div class="delivery-card__mid">
                    <div class="delivery-card__track">
@@ -908,25 +896,6 @@ function renderGrade(user) {
       <p class="hint">${next?.name ? `${safePct}% 달성` : `100%`}</p>
     </div>
   `;
-}
-
-/* ==============================
-   DeepLink: consume helpers
-   - open/focus/orderId 같은 "1회성 트리거"를 실행 후 URL에서 제거한다.
-   - tab은 유지해서 현재 탭 상태는 그대로 남긴다.
-============================== */
-
-function consumeQuery({ remove = ['open', 'focus', 'orderId'] } = {}) {
-   const url = new URL(window.location.href);
-   const params = url.searchParams;
-
-   // ✅ 제거 대상만 삭제
-   remove.forEach((k) => params.delete(k));
-
-   // ✅ URL 반영 (라우터 렌더 재호출 없이, 히스토리 스택 오염 없이)
-   const next =
-      url.pathname + (params.toString() ? `?${params.toString()}` : '');
-   window.history.replaceState({}, '', next);
 }
 
 /* ==============================
@@ -1062,13 +1031,11 @@ export function initMyPage() {
    const root = document.querySelector('[data-mypage]');
    if (!root) return;
 
-   // ✅ 중복 바인딩 방지
    if (root.dataset.bound === '1') return;
    root.dataset.bound = '1';
 
    const toast = initToast();
 
-   // ✅ 패널별 DOM 핸들
    const ownedWrap = root.querySelector('[data-owned-wrap]');
    const msgEl = root.querySelector('[data-coupon-register-msg]');
    const inputEl = root.querySelector('[data-coupon-register-input]');
@@ -1078,11 +1045,10 @@ export function initMyPage() {
    const ordersWrap = root.querySelector('[data-orders-wrap]');
    const addressWrap = root.querySelector('[data-address-wrap]');
 
-   const deliveryWrap = root.querySelector('[data-delivery-wrap]');
    const deliveryListEl = root.querySelector('[data-delivery-list]');
+
    /* ------------------------------
       A) Tab control
-      - UI 반영만 담당(데이터 로딩은 paint에서)
    ------------------------------ */
 
    const setActiveTab = (tabKey) => {
@@ -1107,7 +1073,6 @@ export function initMyPage() {
 
    /* ------------------------------
       B) Paint functions
-      - 스토어 상태를 읽어 패널 내부를 갱신
    ------------------------------ */
 
    const paintOwned = () => {
@@ -1138,13 +1103,10 @@ export function initMyPage() {
       ordersWrap.innerHTML = renderOrdersList(orders);
    };
 
-   const deliveryState = {
-      filterKey: 'ALL',
-   };
+   const deliveryState = { filterKey: 'ALL' };
 
    const paintDelivery = () => {
       if (!deliveryListEl) return;
-
       const orders = orderStore.getOrders?.() ?? [];
       deliveryListEl.innerHTML = renderDeliveryList(orders, {
          filterKey: deliveryState.filterKey,
@@ -1156,10 +1118,6 @@ export function initMyPage() {
       addressWrap.innerHTML = renderAddressPanelInner();
    };
 
-   /**
-    * ✅ 탭별 최소 paint만 수행
-    * - 과한 렌더를 줄이고, UX 반응성을 올림
-    */
    const paintByTab = (tabKey) => {
       if (tabKey === 'coupon') paintOwned();
       if (tabKey === 'profile') paintProfile();
@@ -1171,9 +1129,16 @@ export function initMyPage() {
 
    /* ------------------------------
       C) Deep link actions
-      - tab/open/focus/orderId에 따라 1회성 액션 실행
-      - 실행 후 open/focus를 consume하여 반복 방지
    ------------------------------ */
+
+   const consumeQuery = ({ remove = ['open', 'focus', 'orderId'] } = {}) => {
+      const url = new URL(window.location.href);
+      const params = url.searchParams;
+      remove.forEach((k) => params.delete(k));
+      const next =
+         url.pathname + (params.toString() ? `?${params.toString()}` : '');
+      window.history.replaceState({}, '', next);
+   };
 
    const runDeepLink = async () => {
       const q = readQuery();
@@ -1181,7 +1146,6 @@ export function initMyPage() {
 
       setActiveTab(tab);
 
-      // ✅ 1회성 트리거가 실행됐는지 추적
       let didConsume = false;
 
       if (tab === 'coupon') {
@@ -1233,7 +1197,6 @@ export function initMyPage() {
          }
       }
 
-      // ✅ 트리거 실행 후 URL 파라미터 소비(1회성)
       if (didConsume) {
          consumeQuery({ remove: ['open', 'focus', 'orderId'] });
       }
@@ -1241,8 +1204,6 @@ export function initMyPage() {
 
    /* ------------------------------
       D) Initial render
-      - 전체 paint 1회(초기 로딩)
-      - 이후 딥링크 액션 실행
    ------------------------------ */
 
    paintOwned();
@@ -1256,7 +1217,6 @@ export function initMyPage() {
 
    /* ------------------------------
       E) Store subscriptions
-      - 데이터 변경 시 UI 갱신
    ------------------------------ */
 
    couponStore.subscribe?.(() => paintOwned());
@@ -1270,12 +1230,11 @@ export function initMyPage() {
       paintOrders();
       paintDelivery();
    });
+
    addressStore.subscribe?.(() => paintAddress());
 
    /* ------------------------------
       F) popstate
-      - 뒤로/앞으로가기 시 URL 상태를 탭/UI에 반영
-      - 딥링크 트리거(open/focus)가 남아있다면 재실행 가능
    ------------------------------ */
 
    const onPopState = () => {
@@ -1291,22 +1250,16 @@ export function initMyPage() {
    ------------------------------ */
 
    root.addEventListener('click', async (e) => {
-      /* ==============================
-         1) Tab change
-         - 탭 클릭 시 URL의 tab을 pushState로 동기화
-         ============================== */
+      // 1) Tab change
       const tabBtn = e.target.closest('[data-tab]');
       if (tabBtn) {
          const tabKey = normalizeTab(
             String(tabBtn.getAttribute('data-tab') || '').trim(),
          );
 
-         // ✅ UI 반영
          setActiveTab(tabKey);
          paintByTab(tabKey);
 
-         // ✅ URL 동기화(tab)
-         // - open/focus는 탭 이동 시 제거(의도치 않은 반복 트리거 방지)
          setQuery(
             {
                tab: tabKey,
@@ -1320,9 +1273,7 @@ export function initMyPage() {
          return;
       }
 
-      /* ==============================
-         2) Coupon register
-         ============================== */
+      // 2) Coupon register
       if (e.target.closest('[data-coupon-register]')) {
          const raw = String(inputEl?.value || '').trim();
 
@@ -1347,9 +1298,7 @@ export function initMyPage() {
          return;
       }
 
-      /* ==============================
-         3) Coupon apply
-         ============================== */
+      // 3) Coupon apply
       const applyBtn = e.target.closest('[data-coupon-apply]');
       if (applyBtn) {
          const code = String(applyBtn.getAttribute('data-coupon-apply') || '')
@@ -1384,9 +1333,7 @@ export function initMyPage() {
          return;
       }
 
-      /* ==============================
-         4) Coupon clear
-         ============================== */
+      // 4) Coupon clear
       if (e.target.closest('[data-coupon-clear]')) {
          const applied = String(couponStore.getState?.()?.appliedCode || '');
          const ok = await confirmModal({
@@ -1405,9 +1352,7 @@ export function initMyPage() {
          return;
       }
 
-      /* ==============================
-         5) Used coupons toggle
-         ============================== */
+      // 5) Used coupons toggle
       const toggleUsedBtn = e.target.closest('[data-toggle-used]');
       if (toggleUsedBtn) {
          const wrap = root.querySelector('[data-used-wrap]');
@@ -1419,9 +1364,7 @@ export function initMyPage() {
          return;
       }
 
-      /* ==============================
-         6) Navigate
-         ============================== */
+      // 6) Navigate
       if (e.target.closest('[data-go-cart]')) {
          window.dispatchEvent(
             new CustomEvent('app:navigate', { detail: { href: '/cart' } }),
@@ -1435,11 +1378,11 @@ export function initMyPage() {
          );
          return;
       }
-      /* ==============================
-   X) Delivery: filter / actions
-============================== */
 
-      // (1) 필터 칩
+      /* ==============================
+         X) Delivery: filter / actions
+      ============================== */
+
       const filterBtn = e.target.closest('[data-delivery-filter]');
       if (filterBtn) {
          const next = String(
@@ -1447,7 +1390,6 @@ export function initMyPage() {
          ).toUpperCase();
          deliveryState.filterKey = next;
 
-         // 칩 UI 토글
          root.querySelectorAll('[data-delivery-filter]').forEach((btn) => {
             const k = String(
                btn.getAttribute('data-delivery-filter') || 'ALL',
@@ -1461,7 +1403,6 @@ export function initMyPage() {
          return;
       }
 
-      // (2) "주문내역으로" 버튼
       if (e.target.closest('[data-go-orders-tab]')) {
          const tabKey = 'orders';
          setActiveTab(tabKey);
@@ -1474,7 +1415,6 @@ export function initMyPage() {
          return;
       }
 
-      // (3) 배송 상세: 기존 주문 상세 모달 재사용
       const dDetail = e.target.closest('[data-delivery-detail]');
       if (dDetail) {
          const orderId = String(
@@ -1497,7 +1437,6 @@ export function initMyPage() {
          return;
       }
 
-      // (4) 배송조회: “추적 정보” 모달 (MVP)
       const dTrack = e.target.closest('[data-delivery-track]');
       if (dTrack) {
          const orderId = String(
@@ -1527,11 +1466,11 @@ export function initMyPage() {
          });
          return;
       }
+
       /* ==============================
          7) Address CRUD
-         ============================== */
+      ============================== */
 
-      // (A) Add
       if (e.target.closest('[data-address-add]')) {
          const first = (addressStore.getAddresses?.() ?? []).length === 0;
 
@@ -1569,12 +1508,10 @@ export function initMyPage() {
          return;
       }
 
-      // (B) Card actions
       const card = e.target.closest('[data-address-id]');
       const id = String(card?.getAttribute('data-address-id') || '').trim();
 
       if (id) {
-         // Default
          if (e.target.closest('[data-address-set-default]')) {
             const ok = await confirmModal({
                title: '기본 배송지 설정',
@@ -1597,7 +1534,6 @@ export function initMyPage() {
             return;
          }
 
-         // Edit
          if (e.target.closest('[data-address-edit]')) {
             const current = addressStore.getAddress?.(id);
 
@@ -1640,7 +1576,6 @@ export function initMyPage() {
             return;
          }
 
-         // Delete
          if (e.target.closest('[data-address-delete]')) {
             const ok = await confirmModal({
                title: '배송지 삭제',
@@ -1666,7 +1601,7 @@ export function initMyPage() {
 
       /* ==============================
          8) Order detail / status update
-         ============================== */
+      ============================== */
 
       const detailBtn = e.target.closest('[data-order-detail]');
       if (detailBtn) {

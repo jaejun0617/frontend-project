@@ -36,6 +36,7 @@ import {
 } from '../../utils/exportImport.js';
 
 import { auditLog } from '../../utils/auditLog.js';
+import { toStatusTimeline, statusKo } from '../../utils/orderTimeline.js';
 
 /* ==============================
    1) Page Template
@@ -60,6 +61,7 @@ export function AdminPage() {
            ${renderPanelCoupons()}
            ${renderPanelAudit()}
            ${renderPanelBackup()}
+           ${renderTimeline()}
          </div>
        </div>
      </section>
@@ -76,6 +78,7 @@ const TABS = [
    { key: 'coupons', label: '쿠폰/이벤트', enabled: true },
    { key: 'audit', label: '감사 로그', enabled: true },
    { key: 'backup', label: '백업/복구', enabled: true },
+   { key: 'timeline', label: '주문 타임라인', enabled: true },
 ];
 
 function escapeHtml(value) {
@@ -267,7 +270,76 @@ function renderPanelBackup() {
      </section>
    `;
 }
+function renderTimeline() {
+   return `
+     <section class="admin-panel" role="tabpanel" data-admin-panel="timeline" aria-hidden="true">
+       <div class="admin-head">
+         <div>
+           <h2 class="admin-title">주문 타임라인</h2>
+           <p class="admin-desc">전체 주문의 상태 변경 이력을 모아서 봅니다.</p>
+         </div>
 
+         <div class="admin-head__actions">
+           <button type="button" class="btn" data-admin-refresh-timeline>새로고침</button>
+         </div>
+       </div>
+
+       <div class="admin-card" data-admin-timeline-wrap>
+         <p class="loading">불러오는 중...</p>
+       </div>
+     </section>
+   `;
+}
+
+function renderTimelineList(rows) {
+   if (!rows.length) {
+      return `
+        <div class="empty">
+          <p class="empty__title">타임라인이 없습니다.</p>
+          <p class="empty__desc">주문 상태가 변경되면 이력이 쌓입니다.</p>
+        </div>
+      `;
+   }
+
+   return `
+     <ul class="audit-list" aria-label="Timeline List">
+       ${rows
+          .map((r) => {
+             return `
+               <li class="audit-item">
+                 <div class="audit-item__top">
+                   <span class="pill">${escapeHtml(r.orderId)}</span>
+                   <span class="muted">${escapeHtml(fmtDate(r.at))}</span>
+                 </div>
+                 <p class="audit-item__msg">
+                   <strong>${escapeHtml(r.owner || '-')}</strong> · ${escapeHtml(
+                      statusKo(r.status) || statusLabel(r.status),
+                   )}
+                 </p>
+               </li>
+             `;
+          })
+          .join('')}
+     </ul>
+   `;
+}
+
+function buildTimelineRowsFromOrders(orders) {
+   const list = Array.isArray(orders) ? orders : [];
+
+   const rows = list.flatMap((o) => {
+      const timeline = toStatusTimeline(o?.statusHistory);
+      return timeline.map((t) => ({
+         orderId: o.orderId,
+         owner: o.__ownerKey,
+         status: t.status,
+         at: t.at,
+      }));
+   });
+
+   // 최신순
+   return rows.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+}
 /* ==============================
    3) Render helpers
 ============================== */
@@ -294,6 +366,37 @@ function statusLabel(s) {
    if (v === 'DELIVERED') return '배송완료';
    if (v === 'CANCELED') return '취소';
    return '결제완료';
+}
+
+/* ==============================
+   ✅ (중요) 주문 상세에서 statusHistory 표준 처리
+   - orderStore(객체) / 혹시 다른 형태여도 toStatusTimeline이 흡수
+============================== */
+
+function buildAdminOrderDetailLines(order) {
+   const lines = [
+      `주문번호: ${order.orderId}`,
+      `유저: ${order.__ownerKey || '-'}`,
+      `상태: ${statusLabel(order.status)}`,
+      `결제: ₩ ${formatKRW(order?.pricing?.total || 0)}`,
+      `배송비: ₩ ${formatKRW(order?.pricing?.shipping || 0)}`,
+      `쿠폰: ${order?.coupon?.code || '없음'}`,
+      `생성일: ${fmtDate(order.createdAt)}`,
+   ];
+
+   const rows = toStatusTimeline(order?.statusHistory);
+   if (rows.length) {
+      lines.push('');
+      lines.push('상태 이력:');
+      rows.forEach((r, idx) => {
+         lines.push(`${idx + 1}. ${statusKo(r.status)} (${fmtDate(r.at)})`);
+      });
+   } else {
+      lines.push('');
+      lines.push('상태 이력: 없음');
+   }
+
+   return lines.join('\n');
 }
 
 /* ==============================
@@ -562,7 +665,6 @@ function openFormModal({
       overlay.setAttribute('aria-label', title);
 
       const renderField = (f) => {
-         // ✅ NEW: section header
          if (f.type === 'section') {
             return `
               <div class="form-section">
@@ -683,16 +785,12 @@ function openFormModal({
         </div>
       `;
 
-      // ✅ DOM 준비된 시점에 caller가 overlay를 만질 수 있게
       try {
          if (typeof onMount === 'function') onMount(overlay);
       } catch (e) {
          console.warn('[admin] onMount failed:', e);
       }
 
-      /* --------------------------------
-         ✅ categoryMain/categorySub 연동
-      -------------------------------- */
       const mainSel = overlay.querySelector('[data-f="categoryMain"]');
       const subSel = overlay.querySelector('[data-f="categorySub"]');
 
@@ -750,7 +848,6 @@ function openFormModal({
                out[f.key] = getValue(f.key, f.type);
             });
 
-            // file input은 out.__fileInputs 로 참조만 넘김
             out.__fileInputs = {};
             fields
                .filter((f) => f.type === 'file')
@@ -929,14 +1026,14 @@ function renderOrdersTable(orders) {
                          )}" ${s === 'DELIVERED' || s === 'CANCELED' ? 'disabled' : ''}>
                            다음 상태
                          </button>
-                           <button
-                                 type="button"
-                                 class="btn small danger"
-                                 data-admin-order-cancel="${escapeHtml(o.orderId)}"
-                                 ${s !== 'PAID' ? 'disabled' : ''}  // ✅ PAID에서만 취소 가능
-                                 >
-                                 취소
-                                 </button>
+                         <button
+                           type="button"
+                           class="btn small danger"
+                           data-admin-order-cancel="${escapeHtml(o.orderId)}"
+                           ${s !== 'PAID' ? 'disabled' : ''}
+                         >
+                           취소
+                         </button>
                        </div>
                      </td>
                    </tr>
@@ -1088,6 +1185,7 @@ export function initAdminPage() {
       coupons: root.querySelector('[data-admin-panel="coupons"]'),
       audit: root.querySelector('[data-admin-panel="audit"]'),
       backup: root.querySelector('[data-admin-panel="backup"]'),
+      timeline: root.querySelector('[data-admin-panel="timeline"]'),
    };
 
    const productsWrap = root.querySelector('[data-admin-products-wrap]');
@@ -1106,7 +1204,7 @@ export function initAdminPage() {
 
    const couponQ = root.querySelector('[data-admin-coupon-q]');
    const couponActive = root.querySelector('[data-admin-coupon-active]');
-
+   const timelineWrap = root.querySelector('[data-admin-timeline-wrap]');
    const setActiveTab = (key) => {
       const next = String(key || 'products').trim();
 
@@ -1251,7 +1349,12 @@ export function initAdminPage() {
       const rows = auditLog.list();
       auditWrap.innerHTML = renderAuditList(rows);
    };
-
+   const paintTimeline = () => {
+      if (!timelineWrap) return;
+      const orders = adminOrderStore.getAllOrders();
+      const rows = buildTimelineRowsFromOrders(orders);
+      timelineWrap.innerHTML = renderTimelineList(rows);
+   };
    const syncFiltersFromDOM = () => {
       state.products.q = String(productQ?.value || '');
       state.products.main = String(productMain?.value || '');
@@ -1271,7 +1374,7 @@ export function initAdminPage() {
    paintOrders();
    paintCoupons();
    paintAudit();
-
+   paintTimeline();
    adminProductStore.subscribe(() => paintProducts());
    adminCouponStore.subscribe(() => paintCoupons());
    auditLog.subscribe(() => paintAudit());
@@ -1360,7 +1463,11 @@ export function initAdminPage() {
          }
          return;
       }
-
+      if (e.target.closest('[data-admin-refresh-timeline]')) {
+         paintTimeline();
+         toast.show('타임라인을 갱신했습니다.', { duration: 1200 });
+         return;
+      }
       /* ---------
          Add Product
       --------- */
@@ -1388,7 +1495,6 @@ export function initAdminPage() {
             initial: { active: true, couponEligible: true, discountRate: 0 },
             submitText: '등록',
             onMount: (overlay) => {
-               // ✅ brand -> id 추천
                const brandEl = overlay.querySelector('[data-f="brand"]');
                const idEl = overlay.querySelector('[data-f="id"]');
 
@@ -1408,13 +1514,11 @@ export function initAdminPage() {
                   updateIdPreview();
                }
 
-               // ✅ price + discountRate -> basePrice 자동 계산
                mountPriceAutoCalc(overlay);
             },
          });
          if (!form) return;
 
-         // ✅ 파일 처리: file이 있으면 image(DataURL)로 주입
          const fileEl = form.__fileInputs?.imageFile;
          const file = getFileFromInput(fileEl);
 
@@ -1437,7 +1541,6 @@ export function initAdminPage() {
          delete form.__fileInputs;
          delete form.imageFile;
 
-         // ✅ validate 전에 정규화 (brand/tags/id)
          form.brand = String(form.brand || '').trim();
 
          if (!String(form.id || '').trim() && form.brand) {
@@ -1447,12 +1550,10 @@ export function initAdminPage() {
 
          form.tags = buildTagsFromForm(form);
 
-         // 운영 태그 토글은 tags로만 쓰고 제거
          delete form.isHot;
          delete form.isBest;
          delete form.isNew;
 
-         // ✅ 이미지 URL 검사
          const url = String(form.image || '').trim();
          if (
             url &&
@@ -1470,12 +1571,10 @@ export function initAdminPage() {
             return;
          }
 
-         // ✅ discountRate 정규화 (0~1)
          const drRaw = String(form.discountRate ?? '').trim();
          const dr = drRaw === '' ? 0 : Number(drRaw);
          form.discountRate = Number.isFinite(dr) ? dr : 0;
 
-         // ✅ basePrice 정규화 + 자동 보정(비어있을 때만)
          const priceNum = Number(form.price ?? 0);
          const baseRaw = String(form.basePrice ?? '').trim();
          const hasBase = baseRaw !== '';
@@ -1566,20 +1665,15 @@ export function initAdminPage() {
             },
             submitText: '수정',
             onMount: (overlay) => {
-               // ✅ 수정에서는 ID 잠금(UX)
                const idEl = overlay.querySelector('[data-f="id"]');
                if (idEl) idEl.setAttribute('disabled', 'disabled');
-
-               // ✅ basePrice 자동계산도 동일 적용
                mountPriceAutoCalc(overlay);
             },
          });
          if (!form) return;
 
-         // ID는 수정 금지
          form.id = current.id;
 
-         // ✅ 파일 처리
          const fileEl = form.__fileInputs?.imageFile;
          const file = getFileFromInput(fileEl);
 
@@ -1602,7 +1696,6 @@ export function initAdminPage() {
          delete form.__fileInputs;
          delete form.imageFile;
 
-         // ✅ 이미지 URL 검사 (validate 전에)
          const url = String(form.image || '').trim();
          if (
             url &&
@@ -1620,12 +1713,10 @@ export function initAdminPage() {
             return;
          }
 
-         // ✅ discountRate 정규화
          const drRaw = String(form.discountRate ?? '').trim();
          const dr = drRaw === '' ? 0 : Number(drRaw);
          form.discountRate = Number.isFinite(dr) ? dr : 0;
 
-         // ✅ basePrice 자동 보정(비어있을 때만)
          const priceNum = Number(form.price ?? 0);
          const baseRaw = String(form.basePrice ?? '').trim();
          const hasBase = baseRaw !== '';
@@ -1744,6 +1835,7 @@ export function initAdminPage() {
          return;
       }
 
+      // ✅ 여기: 네가 원했던 “주문 상세 모달” 교체 버전
       const detailOrder = e.target.closest('[data-admin-order-detail]');
       if (detailOrder) {
          const orderId = String(
@@ -1756,50 +1848,10 @@ export function initAdminPage() {
             return;
          }
 
-         // ✅ statusHistory 유연 파싱 (스토어 구현이 달라도 최대한 버팀)
-         const historyRaw = Array.isArray(order.statusHistory)
-            ? order.statusHistory
-            : [];
-
-         const history = historyRaw
-            .map((h) => {
-               const status = String(h?.status || '').toUpperCase() || null;
-               const at =
-                  h?.at ?? h?.changedAt ?? h?.createdAt ?? h?.timestamp ?? null;
-
-               return { status, at: Number(at || 0) || 0 };
-            })
-            .filter((x) => x.status) // status 없는 건 제외
-            .sort((a, b) => a.at - b.at); // 오래된 → 최신
-
-         const lines = [
-            `주문번호: ${order.orderId}`,
-            `유저: ${order.__ownerKey || '-'}`,
-            `상태: ${statusLabel(order.status)}`,
-            `결제: ₩ ${formatKRW(order?.pricing?.total || 0)}`,
-            `배송비: ₩ ${formatKRW(order?.pricing?.shipping || 0)}`,
-            `쿠폰: ${order?.coupon?.code || '없음'}`,
-            `생성일: ${fmtDate(order.createdAt)}`,
-         ];
-
-         // ✅ NEW: 상태 변경 이력 표시
-         if (history.length) {
-            lines.push(''); // 한 줄 띄우기
-            lines.push('상태 이력:');
-            history.forEach((h, idx) => {
-               const label = statusLabel(h.status);
-               const dateText = h.at ? fmtDate(h.at) : '-';
-               lines.push(`${idx + 1}. ${label} (${dateText})`);
-            });
-         } else {
-            lines.push('');
-            lines.push('상태 이력: 없음');
-         }
-
          await confirmModal({
             title: '주문 상세',
-            message: lines.join('\n'),
-            okText: '확인', // ✅ 너 confirmModal은 okText/cancelText 키를 씀
+            message: buildAdminOrderDetailLines(order),
+            confirmText: '확인',
             cancelText: '닫기',
          });
          return;
@@ -2189,3 +2241,9 @@ export function initAdminPage() {
       }
    });
 }
+
+/* =========================================================
+   ⚠️ renderTimeline()는 네 프로젝트에 이미 존재한다고 가정
+   - 이 파일에 실제 정의가 있다면 그대로 두면 됨
+   - 만약 없다면, 여기 아래에 정의를 추가해야 함
+========================================================= */
