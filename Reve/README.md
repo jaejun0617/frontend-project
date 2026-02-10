@@ -5,6 +5,48 @@
 
 ---
 
+## ✅ 오늘 작업 로그 (2026-02-10)
+
+> 오늘은 “상품(사이즈 제거 + 할인 UI)”와 “Admin(할인 등록 + 주문 상태/취소 정책 + 상세 이력/타임라인)”을 마무리한 날.
+
+### 🧩 Product UX / Pricing
+
+- **ProductCard**
+   - 사이즈 pill UI 제거
+   - 사이즈 없이 장바구니 담기 허용
+   - 정가/할인가/할인율 표기 순서 고정: **할인율 → 할인가 → 정가**
+   - 할인 조건(`discountRate > 0 && basePrice > price`)일 때만 3요소 노출
+
+- **ProductDetail**
+   - 사이즈 선택 가드 제거
+   - 장바구니/바로구매 플로우 단순화
+
+- **Products**
+   - `discountRate` 정규화 로직 버그 수정(반환값에 실제 적용)
+
+### 🛠️ Admin (상품/쿠폰/주문)
+
+- **상품**
+   - 상품 등록/수정 폼에 `discountRate(0~1)` 추가
+   - `price + discountRate → basePrice` 자동 계산(공통화)
+   - 모달 폼을 섹션 구조로 리팩터링(가독성/입력 UX 개선)
+   - 이미지 URL + 파일 업로드(DataURL) 지원(2MB 제한 유지)
+   - 최신순 정렬 유지(`updatedAt desc → createdAt desc`)
+
+- **쿠폰**
+   - 운영(Admin) 쿠폰을 storefront 공용 카탈로그로 연결
+   - active/기간 유효성 반영
+   - 운영 필드(minOrderTotal/maxUses/period/desc) 보관
+
+- **주문**
+   - 상태 정책 확정: **PAID에서만 CANCELED 허용**
+   - 관리자 주문 테이블에서 취소 버튼 비활성화로 정책/UX 일치
+   - 상태 변경 시 `reve:orders-changed` 이벤트로 즉시 동기화
+   - 주문 상세 모달에 statusHistory 이력/날짜 표시(필드명 방어 처리)
+   - **주문 타임라인 패널 추가** + `renderTimeline` 미정의 오류 수정
+
+---
+
 ## 목차
 
 - [0) 프로젝트 구조 개요](#0-프로젝트-구조-개요)
@@ -25,8 +67,11 @@
 - [15) 주문(Order) 시스템](#15-주문order-시스템)
 - [16) 결제 완료 페이지(Checkout Success)](#16-결제-완료-페이지checkout-success)
 - [17) 관리자(Admin) 운영툴](#17-관리자admin-운영툴)
+- [17.1) Admin 쿠폰 배포/유저 관리](#171-admin-쿠폰-배포유저-관리-운영툴-고도화)
+- [17.2) Admin Users Patch](#172-admin-users-patch)
 - [18) 품질/안정성 체크리스트(P2)](#18-품질안정성-체크리스트p2)
 - [19) 다음 작업 후보(TODO)](#19-다음-작업-후보todo)
+- [20) 진행률(체감)](#20-진행률체감)
 
 ---
 
@@ -63,7 +108,7 @@
 - `src/pages/mypage/index.js`  
   마이페이지(내정보, 배송지 CRUD, 주문내역, 주문·배송, 등급, 쿠폰)
 - `src/pages/admin/index.js`  
-  관리자 운영 툴(상품/주문/쿠폰/감사로그/백업)
+  관리자 운영 툴(상품/주문/쿠폰/감사로그/백업 + 주문 타임라인 + 유저 + 쿠폰 배포)
 
 ### 스토어
 
@@ -78,9 +123,11 @@
 - `src/store/addressStore.js`  
   유저별 배송지 CRUD, 기본 배송지 지정, persist + owner 스위칭
 - `src/store/adminProductStore.js`  
-  **Admin 상품 SSOT**: normalize/repair, createdAt/updatedAt 보장, 최신순 정렬, (옵션) 업로더 어댑터 슬롯, brand/tags 정규화
+  **Admin 상품 SSOT**: normalize/repair, createdAt/updatedAt 보장, 최신순 정렬, brand/tags 정규화, 이미지 업로드(DataURL)
 - `src/store/adminOrderStore.js`, `src/store/adminCouponStore.js`  
   Admin 주문/쿠폰 운영 스토어
+- `src/store/adminUserStore.js`  
+  Admin 유저 조회/삭제(회원 탈퇴) 스토어
 
 ### 유틸 / 컴포넌트
 
@@ -94,6 +141,8 @@
 - `src/utils/validate.js` : Product/Coupon/Order 검증
 - `src/utils/auditLog.js` : 감사 로그 저장/구독
 - `src/utils/exportImport.js` : Admin 데이터 번들 Export/Import
+- `src/utils/orderTimeline.js` : statusHistory 파싱(toStatusTimeline) + label(statusKo)
+- `src/utils/user/deriveUsers.js` : Admin Users 표시 파이프(검색/필터/정렬/누적구매 합산/등급 재계산)
 - `src/components/Toast.js` : 토스트
 - `src/components/ConfirmModal.js` : 확인/취소 모달
 - `src/components/ProductCard.js` : 상품 카드(장바구니 아이콘 + 태그 + 가격/할인 + 안전 이미지)
@@ -229,6 +278,7 @@
 - 담김 상태 `.is-added` 유지
 - 가격 표현:
    - 정가(`basePrice`) / 할인가(`price`) / 할인율(`discountRate`) 표시
+   - 할인 표기 순서: **할인율 → 할인가 → 정가**
 
 ### (P2) 안전한 이미지 렌더링 ✅
 
@@ -321,6 +371,7 @@
 - navigate: `app:navigate` (detail: `{ href }`)
 - recent search sync: `recent-search:changed`
 - search drawer close bridge: `app:searchDrawerClose`
+- orders changed: `reve:orders-changed`
 
 ---
 
@@ -366,9 +417,9 @@
 
 ### 탭 구성
 
-- 상품 관리 / 주문 관리 / 쿠폰/이벤트 / 감사 로그 / 백업/복구
+- 상품 관리 / 주문 관리 / 주문 타임라인 / 쿠폰/이벤트 / 유저 / 감사 로그 / 백업/복구
 
-### 상품 관리 ✅ (등록/수정/삭제 + 대/중분류 + 이미지 + 브랜드/태그)
+### 상품 관리 ✅ (등록/수정/삭제 + 대/중분류 + 이미지 + 브랜드/태그 + 할인)
 
 #### 1) 대/중분류 연동
 
@@ -395,15 +446,27 @@
    - 뱃지: `HOT`, `베스트`, `신상`
    - (선택) categoryMain/categorySub
 
+#### 5) 할인율(discountRate) + 정가 자동 계산 ✅
+
+- 상품 등록/수정 폼에 `discountRate(0~1)` 추가
+- 판매가(price) + 할인율 입력 시 정가(basePrice) 자동 계산
+- validate 단계에서 discountRate 정규화/범위 검증
+
 ### 주문 관리 ✅
 
-- 주문 조회 + 상태 변경 + 상세 보기 모달
-- 상태 전이 검증 포함
+- 주문 조회 + 상태 변경 + 상세 보기 모달(상태 이력 표시)
+- 취소 정책 반영: **PAID에서만 취소 버튼 활성화**
+- 상태 변경 즉시 동기화(`reve:orders-changed`)
+
+### 주문 타임라인 ✅
+
+- 주문 statusHistory를 toStatusTimeline으로 파싱해 최신순 리스트 표시
+- 새로고침 버튼/paintTimeline 렌더 플로우
 
 ### 쿠폰/이벤트 ✅
 
 - 등록/수정/삭제 + 활성 토글 + 필터
-- (현재) 운영툴에서 쿠폰을 생성/관리 가능 (유저 지급/배포는 TODO)
+- 운영 쿠폰이 storefront 등록 로직에 연결됨(운영 쿠폰 우선)
 
 ### 감사 로그 ✅
 
@@ -413,6 +476,63 @@
 
 - Export JSON 번들 생성
 - Import JSON 덮어쓰기 복원(confirm 포함)
+
+---
+
+## 17.1) Admin 쿠폰 배포/유저 관리 (운영툴 고도화)
+
+### 유저 탭(Users)
+
+- localStorage `reve_users_v1` 기반으로 유저 리스트/ROLE/GRADE/POINTS/TOTAL SPENT 조회
+- 검색/등급 필터/정렬 제공
+- 누적 구매(`totalSpent`)는 **주문 저장소 합산값이 정답 루트**
+   - `adminOrderStore.getAllOrders()`의 `__ownerKey` 기준 합산
+
+### 쿠폰 배포(Distribute)
+
+- 배포 방식:
+   - 전체 지급(ALL)
+   - 특정 등급 지급(GRADE)
+   - 특정 유저 지급(USER: userIds 쉼표 입력)
+- 지급 방식:
+   - 각 유저의 쿠폰 저장소 `reve_coupons_v1:<ownerKey>`에 직접 upsert
+   - 동일 code 중복 지급 방지(이미 보유 시 skip)
+- 감사로그 기록: `COUPON_DISTRIBUTE`
+
+---
+
+## 17.2) Admin Users Patch
+
+관리자(Admin) 페이지의 **유저 탭**을 “정답 데이터 루트” 기준으로 정리하고,  
+정렬 버그를 수정했으며 **회원 탈퇴(삭제)** 기능을 위한 store API를 추가했습니다.
+
+### ✅ 최종 설계 (현재 코드 기준)
+
+- **users 원본:** `adminUserStore.getUsers()` (`reve_users_v1`)
+- **누적 구매(totalSpent) 정답 루트:** `adminOrderStore.getAllOrders()`의 `__ownerKey` 기준 합산
+- **표시/검색/필터/정렬:** `deriveUsers()`에서 파이프 처리
+- **등급(grade):** 합산된 `totalSpent` 기준으로 재계산
+
+### 변경 사항
+
+#### 1) `src/utils/user/deriveUsers.js`
+
+- ✅ 정렬 버그 수정
+   - `sortDir`(asc/desc)가 뒤집히지 않도록 `dirMul` 방식으로 정리
+   - 숫자 필드 강제 숫자 정렬: `totalSpent`, `points`, `createdAt`, `updatedAt`
+   - 문자열 필드 강제 문자열 정렬: `id`, `username`, `role`, `grade`
+- ✅ 등급 계산 기준 통일(정답)
+   - 등급은 user 저장값이 아니라 주문 합산 `totalSpent` 기준으로 재계산
+
+#### 2) `src/store/adminUserStore.js`
+
+- ✅ 회원 탈퇴(삭제) API 추가
+   - `remove(id)` 추가
+   - `reve_users_v1` 배열에서 해당 유저 제거
+   - 삭제 성공/실패 결과 `{ ok, message, removedId }` 반환
+- ✅ UI 갱신 대응
+   - `subscribe/emit` 구조 추가(선택적 사용)
+   - remove 실행 시 emit 호출로 화면 갱신 트리거 가능
 
 ---
 
@@ -427,15 +547,38 @@
 
 ## 19) 다음 작업 후보(TODO)
 
-### P1. 관리자(Admin) 🧰 (기능 확장)
+> 완료된 항목은 제거하고, 남은 것만 유지
 
-- 주문 상태 관리(ADMIN 전용)
-- 이벤트/쿠폰 관리
-   - 관리자가 “사용 가능한 쿠폰”을 등록
-   - 일반유저가 코드를 알면 쿠폰 지급 + 사용 가능 처리(등록/지급 플로우 정식화)
+### P1. 관리자(Admin) 🧰 (운영 고도화)
+
+- (고도화) 이벤트/쿠폰 관리 확장(타겟팅 규칙/발급 이력/사용 통계)
+- (보강) **유저 포인트(POINTS) 표시/동기화 불일치 해결**
+   - users 저장소(`reve_users_v1`)의 `points`와 실제 적립/차감 흐름이 UI에 안정적으로 반영되는지 점검
+   - Admin Users 탭에서 points가 0/누락으로 보이는 케이스 재현 후 원인 추적(정규화/마이그레이션/ownerKey 불일치 등)
+- (추가) 회원 탈퇴(remove) UI 액션 연결(테이블 버튼 + confirm + toast + repaint)
 
 ### P2. 주문/배송 고도화 🚚 (현실감 강화)
 
-- `statusHistory`를 orderStore에 “정식 반영”(최초 1회 기록 규칙)
-- 취소 플로우(결제완료 상태에서 취소 가능) + 타임라인 반영
+- `statusHistory`를 **orderStore에 정식 반영**
+   - 단계별 최초 1회 기록 규칙을 생성/변경 API 레벨에서 강제
 - 주문 후 배송지 변경 불가 정책/안내 문구 정리
+- (선택) 운송장 번호/택배사 필드, 배송 조회 링크 템플릿
+
+### P3. 운영/안정성 🌿
+
+- localStorage 용량 한계 대응(이미지 업로더 어댑터: Firebase/S3 등으로 교체)
+- import/export 스키마 버전업 및 마이그레이션 가이드
+- 에러 리포팅(개발 모드 로그/프로덕션 최소 로그)
+
+---
+
+## 20) 진행률(체감)
+
+**현재 작업 완료도: 약 85%** ✅
+
+- ✅ 핵심 쇼핑몰 흐름(검색 → 상품 → 장바구니 → 쿠폰 → 결제(mock) → 주문 → 마이페이지) 완성
+- ✅ Admin 운영툴(상품/주문/쿠폰/감사/백업 + 타임라인 + 유저/배포)까지 MVP 범위 충족
+- ⏳ 남은 15%는 “현실감/정책의 정식화 + 운영 안정화” 쪽
+   - orderStore 레벨에서 statusHistory 규칙을 더 강하게 보장
+   - 유저 포인트 표시/동기화 불일치 해결
+   - 회원 탈퇴 UI 액션 연결 + 운영 디테일(배송/운송장/통계) 채우기

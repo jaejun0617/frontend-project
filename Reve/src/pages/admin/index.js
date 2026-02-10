@@ -11,6 +11,12 @@
  * - 상품 등록 모달: 섹션(그룹) 구조로 입력 폼 가독성 개선
  * - 판매가(price) + 할인율(discountRate) 입력 시 정가(basePrice) 자동 계산
  *
+ * ✅ P1-1 유저 탭 최종 설계 반영(정답 루트)
+ * - users 원본: adminUserStore.getUsers() (reve_users_v1)
+ * - 누적 구매(totalSpent): adminOrderStore.getAllOrders()에서 __ownerKey 기준 합산(정답)
+ * - 표시/검색/필터/정렬: deriveUsers()에서 처리
+ * - 등급(grade): totalSpent(정답 루트) 기반으로 재계산해서 표시/배포에도 반영
+ *
  * ⚠️ 주의
  * - LocalStorage에 base64 이미지를 저장하므로 용량 제한이 있음(브라우저마다 다름).
  *   기본 2MB 제한을 걸어둠. (Firebase 연결 시 업로드 방식으로 교체 추천)
@@ -38,6 +44,11 @@ import {
 import { auditLog } from '../../utils/auditLog.js';
 import { toStatusTimeline, statusKo } from '../../utils/orderTimeline.js';
 
+import { adminUserStore } from '../../store/adminUserStore.js';
+import { distributeCoupon } from '../../utils/couponDistribution.js';
+
+import { deriveUsers } from '../../utils/user/deriveUsers.js';
+
 /* ==============================
    1) Page Template
 ============================== */
@@ -62,6 +73,7 @@ export function AdminPage() {
            ${renderPanelAudit()}
            ${renderPanelBackup()}
            ${renderTimeline()}
+           ${renderPanelUsers()}
          </div>
        </div>
      </section>
@@ -76,6 +88,7 @@ const TABS = [
    { key: 'products', label: '상품 관리', enabled: true },
    { key: 'orders', label: '주문 관리', enabled: true },
    { key: 'coupons', label: '쿠폰/이벤트', enabled: true },
+   { key: 'users', label: '유저', enabled: true },
    { key: 'audit', label: '감사 로그', enabled: true },
    { key: 'backup', label: '백업/복구', enabled: true },
    { key: 'timeline', label: '주문 타임라인', enabled: true },
@@ -222,6 +235,45 @@ function renderPanelCoupons() {
    `;
 }
 
+function renderPanelUsers() {
+   return `
+     <section class="admin-panel" role="tabpanel" data-admin-panel="users" aria-hidden="true">
+       <div class="admin-head">
+         <div>
+           <h2 class="admin-title">유저</h2>
+           <p class="admin-desc">유저 리스트/등급/포인트 조회 + 쿠폰 배포</p>
+         </div>
+       </div>
+
+       <div class="admin-toolbar" aria-label="Users Toolbar">
+         <input class="admin-input" type="text" placeholder="검색: id/username/role/grade" data-admin-user-q />
+         <select class="admin-select" data-admin-user-grade>
+           <option value="ALL">등급(전체)</option>
+           <option value="SILVER">SILVER</option>
+           <option value="GOLD">GOLD</option>
+           <option value="ROYAL">ROYAL</option>
+           <option value="VIP">VIP</option>
+           <option value="VVIP">VVIP</option>
+         </select>
+
+         <select class="admin-select" data-admin-user-sort>
+           <option value="createdAt:desc">가입일 최신순</option>
+           <option value="totalSpent:desc">누적구매 높은순</option>
+           <option value="points:desc">포인트 높은순</option>
+           <option value="username:asc">이름 A→Z</option>
+           <option value="id:asc">ID A→Z</option>
+         </select>
+
+         <button type="button" class="btn primary" data-admin-open-distribute>쿠폰 배포</button>
+       </div>
+
+       <div class="admin-card" data-admin-users-wrap>
+         <p class="loading">불러오는 중...</p>
+       </div>
+     </section>
+   `;
+}
+
 function renderPanelAudit() {
    return `
      <section class="admin-panel" role="tabpanel" data-admin-panel="audit" aria-hidden="true">
@@ -270,6 +322,7 @@ function renderPanelBackup() {
      </section>
    `;
 }
+
 function renderTimeline() {
    return `
      <section class="admin-panel" role="tabpanel" data-admin-panel="timeline" aria-hidden="true">
@@ -337,9 +390,9 @@ function buildTimelineRowsFromOrders(orders) {
       }));
    });
 
-   // 최신순
    return rows.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
 }
+
 /* ==============================
    3) Render helpers
 ============================== */
@@ -369,8 +422,34 @@ function statusLabel(s) {
 }
 
 /* ==============================
+   ✅ (중요) 유저 등급 규칙(정답 루트: totalSpent 기반)
+   - deriveUsers가 만든 totalSpent를 기준으로 grade를 재계산
+   - 표시/필터/배포 모두 동일 규칙을 쓰게 만듦
+============================== */
+
+function computeGradeEnumFromTotalSpent(totalSpent = 0) {
+   const v = Number(totalSpent || 0);
+   if (v < 3_000_000) return 'SILVER';
+   if (v < 6_000_000) return 'GOLD';
+   if (v < 12_000_000) return 'ROYAL';
+   if (v < 30_000_000) return 'VIP';
+   return 'VVIP';
+}
+
+function applySpentBasedGrade(rows) {
+   const list = Array.isArray(rows) ? rows : [];
+   return list.map((r) => {
+      const grade = computeGradeEnumFromTotalSpent(r?.totalSpent || 0);
+      return {
+         ...r,
+         grade,
+         gradeLabel: grade,
+      };
+   });
+}
+
+/* ==============================
    ✅ (중요) 주문 상세에서 statusHistory 표준 처리
-   - orderStore(객체) / 혹시 다른 형태여도 toStatusTimeline이 흡수
 ============================== */
 
 function buildAdminOrderDetailLines(order) {
@@ -1126,6 +1205,65 @@ function renderCouponsTable(coupons) {
 }
 
 /* ==============================
+   8.5) Users UI
+   - deriveUsers 결과(표시용 row)를 그대로 렌더
+============================== */
+
+function renderUsersTable(users) {
+   if (!users.length) {
+      return `
+       <div class="empty">
+         <p class="empty__title">유저가 없습니다.</p>
+         <p class="empty__desc">reve_users_v1 저장소를 확인하세요.</p>
+       </div>
+     `;
+   }
+
+   return `
+     <div class="admin-table-wrap">
+       <table class="admin-table" aria-label="Users Table">
+         <thead>
+           <tr>
+             <th>ID</th>
+             <th>USERNAME</th>
+             <th>ROLE</th>
+             <th>GRADE</th>
+             <th>POINTS</th>
+             <th>TOTAL SPENT</th>
+             <th>ACTION</th>
+           </tr>
+         </thead>
+         <tbody>
+           ${users
+              .map(
+                 (u) => `
+             <tr data-admin-user-row="${escapeHtml(u.id)}">
+               <td><code>${escapeHtml(u.id)}</code></td>
+               <td>${escapeHtml(u.username || '-')}</td>
+               <td><span class="pill">${escapeHtml(u.role)}</span></td>
+               <td><span class="pill">${escapeHtml(u.gradeLabel || u.grade)}</span></td>
+               <td>${formatKRW(u.points)}</td>
+               <td>${formatKRW(u.totalSpent)}</td>
+               <td>
+                 <button
+                   type="button"
+                   class="btn small danger"
+                   data-admin-user-delete="${escapeHtml(u.id)}"
+                   ${String(u.role || '').toUpperCase() === 'ADMIN' ? 'disabled' : ''}
+                 >
+                   탈퇴
+                 </button>
+               </td>
+             </tr>
+           `,
+              )
+              .join('')}
+         </tbody>
+       </table>
+     </div>
+   `;
+}
+/* ==============================
    9) Audit UI
 ============================== */
 
@@ -1183,6 +1321,7 @@ export function initAdminPage() {
       products: root.querySelector('[data-admin-panel="products"]'),
       orders: root.querySelector('[data-admin-panel="orders"]'),
       coupons: root.querySelector('[data-admin-panel="coupons"]'),
+      users: root.querySelector('[data-admin-panel="users"]'),
       audit: root.querySelector('[data-admin-panel="audit"]'),
       backup: root.querySelector('[data-admin-panel="backup"]'),
       timeline: root.querySelector('[data-admin-panel="timeline"]'),
@@ -1193,6 +1332,7 @@ export function initAdminPage() {
    const couponsWrap = root.querySelector('[data-admin-coupons-wrap]');
    const auditWrap = root.querySelector('[data-admin-audit-wrap]');
    const backupText = root.querySelector('[data-admin-backup-text]');
+   const timelineWrap = root.querySelector('[data-admin-timeline-wrap]');
 
    const productQ = root.querySelector('[data-admin-product-q]');
    const productMain = root.querySelector('[data-admin-product-main]');
@@ -1204,7 +1344,16 @@ export function initAdminPage() {
 
    const couponQ = root.querySelector('[data-admin-coupon-q]');
    const couponActive = root.querySelector('[data-admin-coupon-active]');
-   const timelineWrap = root.querySelector('[data-admin-timeline-wrap]');
+
+   const usersWrap = root.querySelector('[data-admin-users-wrap]');
+   const userQ = root.querySelector('[data-admin-user-q]');
+   const userGrade = root.querySelector('[data-admin-user-grade]');
+   const userSort = root.querySelector('[data-admin-user-sort]');
+
+   /* ==============================
+      10.1) Tab switching
+   ============================== */
+
    const setActiveTab = (key) => {
       const next = String(key || 'products').trim();
 
@@ -1225,11 +1374,21 @@ export function initAdminPage() {
       return next;
    };
 
+   /* ==============================
+      10.2) Local UI State
+      - 중복 key(users) 제거: 하나로 통합
+   ============================== */
+
    const state = {
       products: { q: '', main: '', sub: '', status: 'ALL' },
       orders: { q: '', status: 'ALL' },
       coupons: { q: '', active: 'ALL' },
+      users: { q: '', grade: 'ALL', sort: 'createdAt:desc' },
    };
+
+   /* ==============================
+      10.3) Products paint
+   ============================== */
 
    const sortProductsLatestFirst = (list) => {
       const arr = Array.isArray(list) ? [...list] : [];
@@ -1286,6 +1445,10 @@ export function initAdminPage() {
       productsWrap.innerHTML = renderProductsTable(filtered);
    };
 
+   /* ==============================
+      10.4) Orders paint
+   ============================== */
+
    const paintOrders = () => {
       if (!ordersWrap) return;
 
@@ -1313,6 +1476,10 @@ export function initAdminPage() {
 
       ordersWrap.innerHTML = renderOrdersTable(filtered);
    };
+
+   /* ==============================
+      10.5) Coupons paint
+   ============================== */
 
    const paintCoupons = () => {
       if (!couponsWrap) return;
@@ -1344,17 +1511,58 @@ export function initAdminPage() {
       couponsWrap.innerHTML = renderCouponsTable(filtered);
    };
 
+   /* ==============================
+      ✅ 10.6) Users paint (P1-1 정답 루트)
+      - users: adminUserStore.getUsers()
+      - orders: adminOrderStore.getAllOrders()
+      - deriveUsers()로 필터/정렬
+      - totalSpent 기반 grade 재계산(applySpentBasedGrade)
+   ============================== */
+
+   const paintUsers = () => {
+      if (!usersWrap) return;
+
+      const users = adminUserStore.getUsers();
+      const orders = adminOrderStore.getAllOrders();
+
+      const sortRaw = String(state.users.sort || 'createdAt:desc');
+      const [sortKey, sortDir] = sortRaw.split(':');
+
+      const derived = deriveUsers({
+         users,
+         orders,
+         q: state.users.q,
+         grade: state.users.grade,
+         sortKey: sortKey || 'createdAt',
+         sortDir: sortDir === 'asc' ? 'asc' : 'desc',
+      });
+
+      const rows = applySpentBasedGrade(derived);
+
+      usersWrap.innerHTML = renderUsersTable(rows);
+   };
+
+   /* ==============================
+      10.7) Audit / Timeline paint
+   ============================== */
+
    const paintAudit = () => {
       if (!auditWrap) return;
       const rows = auditLog.list();
       auditWrap.innerHTML = renderAuditList(rows);
    };
+
    const paintTimeline = () => {
       if (!timelineWrap) return;
       const orders = adminOrderStore.getAllOrders();
       const rows = buildTimelineRowsFromOrders(orders);
       timelineWrap.innerHTML = renderTimelineList(rows);
    };
+
+   /* ==============================
+      10.8) DOM -> State sync
+   ============================== */
+
    const syncFiltersFromDOM = () => {
       state.products.q = String(productQ?.value || '');
       state.products.main = String(productMain?.value || '');
@@ -1366,18 +1574,32 @@ export function initAdminPage() {
 
       state.coupons.q = String(couponQ?.value || '');
       state.coupons.active = String(couponActive?.value || 'ALL');
+
+      state.users.q = String(userQ?.value || '');
+      state.users.grade = String(userGrade?.value || 'ALL');
+      state.users.sort = String(userSort?.value || 'createdAt:desc');
    };
+
+   /* ==============================
+      10.9) Initial render + subscriptions
+   ============================== */
 
    fillCategorySelects(root);
 
    paintProducts();
    paintOrders();
    paintCoupons();
+   paintUsers();
    paintAudit();
    paintTimeline();
+
    adminProductStore.subscribe(() => paintProducts());
    adminCouponStore.subscribe(() => paintCoupons());
    auditLog.subscribe(() => paintAudit());
+
+   /* ==============================
+      10.10) Events: input/change
+   ============================== */
 
    root.addEventListener('input', (e) => {
       if (e.target.closest('[data-admin-product-q]')) {
@@ -1393,6 +1615,12 @@ export function initAdminPage() {
       if (e.target.closest('[data-admin-coupon-q]')) {
          syncFiltersFromDOM();
          paintCoupons();
+         return;
+      }
+      if (e.target.closest('[data-admin-user-q]')) {
+         syncFiltersFromDOM();
+         paintUsers();
+         return;
       }
    });
 
@@ -1421,8 +1649,25 @@ export function initAdminPage() {
       if (e.target.closest('[data-admin-coupon-active]')) {
          syncFiltersFromDOM();
          paintCoupons();
+         return;
+      }
+
+      if (e.target.closest('[data-admin-user-grade]')) {
+         syncFiltersFromDOM();
+         paintUsers();
+         return;
+      }
+
+      if (e.target.closest('[data-admin-user-sort]')) {
+         syncFiltersFromDOM();
+         paintUsers();
+         return;
       }
    });
+
+   /* ==============================
+      10.11) Events: click actions
+   ============================== */
 
    root.addEventListener('click', async (e) => {
       const tabBtn = e.target.closest('[data-admin-tab]');
@@ -1431,6 +1676,10 @@ export function initAdminPage() {
          setActiveTab(key);
          return;
       }
+
+      /* ==============================
+         Products: filter reset
+      ============================== */
 
       if (e.target.closest('[data-admin-product-reset]')) {
          if (productQ) productQ.value = '';
@@ -1444,6 +1693,10 @@ export function initAdminPage() {
          toast.show('필터를 초기화했습니다.', { duration: 1200 });
          return;
       }
+
+      /* ==============================
+         Products: seed
+      ============================== */
 
       if (e.target.closest('[data-admin-seed-products]')) {
          const ok = await confirmModal({
@@ -1463,14 +1716,21 @@ export function initAdminPage() {
          }
          return;
       }
+
+      /* ==============================
+         Timeline: refresh
+      ============================== */
+
       if (e.target.closest('[data-admin-refresh-timeline]')) {
          paintTimeline();
          toast.show('타임라인을 갱신했습니다.', { duration: 1200 });
          return;
       }
-      /* ---------
-         Add Product
-      --------- */
+
+      /* ==============================
+         Products: Add
+      ============================== */
+
       if (e.target.closest('[data-admin-add-product]')) {
          const { mainOptions, subAllOptions } = getAdminCategoryOptions();
 
@@ -1624,9 +1884,10 @@ export function initAdminPage() {
          return;
       }
 
-      /* ---------
-         Edit Product
-      --------- */
+      /* ==============================
+         Products: Edit
+      ============================== */
+
       const editBtn = e.target.closest('[data-admin-product-edit]');
       if (editBtn) {
          const id = String(
@@ -1766,9 +2027,10 @@ export function initAdminPage() {
          return;
       }
 
-      /* ---------
-         Toggle Product
-      --------- */
+      /* ==============================
+         Products: Toggle
+      ============================== */
+
       const toggleBtn = e.target.closest('[data-admin-product-toggle]');
       if (toggleBtn) {
          const id = String(
@@ -1795,9 +2057,10 @@ export function initAdminPage() {
          return;
       }
 
-      /* ---------
-         Delete Product
-      --------- */
+      /* ==============================
+         Products: Delete
+      ============================== */
+
       const delBtn = e.target.closest('[data-admin-product-delete]');
       if (delBtn) {
          const id = String(
@@ -1835,7 +2098,6 @@ export function initAdminPage() {
          return;
       }
 
-      // ✅ 여기: 네가 원했던 “주문 상세 모달” 교체 버전
       const detailOrder = e.target.closest('[data-admin-order-detail]');
       if (detailOrder) {
          const orderId = String(
@@ -1902,6 +2164,8 @@ export function initAdminPage() {
 
          toast.show('주문 상태가 변경되었습니다.', { duration: 1200 });
          paintOrders();
+         paintTimeline();
+         paintUsers();
          return;
       }
 
@@ -1945,6 +2209,8 @@ export function initAdminPage() {
 
          toast.show('주문이 취소되었습니다.', { duration: 1200 });
          paintOrders();
+         paintTimeline();
+         paintUsers();
          return;
       }
 
@@ -2155,6 +2421,246 @@ export function initAdminPage() {
       }
 
       /* ==============================
+         ✅ Users: 쿠폰 배포
+         - GRADE 배포 시 "정답 루트(totalSpent 기반 grade)"로 대상 선정
+         - distributeCoupon 유틸을 그대로 쓰되,
+           등급 배포는 USER 모드로 변환해서 userIds로 전달
+      ============================== */
+
+      if (e.target.closest('[data-admin-open-distribute]')) {
+         const coupons = adminCouponStore.getCoupons().filter((c) => c.active);
+         if (!coupons.length) {
+            toast.show('활성 쿠폰이 없습니다. 먼저 쿠폰을 등록/활성화하세요.', {
+               duration: 1600,
+            });
+            return;
+         }
+
+         const users = adminUserStore.getUsers();
+         if (!users.length) {
+            toast.show('유저가 없습니다. reve_users_v1를 확인하세요.', {
+               duration: 1600,
+            });
+            return;
+         }
+
+         const fields = [
+            {
+               key: 'mode',
+               label: '배포 방식',
+               type: 'select',
+               options: [
+                  { value: 'ALL', label: '전체 지급' },
+                  { value: 'GRADE', label: '특정 등급 지급' },
+                  { value: 'USER', label: '특정 유저 지급' },
+               ],
+            },
+            {
+               key: 'couponCode',
+               label: '쿠폰 선택',
+               type: 'select',
+               options: [
+                  { value: '', label: '선택' },
+                  ...coupons.map((c) => ({
+                     value: c.code,
+                     label: `${c.code} (${c.title})`,
+                  })),
+               ],
+            },
+            {
+               key: 'grade',
+               label: '등급(선택)',
+               type: 'select',
+               options: [
+                  { value: 'SILVER', label: 'SILVER' },
+                  { value: 'GOLD', label: 'GOLD' },
+                  { value: 'ROYAL', label: 'ROYAL' },
+                  { value: 'VIP', label: 'VIP' },
+                  { value: 'VVIP', label: 'VVIP' },
+               ],
+               hint: '배포 방식이 "특정 등급"일 때만 사용',
+            },
+            {
+               key: 'userIds',
+               label: '유저ID 목록(쉼표)',
+               placeholder: 'user1,user2',
+               hint: '배포 방식이 "특정 유저"일 때만 사용',
+            },
+         ];
+
+         const form = await openFormModal({
+            title: '쿠폰 배포',
+            fields,
+            initial: { mode: 'ALL' },
+            submitText: '배포',
+         });
+         if (!form) return;
+
+         const mode = String(form.mode || 'ALL').toUpperCase();
+         const couponCode = String(form.couponCode || '')
+            .trim()
+            .toUpperCase();
+         if (!couponCode) {
+            toast.show('쿠폰을 선택하세요.', { duration: 1400 });
+            return;
+         }
+
+         const coupon = adminCouponStore.getCoupon(couponCode);
+         if (!coupon) {
+            toast.show('선택한 쿠폰을 찾을 수 없습니다.', { duration: 1400 });
+            return;
+         }
+
+         const grade = String(form.grade || '').toUpperCase();
+         const userIds = String(form.userIds || '')
+            .split(',')
+            .map((x) => x.trim())
+            .filter(Boolean);
+
+         let targetMode = mode;
+         let targetUserIds = userIds;
+
+         if (mode === 'GRADE') {
+            const orders = adminOrderStore.getAllOrders();
+            const derived = deriveUsers({
+               users,
+               orders,
+               q: '',
+               grade: 'ALL',
+               sortKey: 'createdAt',
+               sortDir: 'desc',
+            });
+            const rows = applySpentBasedGrade(derived);
+
+            const selected = String(grade || '').toUpperCase();
+            const ids = rows
+               .filter((r) => r.grade === selected)
+               .map((r) => r.id);
+
+            targetMode = 'USER';
+            targetUserIds = ids;
+
+            if (!ids.length) {
+               toast.show('해당 등급 유저가 없습니다.', { duration: 1500 });
+               return;
+            }
+         }
+
+         if (mode === 'USER' && !targetUserIds.length) {
+            toast.show('유저ID를 입력하세요.', { duration: 1400 });
+            return;
+         }
+
+         const msg =
+            mode === 'ALL'
+               ? `쿠폰(${couponCode})을 전체 유저에게 지급할까요?`
+               : mode === 'GRADE'
+                 ? `쿠폰(${couponCode})을 ${grade} 등급 유저(${targetUserIds.length}명)에게 지급할까요?`
+                 : `쿠폰(${couponCode})을 특정 유저(${targetUserIds.length}명)에게 지급할까요?`;
+
+         const ok = await confirmModal({
+            title: '쿠폰 배포',
+            message: msg,
+            confirmText: '배포',
+            cancelText: '취소',
+         });
+         if (!ok) return;
+
+         const r = distributeCoupon({
+            users,
+            couponDraft: coupon,
+            mode: targetMode,
+            grade: null,
+            userIds: targetUserIds,
+         });
+
+         if (!r?.ok) {
+            toast.show(r?.message || '배포 실패', { duration: 1600 });
+            return;
+         }
+
+         auditLog.add('COUPON_DISTRIBUTE', `쿠폰 배포: ${couponCode}`, {
+            mode,
+            resolvedMode: targetMode,
+            grade: mode === 'GRADE' ? grade : null,
+            userCount: r.targetCount,
+            granted: r.granted,
+            skipped: r.skipped,
+         });
+
+         toast.show(`배포 완료 ✅ 지급 ${r.granted} / 중복 ${r.skipped}`, {
+            duration: 1600,
+         });
+         return;
+      }
+      // ==============================
+      // Users: 회원 탈퇴(삭제)
+      // ==============================
+      const delUserBtn = e.target.closest('[data-admin-user-delete]');
+      if (delUserBtn) {
+         const userId = String(
+            delUserBtn.getAttribute('data-admin-user-delete') || '',
+         ).trim();
+         if (!userId) return;
+
+         const u =
+            adminUserStore.getUser?.(userId) ||
+            adminUserStore.getUsers().find((x) => x.id === userId);
+         if (!u) {
+            toast.show('유저를 찾을 수 없습니다.', { duration: 1400 });
+            return;
+         }
+
+         if (String(u.role || '').toUpperCase() === 'ADMIN') {
+            toast.show('ADMIN 계정은 탈퇴시킬 수 없습니다.', {
+               duration: 1400,
+            });
+            return;
+         }
+
+         const ok = await confirmModal({
+            title: '회원 탈퇴',
+            message: `유저(${userId})를 탈퇴(삭제)할까요?\n삭제 후 복구할 수 없습니다.`,
+            confirmText: '탈퇴',
+            cancelText: '취소',
+         });
+         if (!ok) return;
+
+         // ✅ store API 이름이 프로젝트마다 달라서 3단 방어
+         let r = null;
+
+         if (typeof adminUserStore.remove === 'function')
+            r = await adminUserStore.remove(userId);
+         else if (typeof adminUserStore.delete === 'function')
+            r = await adminUserStore.delete(userId);
+         else if (typeof adminUserStore.removeUser === 'function')
+            r = await adminUserStore.removeUser(userId);
+         else {
+            // 최후: 직접 삭제(스토어에 없을 때만) -> 이건 비추천이라 경고만
+            toast.show(
+               'adminUserStore에 remove/delete API가 없습니다. 스토어에 삭제 메서드를 추가하세요.',
+               { duration: 1800 },
+            );
+            return;
+         }
+
+         if (r && r.ok === false) {
+            toast.show(r.message || '탈퇴 처리 실패', { duration: 1600 });
+            return;
+         }
+
+         auditLog.add('USER_DELETE', `회원 탈퇴: ${userId}`, {
+            userId,
+            username: u.username,
+         });
+
+         toast.show('회원 탈퇴 처리 완료', { duration: 1200 });
+
+         // ✅ 화면 갱신
+         paintUsers();
+         return;
+      }
+      /* ==============================
          5) Audit actions
       ============================== */
 
@@ -2237,7 +2743,9 @@ export function initAdminPage() {
          paintProducts();
          paintCoupons();
          paintOrders();
+         paintUsers();
          paintAudit();
+         paintTimeline();
       }
    });
 }
