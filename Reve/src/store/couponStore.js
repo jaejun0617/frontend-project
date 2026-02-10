@@ -3,14 +3,17 @@
  * 📍 위치: src/store/couponStore.js
  * 역할: 쿠폰 전역 상태 + localStorage 영속화 (유저별 분리)
  *
- * ✅ 핵심
- * - storage key: reve_coupons_v1:<ownerKey>
- * - ownerKey: userId 또는 'guest'
- * - auth 변경 시 couponStore.setOwner(userId) 호출하면 자동 스위칭
+ * ✅ 이번 패치: 운영(Admin) 쿠폰 카탈로그 연결
+ * - AdminCouponStore(localStorage: reve_admin_coupons_v1)의 쿠폰을
+ *   일반 유저 register(code)에서 조회 가능하게 "공용 카탈로그"로 합침
+ * - 기존 하드코딩 COUPON_CATALOG는 그대로 유지(서버 대체/기본 쿠폰)
  *
- * ✅ 마이그레이션
- * - 레거시 글로벌 키(eclat_coupons_v2/v1)가 있으면
- *   현재 ownerKey로 1회 옮기고 레거시 키 삭제
+ * ✅ 유효성(최소 구현)
+ * - active=false 쿠폰은 등록 불가
+ * - startsAt/endsAt(선택)이 있으면 기간 밖 등록 불가
+ * - minOrderTotal/maxUses는 "등록 단계"에서만 최소한의 정보로 보관
+ *   (결제 조건 적용은 추후 고도화에서 pricing/apply 단계로 확장 가능)
+ *
  * =============================================
  */
 
@@ -21,10 +24,11 @@ const LEGACY_KEY_V1 = 'eclat_coupons_v1';
 let ownerKey = 'guest';
 
 /**
- * ✅ 쿠폰 카탈로그(서버 대체)
+ * ✅ 기본 쿠폰 카탈로그(서버 대체)
  * - 운영 정책은 여기만 바꾸면 됨
+ * - admin 쿠폰과 "병합"되어 최종 조회됨
  */
-const COUPON_CATALOG = {
+const BASE_COUPON_CATALOG = {
    HELLOWORLD: {
       code: 'HELLOWORLD',
       title: '첫 구매 환영 10%',
@@ -32,7 +36,6 @@ const COUPON_CATALOG = {
       description: '기본 세일 + 추가 10% 쿠폰 할인',
    },
 
-   // ✅ 승급 축하 쿠폰
    UPGRADE_GOLD: {
       code: 'UPGRADE_GOLD',
       title: '골드 승급 축하 7%',
@@ -109,6 +112,133 @@ function clampRate(n) {
    return Math.max(0, Math.min(1, r));
 }
 
+function nowMs() {
+   return Date.now();
+}
+
+function toMsMaybe(v) {
+   const s = String(v ?? '').trim();
+   if (!s) return 0;
+   const n = Number(s);
+   if (!Number.isFinite(n)) return 0;
+   return Math.max(0, Math.floor(n));
+}
+
+function toIntMaybe(v) {
+   const s = String(v ?? '').trim();
+   if (!s) return 0;
+   const n = Number(s);
+   if (!Number.isFinite(n)) return 0;
+   return Math.max(0, Math.floor(n));
+}
+
+/* ==============================
+   0.5) Admin Catalog Bridge (NEW)
+   - adminCouponStore(localStorage)의 items를 읽어
+     "공용 카탈로그" 형태로 변환한다.
+   ============================== */
+
+const ADMIN_COUPON_STORAGE_KEY = 'reve_admin_coupons_v1';
+
+function normalizeAdminCoupon(raw) {
+   if (!raw || typeof raw !== 'object') return null;
+
+   const code = normalizeCode(raw.code);
+   const title = String(raw.title ?? '').trim();
+   if (!code || !title) return null;
+
+   return {
+      code,
+      title,
+      rate: clampRate(raw.rate),
+
+      active: raw.active === false ? false : true,
+
+      startsAt: toMsMaybe(raw.startsAt),
+      endsAt: toMsMaybe(raw.endsAt),
+
+      minOrderTotal: toIntMaybe(raw.minOrderTotal),
+      maxUses: toIntMaybe(raw.maxUses),
+
+      description: String(raw.description ?? '').trim(),
+      updatedAt: Number(raw.updatedAt || 0) || 0,
+      createdAt: Number(raw.createdAt || 0) || 0,
+   };
+}
+
+function isAdminCouponInPeriod(c, t = nowMs()) {
+   const start = Number(c?.startsAt || 0) || 0;
+   const end = Number(c?.endsAt || 0) || 0;
+
+   if (start && t < start) return false;
+   if (end && t > end) return false;
+   return true;
+}
+
+/**
+ * ✅ 운영 쿠폰을 "공용 카탈로그"로 변환
+ * - code 중복 시 updatedAt 최신 우선
+ * - active=false 제외
+ * - 기간(start/end) 벗어나면 제외
+ */
+function readAdminCatalogAsMap() {
+   if (!hasStorage()) return new Map();
+
+   const parsed = safeParse(readRaw(ADMIN_COUPON_STORAGE_KEY) || '');
+   const items = Array.isArray(parsed?.items) ? parsed.items : [];
+
+   const normalized = items.map(normalizeAdminCoupon).filter(Boolean);
+
+   const map = new Map();
+   normalized.forEach((c) => {
+      if (!c.active) return;
+      if (!isAdminCouponInPeriod(c)) return;
+
+      const prev = map.get(c.code);
+      if (!prev) map.set(c.code, c);
+      else {
+         const pt = Number(prev.updatedAt || 0) || 0;
+         const ct = Number(c.updatedAt || 0) || 0;
+         map.set(c.code, ct >= pt ? c : prev);
+      }
+   });
+
+   return map;
+}
+
+/**
+ * ✅ 최종 카탈로그 조회
+ * - admin 쿠폰이 BASE 쿠폰을 "덮어씀" (운영이 우선권)
+ */
+function getMergedCatalogItem(codeInput) {
+   const code = normalizeCode(codeInput);
+
+   const adminMap = readAdminCatalogAsMap();
+   const admin = adminMap.get(code) || null;
+   if (admin) return admin;
+
+   return BASE_COUPON_CATALOG[code] || null;
+}
+
+/**
+ * 전체 카탈로그를 조회하고 싶은 화면이 있으면 이 함수로
+ * (필요 시 admin + base를 합쳐 반환)
+ */
+function getMergedCatalogAll() {
+   const adminMap = readAdminCatalogAsMap();
+   const out = { ...BASE_COUPON_CATALOG };
+
+   adminMap.forEach((v, k) => {
+      out[k] = v;
+   });
+
+   return out;
+}
+
+/* ==============================
+   Types
+   ============================== */
+
 /**
  * @typedef {Object} OwnedCoupon
  * @property {string} code
@@ -117,6 +247,11 @@ function clampRate(n) {
  * @property {boolean} used
  * @property {number} createdAt
  * @property {number} usedAt
+ * @property {number} minOrderTotal
+ * @property {number} maxUses
+ * @property {number} startsAt
+ * @property {number} endsAt
+ * @property {string} description
  */
 
 /**
@@ -144,6 +279,13 @@ function normalizeOwnedList(list) {
             used: Boolean(c?.used),
             createdAt: Number(c?.createdAt || Date.now()),
             usedAt: Number(c?.usedAt || 0),
+
+            // ✅ 운영 필드(선택): 기존 데이터가 없어도 안전
+            minOrderTotal: toIntMaybe(c?.minOrderTotal),
+            maxUses: toIntMaybe(c?.maxUses),
+            startsAt: toMsMaybe(c?.startsAt),
+            endsAt: toMsMaybe(c?.endsAt),
+            description: String(c?.description ?? '').trim(),
          };
       })
       .filter(Boolean);
@@ -190,8 +332,6 @@ function writeStateByOwner(okey, nextState) {
 
 /**
  * ✅ 레거시 글로벌 키 -> 현재 ownerKey로 1회 마이그레이션
- * - 유저별 분리 전 프로젝트에서 이미 저장된 쿠폰이 있다면 살려서 옮김
- * - 옮긴 후 레거시 키 삭제(중복 노출/재오염 방지)
  */
 function migrateLegacyIntoOwner(okey) {
    if (!hasStorage()) return false;
@@ -204,7 +344,6 @@ function migrateLegacyIntoOwner(okey) {
 
    const normalizedLegacy = normalizeState(legacy);
 
-   // ✅ 현재 owner 저장이 비어있을 때만 옮기는 게 안전
    const current = readStateByOwner(okey);
    const hasAny =
       (current.owned?.length || 0) > 0 || Boolean(current.appliedCode);
@@ -213,7 +352,6 @@ function migrateLegacyIntoOwner(okey) {
       writeStateByOwner(okey, normalizedLegacy);
    }
 
-   // ✅ 레거시 삭제: 이제부터는 유저별 key만 신뢰
    removeRaw(LEGACY_KEY_V2);
    removeRaw(LEGACY_KEY_V1);
 
@@ -225,11 +363,8 @@ function migrateLegacyIntoOwner(okey) {
    ============================== */
 
 let state = (() => {
-   // ✅ 최초는 guest로 읽기
    const s = readStateByOwner(ownerKey);
 
-   // ✅ 레거시가 있으면 guest로 한번 옮겨줌(초기 진입 보호)
-   // (로그인 되면 setOwner에서 다시 해당 유저로 읽음)
    const hasAny = (s.owned?.length || 0) > 0 || Boolean(s.appliedCode);
    if (!hasAny) migrateLegacyIntoOwner(ownerKey);
 
@@ -245,11 +380,6 @@ function notify() {
    listeners.forEach((fn) => fn(state));
 }
 
-function getCatalog(code) {
-   const c = normalizeCode(code);
-   return COUPON_CATALOG[c] || null;
-}
-
 function findOwned(code) {
    const c = normalizeCode(code);
    return state.owned.find((x) => x.code === c) || null;
@@ -263,23 +393,21 @@ function fail(message) {
    return { ok: false, message };
 }
 
+/* ==============================
+   4) Public API
+   ============================== */
+
 export const couponStore = {
    /* ------------------------------
-      owner switching (핵심)
+      owner switching
    ------------------------------ */
 
-   /**
-    * ✅ 로그인/로그아웃 시 호출
-    * - userId 없으면 guest로 스위칭
-    * - 스위칭 시 해당 owner의 state를 다시 로드 + notify
-    */
    setOwner(userId) {
       const nextOwner = normalizeOwnerKey(userId || 'guest');
       if (nextOwner === ownerKey) return;
 
       ownerKey = nextOwner;
 
-      // ✅ 레거시가 남아 있으면 "현재 로그인 유저"쪽으로도 1회 이동 시도
       migrateLegacyIntoOwner(ownerKey);
 
       state = readStateByOwner(ownerKey);
@@ -304,8 +432,12 @@ export const couponStore = {
       return state;
    },
 
+   /**
+    * ✅ (변경) 최종 병합된 카탈로그 반환
+    * - admin + base 합친 결과
+    */
    getCatalog() {
-      return COUPON_CATALOG;
+      return getMergedCatalogAll();
    },
 
    getOwned({ includeUsed = true } = {}) {
@@ -315,6 +447,7 @@ export const couponStore = {
 
    /**
     * ✅ 적용된 쿠폰 객체 반환 (없으면 null)
+    * - 운영 필드도 함께 내려준다(결제 조건/표시 고도화용)
     */
    getAppliedCoupon() {
       const code = normalizeCode(state.appliedCode);
@@ -327,6 +460,11 @@ export const couponStore = {
          code: owned.code,
          title: owned.title,
          rate: owned.rate,
+         minOrderTotal: owned.minOrderTotal,
+         maxUses: owned.maxUses,
+         startsAt: owned.startsAt,
+         endsAt: owned.endsAt,
+         description: owned.description,
       };
    },
 
@@ -334,22 +472,36 @@ export const couponStore = {
       commands
    ------------------------------ */
 
+   /**
+    * ✅ (변경) register()가 admin catalog도 조회한다.
+    */
    register(codeInput) {
       const code = normalizeCode(codeInput);
       if (!code) return fail('쿠폰 코드를 입력해 주세요.');
 
-      const catalog = getCatalog(code);
+      const catalog = getMergedCatalogItem(code);
       if (!catalog) return fail('유효하지 않은 쿠폰 코드입니다.');
 
+      // 운영 쿠폰 필드까지 반영: active/기간은 bridge에서 이미 거름
+      if (catalog?.active === false) return fail('비활성 쿠폰입니다.');
+
+      // 보유 중복 방지(최소 구현: 1회 보유)
       if (findOwned(code)) return fail('이미 보유 중인 쿠폰입니다.');
 
       const next = /** @type {OwnedCoupon} */ ({
-         code: catalog.code,
-         title: String(catalog.title || catalog.code),
+         code: String(catalog.code || code),
+         title: String(catalog.title || code),
          rate: clampRate(catalog.rate),
+
          used: false,
          createdAt: Date.now(),
          usedAt: 0,
+
+         minOrderTotal: toIntMaybe(catalog.minOrderTotal),
+         maxUses: toIntMaybe(catalog.maxUses),
+         startsAt: toMsMaybe(catalog.startsAt),
+         endsAt: toMsMaybe(catalog.endsAt),
+         description: String(catalog.description ?? '').trim(),
       });
 
       state = { ...state, owned: [next, ...state.owned] };
@@ -407,19 +559,12 @@ export const couponStore = {
       notify();
    },
 
-   /**
-    * ✅ 현재 ownerKey 범위에서만 초기화
-    */
    clearAll() {
       state = { owned: [], appliedCode: '' };
       removeRaw(getStorageKey(ownerKey));
       notify();
    },
 
-   /**
-    * ✅ 레거시 키 완전 제거(정리용)
-    * - 보통은 안 써도 됨(마이그레이션에서 자동 제거함)
-    */
    purgeLegacyKeys() {
       removeRaw(LEGACY_KEY_V2);
       removeRaw(LEGACY_KEY_V1);
