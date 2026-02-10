@@ -675,6 +675,11 @@ function renderShippingSnapshot(order) {
     <div class="ship">
       <p class="ship__to"><strong>${escapeHtml(a.receiver)}</strong> ${label} · ${escapeHtml(a.phone)}</p>
       <p class="ship__addr muted">${line}</p>
+
+      <!-- ✅ 정책 안내 -->
+      <p class="ship__policy muted">
+        ※ 주문 생성 이후 배송지 변경은 불가합니다. (취소 후 재주문해 주세요.)
+      </p>
     </div>
   `;
 }

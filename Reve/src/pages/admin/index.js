@@ -929,11 +929,14 @@ function renderOrdersTable(orders) {
                          )}" ${s === 'DELIVERED' || s === 'CANCELED' ? 'disabled' : ''}>
                            다음 상태
                          </button>
-                         <button type="button" class="btn small danger" data-admin-order-cancel="${escapeHtml(
-                            o.orderId,
-                         )}" ${s === 'CANCELED' || s === 'DELIVERED' || s === 'SHIPPING' ? 'disabled' : ''}>
-                           취소
-                         </button>
+                           <button
+                                 type="button"
+                                 class="btn small danger"
+                                 data-admin-order-cancel="${escapeHtml(o.orderId)}"
+                                 ${s !== 'PAID' ? 'disabled' : ''}  // ✅ PAID에서만 취소 가능
+                                 >
+                                 취소
+                                 </button>
                        </div>
                      </td>
                    </tr>
@@ -1746,11 +1749,28 @@ export function initAdminPage() {
          const orderId = String(
             detailOrder.getAttribute('data-admin-order-detail') || '',
          ).trim();
+
          const order = adminOrderStore.getOrder(orderId);
          if (!order) {
             toast.show('주문을 찾을 수 없습니다.', { duration: 1400 });
             return;
          }
+
+         // ✅ statusHistory 유연 파싱 (스토어 구현이 달라도 최대한 버팀)
+         const historyRaw = Array.isArray(order.statusHistory)
+            ? order.statusHistory
+            : [];
+
+         const history = historyRaw
+            .map((h) => {
+               const status = String(h?.status || '').toUpperCase() || null;
+               const at =
+                  h?.at ?? h?.changedAt ?? h?.createdAt ?? h?.timestamp ?? null;
+
+               return { status, at: Number(at || 0) || 0 };
+            })
+            .filter((x) => x.status) // status 없는 건 제외
+            .sort((a, b) => a.at - b.at); // 오래된 → 최신
 
          const lines = [
             `주문번호: ${order.orderId}`,
@@ -1760,12 +1780,26 @@ export function initAdminPage() {
             `배송비: ₩ ${formatKRW(order?.pricing?.shipping || 0)}`,
             `쿠폰: ${order?.coupon?.code || '없음'}`,
             `생성일: ${fmtDate(order.createdAt)}`,
-         ].join('\n');
+         ];
+
+         // ✅ NEW: 상태 변경 이력 표시
+         if (history.length) {
+            lines.push(''); // 한 줄 띄우기
+            lines.push('상태 이력:');
+            history.forEach((h, idx) => {
+               const label = statusLabel(h.status);
+               const dateText = h.at ? fmtDate(h.at) : '-';
+               lines.push(`${idx + 1}. ${label} (${dateText})`);
+            });
+         } else {
+            lines.push('');
+            lines.push('상태 이력: 없음');
+         }
 
          await confirmModal({
             title: '주문 상세',
-            message: lines,
-            confirmText: '확인',
+            message: lines.join('\n'),
+            okText: '확인', // ✅ 너 confirmModal은 okText/cancelText 키를 씀
             cancelText: '닫기',
          });
          return;

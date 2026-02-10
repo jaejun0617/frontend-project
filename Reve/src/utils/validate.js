@@ -152,6 +152,8 @@ export function validateCouponDraft(draft, { allowCodeExisting = false } = {}) {
    return { ok: true };
 }
 
+// src/utils/validate.js
+
 export function validateOrderStatusTransition(from, to) {
    const f = String(from || '').toUpperCase();
    const t = String(to || '').toUpperCase();
@@ -161,19 +163,33 @@ export function validateOrderStatusTransition(from, to) {
       return { ok: false, message: '유효하지 않은 주문 상태입니다.' };
    }
 
+   // Terminal
    if (f === 'DELIVERED')
       return { ok: false, message: '배송완료 주문은 상태 변경이 제한됩니다.' };
    if (f === 'CANCELED')
       return { ok: false, message: '취소 주문은 상태 변경이 제한됩니다.' };
 
-   // ✅ 취소 정책 확정: PAID에서만 취소 가능
+   /**
+    * ✅ 정책 확정: 취소는 "결제완료(PAID)에서만" 가능
+    * - PAID -> SHIPPING / CANCELED
+    * - SHIPPING -> DELIVERED
+    */
    const nextMap = {
       PAID: new Set(['SHIPPING', 'CANCELED']),
-      SHIPPING: new Set(['DELIVERED']), // ← 여기서 CANCELED 제거
+      SHIPPING: new Set(['DELIVERED']),
    };
 
    const ok = nextMap[f]?.has(t) ?? false;
-   if (!ok) return { ok: false, message: `상태 전이 불가: ${f} → ${t}` };
+   if (!ok) {
+      // UX 메시지 좀 더 명확하게
+      if (t === 'CANCELED') {
+         return {
+            ok: false,
+            message: '취소는 결제완료(PAID) 상태에서만 가능합니다.',
+         };
+      }
+      return { ok: false, message: `상태 전이 불가: ${f} → ${t}` };
+   }
 
    return { ok: true };
 }
