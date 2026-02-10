@@ -191,6 +191,7 @@ function normalizeProduct(p) {
    const updatedAt = Number(p?.updatedAt || 0) || createdAt;
    const discountRateRaw = Number(p?.discountRate ?? 0);
    const discountRate = Number.isFinite(discountRateRaw) ? discountRateRaw : 0;
+   const safeDiscountRate = Math.max(0, Math.min(1, discountRate));
    return {
       ...p,
       id,
@@ -208,7 +209,7 @@ function normalizeProduct(p) {
            ? price
            : 0,
 
-      discountRate,
+      discountRate: safeDiscountRate,
       couponEligible: Boolean(p?.couponEligible ?? true),
       couponRateCap: Number(p?.couponRateCap ?? 0),
       couponTags: Array.isArray(p?.couponTags) ? p.couponTags : [],

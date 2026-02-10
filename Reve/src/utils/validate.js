@@ -63,24 +63,19 @@ export function validateProductDraft(draft, { allowIdExisting = false } = {}) {
          };
       }
    }
-   // ✅ discountRate (0~1)
-   const drRaw = normalizeText(draft?.discountRate);
-
-   // 비어있으면 0으로 허용
-   if (drRaw === '') {
-      // no-op
-   } else {
-      const dr = toNumber(drRaw);
-      if (!Number.isFinite(dr)) {
+   const discountRateRaw = normalizeText(draft?.discountRate);
+   if (discountRateRaw !== '') {
+      const r = toNumber(discountRateRaw);
+      if (!Number.isFinite(r)) {
          return {
             ok: false,
             message: '할인율(discountRate)은 숫자여야 합니다.',
          };
       }
-      if (dr < 0 || dr > 1) {
+      if (r < 0 || r > 1) {
          return {
             ok: false,
-            message: '할인율(discountRate)은 0~1 사이여야 합니다.',
+            message: '할인율(discountRate)은 0~1 범위여야 합니다.',
          };
       }
    }
