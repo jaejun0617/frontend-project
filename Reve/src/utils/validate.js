@@ -156,28 +156,24 @@ export function validateOrderStatusTransition(from, to) {
    const f = String(from || '').toUpperCase();
    const t = String(to || '').toUpperCase();
 
-   // Allowed statuses
    const allowed = new Set(['PAID', 'SHIPPING', 'DELIVERED', 'CANCELED']);
    if (!allowed.has(f) || !allowed.has(t)) {
       return { ok: false, message: '유효하지 않은 주문 상태입니다.' };
    }
 
-   // Terminal
    if (f === 'DELIVERED')
       return { ok: false, message: '배송완료 주문은 상태 변경이 제한됩니다.' };
    if (f === 'CANCELED')
       return { ok: false, message: '취소 주문은 상태 변경이 제한됩니다.' };
 
-   // Transitions
+   // ✅ 취소 정책 확정: PAID에서만 취소 가능
    const nextMap = {
       PAID: new Set(['SHIPPING', 'CANCELED']),
-      SHIPPING: new Set(['DELIVERED', 'CANCELED']),
+      SHIPPING: new Set(['DELIVERED']), // ← 여기서 CANCELED 제거
    };
 
    const ok = nextMap[f]?.has(t) ?? false;
-   if (!ok) {
-      return { ok: false, message: `상태 전이 불가: ${f} → ${t}` };
-   }
+   if (!ok) return { ok: false, message: `상태 전이 불가: ${f} → ${t}` };
 
    return { ok: true };
 }

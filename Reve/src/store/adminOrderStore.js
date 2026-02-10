@@ -178,6 +178,10 @@ export const adminOrderStore = {
       const history = ensureStatusHistory(current);
       const patched = { ...history };
 
+      const currentStatus = String(current.status || 'PAID').toUpperCase();
+      const v = validateOrderStatusTransition(currentStatus, next);
+      if (!v.ok) return fail(v.message);
+
       if (next === 'PAID' && !patched.PAID) patched.PAID = now;
       if (next === 'SHIPPING' && !patched.SHIPPING) patched.SHIPPING = now;
       if (next === 'DELIVERED' && !patched.DELIVERED) patched.DELIVERED = now;
@@ -192,8 +196,15 @@ export const adminOrderStore = {
 
       const nextOrders = [...orders];
       nextOrders[idx] = nextOrder;
-
       writeOrdersByOwner(owner, nextOrders);
+
+      // ✅ 같은 탭에서도 orderStore 구독 UI 갱신 트리거
+      window.dispatchEvent(
+         new CustomEvent('reve:orders-changed', {
+            detail: { ownerKey: owner, orderId: id, status: next },
+         }),
+      );
+
       return ok({ orderId: id, owner, status: next });
    },
 };

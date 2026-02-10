@@ -931,7 +931,7 @@ function renderOrdersTable(orders) {
                          </button>
                          <button type="button" class="btn small danger" data-admin-order-cancel="${escapeHtml(
                             o.orderId,
-                         )}" ${s === 'CANCELED' || s === 'DELIVERED' ? 'disabled' : ''}>
+                         )}" ${s === 'CANCELED' || s === 'DELIVERED' || s === 'SHIPPING' ? 'disabled' : ''}>
                            취소
                          </button>
                        </div>

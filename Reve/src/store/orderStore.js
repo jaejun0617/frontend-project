@@ -143,6 +143,22 @@ function notify() {
    listeners.forEach((fn) => fn(state));
 }
 
+function reloadFromStorage() {
+   state = readState();
+   notify(); // notify가 writeState도 하지만, 동일 값이면 큰 문제 없음
+}
+
+// ✅ 같은 탭 이벤트(관리자 페이지에서 쏨)
+window.addEventListener('reve:orders-changed', (e) => {
+   const owner = String(e?.detail?.ownerKey || '');
+   if (owner && owner === ownerKey) reloadFromStorage();
+});
+
+// ✅ 다른 탭 변경(브라우저 storage 이벤트)
+window.addEventListener('storage', (e) => {
+   if (e.key === storageKey()) reloadFromStorage();
+});
+
 /* ==============================
    5) Public API
 ============================== */
