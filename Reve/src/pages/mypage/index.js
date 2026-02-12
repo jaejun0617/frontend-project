@@ -534,13 +534,19 @@ function formatStatusLabel(status) {
 function buildOrderDetailLines(order) {
    if (!order) return '';
 
+   const pointsUsed = Math.max(
+      0,
+      Math.floor(Number(order?.pointsUsed ?? order?.pricing?.pointsUsed ?? 0)),
+   );
+
    const lines = [
       `주문번호: ${order.orderId}`,
       `상태: ${formatStatusLabel(order.status)}`,
       `결제: ₩ ${formatKRW(order?.pricing?.total || 0)}`,
+      pointsUsed > 0 ? `포인트 사용: -${formatKRW(pointsUsed)}P` : null,
       `배송비: ₩ ${formatKRW(order?.pricing?.shipping || 0)}`,
       `쿠폰: ${order?.coupon?.code ? order.coupon.code : '없음'}`,
-   ];
+   ].filter(Boolean);
 
    const rows = toStatusTimeline(order?.statusHistory);
    if (rows.length) {

@@ -8,7 +8,13 @@
  * - 쿠폰 적용 가능 상품(라인) 개수 표시
  * - 보유 쿠폰 라디오 선택 + 확인 모달 후 적용/해제 (즉시 적용 X)
  * - 기본 세일(product.price) + 쿠폰 할인(pricing.js) 누적 반영
- * - checkout 버튼 활성화: (아이템 >= 1) && (최종금액 > 0)
+ *
+ * ✅ 포인트 사용(NEW)
+ * - 결제 요약에 포인트 입력/전체사용/초기화
+ * - 적용 즉시 최종 결제금액 반영
+ * - 결제 완료 시:
+ *   - authStore points 차감 + 적립 포인트 추가
+ *   - 주문 payload에 pointsUsed 스냅샷 저장
  *
  * 옵션(사이즈) 기능
  * - Cart에서도 상품리스트와 동일한 "사이즈 pill" UI 제공
@@ -23,12 +29,8 @@
  *
  * 포인트 정책
  * - 상품금액만 적립(배송비 제외)
- *
- * 배송지 UX
- * - Cart 요약에 기본 배송지 노출
- * - 변경 클릭 시 /mypage?tab=address 이동
- * - 결제 시 기본 배송지 없으면 등록 유도 후 결제 중단
- * - 주문 payload에 배송지 스냅샷 포함(주문 당시 주소 보존)
+ * - 포인트 사용 한도: min(user.points, totalAfterCoupon)
+ * - 배송비/무료배송 판단: totalAfterCoupon 기준(포인트는 결제수단이므로)
  * =============================================
  */
 
@@ -101,6 +103,12 @@ function clamp(n, min, max) {
    return Math.max(min, Math.min(max, n));
 }
 
+function clampInt(n, min, max) {
+   const v = Math.floor(Number(n));
+   if (!Number.isFinite(v)) return min;
+   return Math.max(min, Math.min(max, v));
+}
+
 function calcShipping(subtotalAfterCoupon) {
    if (subtotalAfterCoupon <= 0) return 0;
    return subtotalAfterCoupon < FREE_SHIPPING_THRESHOLD ? SHIPPING_FEE : 0;
@@ -163,6 +171,23 @@ function calcCartPricing(detailedItems, coupon) {
 }
 
 /* ==============================
+   2-1) Points helpers (NEW)
+============================== */
+
+function getMaxUsablePoints({ userPoints, pointsBase }) {
+   const p = Math.max(0, Math.floor(Number(userPoints || 0)));
+   const base = Math.max(0, Math.floor(Number(pointsBase || 0)));
+   return Math.min(p, base);
+}
+
+function normalizePointsInput(raw) {
+   // ✅ 음수/소수/문자 방어: 정수만
+   const v = Math.floor(Number(String(raw || '').replace(/[^\d]/g, '')));
+   if (!Number.isFinite(v)) return 0;
+   return Math.max(0, v);
+}
+
+/* ==============================
    3) Address Helpers
 ============================== */
 
@@ -190,7 +215,6 @@ function buildShippingAddressSnapshot(address) {
 }
 
 function renderShippingAddressSummary(address) {
-   // ✅ 주소가 없으면 "등록"은 딥링크로 추가 모달까지 자동 오픈
    if (!address) {
       return `
         <div class="cart__address" aria-label="배송지">
@@ -216,7 +240,6 @@ function renderShippingAddressSummary(address) {
       address.address1,
    )}${address.address2 ? ` ${escapeHtml(address.address2)}` : ''}`;
 
-   // ✅ 주소가 있으면 "변경"은 그냥 address 탭으로
    return `
       <div class="cart__address" aria-label="배송지">
         <div class="cart__row">
@@ -248,7 +271,6 @@ async function ensureDefaultAddress() {
       cancelText: '취소',
    });
 
-   // ✅ 여기서도 open=add로 보내서 "추가 모달 자동 오픈"까지 연결
    if (go) {
       window.dispatchEvent(
          new CustomEvent('app:navigate', {
@@ -366,17 +388,85 @@ function renderSizePills({ product, currentSize, inCartSizeSet }) {
 }
 
 /* ==============================
+   4-1) Points Render (NEW)
+============================== */
+
+function renderPointsSection({ userPoints, usedPoints, maxUsable }) {
+   const safeUserPoints = Math.max(0, Math.floor(Number(userPoints || 0)));
+   const safeUsed = clampInt(usedPoints, 0, maxUsable);
+
+   const disabled = maxUsable <= 0 ? 'disabled' : '';
+   const hint =
+      maxUsable > 0
+         ? `사용 가능: ${formatPrice(maxUsable)}P (보유 ${formatPrice(
+              safeUserPoints,
+           )}P)`
+         : `보유 포인트: ${formatPrice(safeUserPoints)}P`;
+
+   return `
+     <div class="cart__points" aria-label="포인트 사용">
+       <div class="cart__row">
+         <span>포인트</span>
+         <strong>${escapeHtml(hint)}</strong>
+       </div>
+
+       <div class="cart__pointsRow">
+         <input
+           type="text"
+           inputmode="numeric"
+           class="cart__pointsInput"
+           placeholder="0"
+           value="${safeUsed ? escapeHtml(String(safeUsed)) : ''}"
+           data-points-input
+           ${disabled}
+           aria-label="사용 포인트 입력"
+         />
+
+         <button type="button" class="btn subtle" data-points-max ${disabled}>
+           전체사용
+         </button>
+
+         <button type="button" class="btn subtle" data-points-clear ${
+            safeUsed > 0 ? '' : 'disabled'
+         }>
+           초기화
+         </button>
+       </div>
+
+       <p class="cart__couponmsg">
+         포인트는 상품금액(쿠폰 적용 후)에만 사용됩니다. (배송비 제외)
+       </p>
+     </div>
+   `;
+}
+
+/* ==============================
    5) Main Render
 ============================== */
 
-function renderCart(detailedItems) {
+function renderCart(detailedItems, { usedPoints = 0 } = {}) {
    const appliedCoupon = couponStore.getAppliedCoupon();
    const { owned } = couponStore.getState();
 
    const pricingCore = calcCartPricing(detailedItems, appliedCoupon);
 
+   // ✅ 배송비/무료배송 판단은 "쿠폰 적용 후 상품금액" 기준
    const shipping = calcShipping(pricingCore.totalAfterCoupon);
-   const total = pricingCore.totalAfterCoupon + shipping;
+
+   // ✅ 포인트는 결제수단: 상품금액에서만 차감
+   const user = authStore.getUser?.();
+   const pointsBase = pricingCore.totalAfterCoupon;
+   const maxUsable = getMaxUsablePoints({
+      userPoints: user?.points ?? 0,
+      pointsBase,
+   });
+   const safeUsedPoints = clampInt(usedPoints, 0, maxUsable);
+
+   const totalAfterPoints = Math.max(
+      0,
+      pricingCore.totalAfterCoupon - safeUsedPoints,
+   );
+   const total = totalAfterPoints + shipping;
 
    const eligibleCount = countCouponEligibleLines(detailedItems);
 
@@ -389,16 +479,16 @@ function renderCart(detailedItems) {
              )} 남았습니다.`
            : '무료배송이 적용됩니다.';
 
-   const canCheckout = detailedItems.length > 0 && total > 0;
+   // ✅ 0원 결제 허용: 포인트로 전액 결제(+배송비 0) 가능
+   const canCheckout =
+      detailedItems.length > 0 &&
+      (total > 0 || (total === 0 && safeUsedPoints > 0));
 
    const rawItems = cartStore.getState()?.items ?? [];
 
-   const user = authStore.getUser?.();
-   const pointsBase = pricingCore.totalAfterCoupon;
-
    const { tierInfo, earnRate, expectedPoints } = getMembershipSnapshot({
       totalSpent: user?.totalSpent ?? 0,
-      checkoutTotal: pointsBase,
+      checkoutTotal: pointsBase, // ✅ 적립 기준은 "쿠폰 적용 후 상품금액" (포인트 사용과 무관)
    });
 
    const defaultAddress = getDefaultAddressSafe();
@@ -499,6 +589,12 @@ function renderCart(detailedItems) {
 
         ${renderCouponSection({ owned, appliedCoupon, eligibleCount })}
 
+        ${renderPointsSection({
+           userPoints: user?.points ?? 0,
+           usedPoints: safeUsedPoints,
+           maxUsable,
+        })}
+
         <div class="cart__row">
           <span>상품 합계(세일 반영)</span>
           <strong>₩ ${formatPrice(pricingCore.subtotalAfterSale)}</strong>
@@ -507,6 +603,11 @@ function renderCart(detailedItems) {
         <div class="cart__row">
           <span>쿠폰 할인</span>
           <strong>-₩ ${formatPrice(pricingCore.couponDiscountTotal)}</strong>
+        </div>
+
+        <div class="cart__row">
+          <span>포인트 사용</span>
+          <strong>- ${formatPrice(safeUsedPoints)}P</strong>
         </div>
 
         <div class="cart__row">
@@ -545,6 +646,7 @@ function buildCheckoutPayload({
    pricing,
    appliedCoupon,
    shippingAddress,
+   pointsUsed = 0,
 }) {
    const user = authStore.getUser?.();
 
@@ -552,6 +654,8 @@ function buildCheckoutPayload({
       orderId: `order_${Date.now()}`,
       userId: user?.id ?? null,
       shippingAddress: buildShippingAddressSnapshot(shippingAddress),
+
+      pointsUsed: Math.max(0, Math.floor(Number(pointsUsed || 0))), // ✅ 스냅샷
 
       items: detailedItems.map((row) => ({
          cartKey: row.key,
@@ -577,8 +681,16 @@ function buildCheckoutPayload({
          subtotalAfterSale: pricing.subtotalAfterSale,
          couponDiscountTotal: pricing.couponDiscountTotal,
          totalAfterCoupon: pricing.totalAfterCoupon,
+
+         // ✅ 포인트 반영 스냅샷
+         totalAfterPoints: pricing.totalAfterPoints,
+         pointsUsed: Math.max(0, Math.floor(Number(pointsUsed || 0))),
+
+         // ✅ 참고용: 포인트 반영 전 총액(멤버십/누적구매 기준으로 쓰기 좋음)
+         totalBeforePoints: pricing.totalBeforePoints,
+
          shipping: pricing.shipping,
-         total: pricing.total,
+         total: pricing.total, // ✅ 최종 결제(포인트 반영 + 배송비)
          currency: 'KRW',
       },
 
@@ -591,12 +703,30 @@ async function checkout(payload) {
    return { ok: true, data: { paidAt: Date.now(), orderId: payload.orderId } };
 }
 
-async function handleCheckout({ detailedItems, shippingAddress }) {
+async function handleCheckout({ detailedItems, shippingAddress, usedPoints }) {
    const appliedCoupon = couponStore.getAppliedCoupon();
 
    const pricingCore = calcCartPricing(detailedItems, appliedCoupon);
    const shipping = calcShipping(pricingCore.totalAfterCoupon);
-   const total = pricingCore.totalAfterCoupon + shipping;
+
+   const userBefore = authStore.getUser?.();
+   const maxUsable = getMaxUsablePoints({
+      userPoints: userBefore?.points ?? 0,
+      pointsBase: pricingCore.totalAfterCoupon,
+   });
+
+   const safeUsedPoints = clampInt(usedPoints, 0, maxUsable);
+
+   const totalAfterPoints = Math.max(
+      0,
+      pricingCore.totalAfterCoupon - safeUsedPoints,
+   );
+
+   // ✅ 최종 결제(포인트 반영 + 배송비)
+   const total = totalAfterPoints + shipping;
+
+   // ✅ 참고용: 포인트 반영 전 총액
+   const totalBeforePoints = pricingCore.totalAfterCoupon + shipping;
 
    const payload = buildCheckoutPayload({
       detailedItems: pricingCore.computedRows,
@@ -604,11 +734,14 @@ async function handleCheckout({ detailedItems, shippingAddress }) {
          subtotalAfterSale: pricingCore.subtotalAfterSale,
          couponDiscountTotal: pricingCore.couponDiscountTotal,
          totalAfterCoupon: pricingCore.totalAfterCoupon,
+         totalAfterPoints,
+         totalBeforePoints,
          shipping,
          total,
       },
       appliedCoupon,
       shippingAddress,
+      pointsUsed: safeUsedPoints,
    });
 
    const result = await checkout(payload);
@@ -618,21 +751,27 @@ async function handleCheckout({ detailedItems, shippingAddress }) {
       orderStore.createOrder({
          ...payload,
          status: 'PAID',
+         receipt: result.data, // ✅ paidAt 기록을 주문에도 남겨두면 화면 표시가 안정적
       });
    }
 
    if (appliedCoupon?.code) {
-      couponStore.markUsed?.(appliedCoupon.code);
+      couponStore.markUsed?.(appliedCoupon.code, {
+         orderId: payload.orderId,
+         total: payload.pricing.total,
+         pointsUsed: safeUsedPoints,
+      });
       couponStore.clearApplied?.();
    }
 
-   const userBefore = authStore.getUser?.();
    const prevSpent = Number(userBefore?.totalSpent ?? 0);
    const prevPoints = Number(userBefore?.points ?? 0);
 
-   const addedSpent = Number(payload.pricing.total || 0);
+   // ✅ 누적 구매액은 "포인트 반영 전 주문 가치"를 기준으로(등급/적립 UX 일관)
+   const addedSpent = Number(payload.pricing.totalBeforePoints || 0);
    const nextSpent = prevSpent + addedSpent;
 
+   // ✅ 적립 기준: 쿠폰 적용 후 상품금액(배송비 제외), 포인트 사용과 무관
    const pointsBase = Number(payload.pricing.totalAfterCoupon || 0);
 
    const snap = getMembershipSnapshot({
@@ -641,7 +780,22 @@ async function handleCheckout({ detailedItems, shippingAddress }) {
    });
 
    const earnedPoints = Number(snap.expectedPoints || 0);
-   const nextPoints = prevPoints + earnedPoints;
+
+   // ✅ 포인트 정산: 사용 차감 + 적립 추가
+   // (authStore에 usePoints/addPoints가 없을 수 있어서 updateUser로도 안전하게 동작)
+   let nextPoints = prevPoints;
+
+   if (safeUsedPoints > 0) {
+      const r = authStore.usePoints?.(safeUsedPoints);
+      if (r?.ok) nextPoints = authStore.getUser?.()?.points ?? nextPoints;
+      else nextPoints = Math.max(0, Math.floor(nextPoints - safeUsedPoints));
+   }
+
+   if (earnedPoints > 0) {
+      const r = authStore.addPoints?.(earnedPoints);
+      if (r?.ok) nextPoints = authStore.getUser?.()?.points ?? nextPoints;
+      else nextPoints = Math.max(0, Math.floor(nextPoints + earnedPoints));
+   }
 
    authStore.updateUser?.({
       totalSpent: nextSpent,
@@ -676,6 +830,7 @@ async function handleCheckout({ detailedItems, shippingAddress }) {
       receipt: result.data,
       earnedPoints,
       grantedUpgradeCoupons,
+      usedPoints: safeUsedPoints,
    };
 }
 
@@ -690,12 +845,34 @@ export async function initCartPage() {
    const toast = initToast();
    let paintSeq = 0;
 
+   // ✅ 페이지 로컬 상태: usedPoints
+   let usedPoints = 0;
+
+   const normalizeUsedPointsByCurrentState = async () => {
+      const detailed = await cartStore.getDetailedItems();
+      const appliedCoupon = couponStore.getAppliedCoupon();
+      const pricingCore = calcCartPricing(detailed, appliedCoupon);
+
+      const user = authStore.getUser?.();
+      const maxUsable = getMaxUsablePoints({
+         userPoints: user?.points ?? 0,
+         pointsBase: pricingCore.totalAfterCoupon,
+      });
+
+      usedPoints = clampInt(usedPoints, 0, maxUsable);
+   };
+
    const paint = async () => {
       const seq = ++paintSeq;
       const detailed = await cartStore.getDetailedItems();
       if (seq !== paintSeq) return;
 
-      cartEl.innerHTML = detailed.length ? renderCart(detailed) : renderEmpty();
+      // ✅ 포인트는 상황 변화(수량/쿠폰/로그인 등)에 따라 한도 재정규화
+      await normalizeUsedPointsByCurrentState();
+
+      cartEl.innerHTML = detailed.length
+         ? renderCart(detailed, { usedPoints })
+         : renderEmpty();
    };
 
    await paint();
@@ -703,17 +880,39 @@ export async function initCartPage() {
    cartStore.subscribe(() => paint());
    couponStore.subscribe(() => paint());
    addressStore.subscribe?.(() => paint());
+   authStore.subscribe?.(() => paint()); // ✅ 포인트/유저 변경 시 UI 반영
+
+   // ✅ 입력 이벤트: 포인트 입력은 click 위임보다 input이 안전
+   cartEl.addEventListener('input', async (e) => {
+      const input = e.target.closest('[data-points-input]');
+      if (!input) return;
+
+      const nextRaw = input.value;
+      const parsed = normalizePointsInput(nextRaw);
+
+      const detailed = await cartStore.getDetailedItems();
+      const appliedCoupon = couponStore.getAppliedCoupon();
+      const pricingCore = calcCartPricing(detailed, appliedCoupon);
+
+      const user = authStore.getUser?.();
+      const maxUsable = getMaxUsablePoints({
+         userPoints: user?.points ?? 0,
+         pointsBase: pricingCore.totalAfterCoupon,
+      });
+
+      usedPoints = clampInt(parsed, 0, maxUsable);
+      await paint();
+   });
 
    cartEl.addEventListener('click', async (e) => {
       if (e.target.closest('[data-cart-clear]')) {
          cartStore.clear();
+         usedPoints = 0; // ✅ 장바구니 비우면 포인트도 초기화
          return;
       }
 
       /* ==============================
          Address: deep link routing
-         - 등록 버튼: open=add 로 입력 모달까지 1회 오픈
-         - 변경 버튼: address 탭만 이동
          ============================== */
 
       if (e.target.closest('[data-address-open]')) {
@@ -732,6 +931,44 @@ export async function initCartPage() {
          );
          return;
       }
+
+      /* ==============================
+         Points buttons (NEW)
+         ============================== */
+
+      if (e.target.closest('[data-points-max]')) {
+         const detailed = await cartStore.getDetailedItems();
+         const appliedCoupon = couponStore.getAppliedCoupon();
+         const pricingCore = calcCartPricing(detailed, appliedCoupon);
+
+         const user = authStore.getUser?.();
+         const maxUsable = getMaxUsablePoints({
+            userPoints: user?.points ?? 0,
+            pointsBase: pricingCore.totalAfterCoupon,
+         });
+
+         if (maxUsable <= 0) {
+            toast.show('사용 가능한 포인트가 없습니다.', { duration: 1400 });
+            return;
+         }
+
+         usedPoints = maxUsable;
+         await paint();
+         toast.show('포인트를 전액 적용했습니다.', { duration: 1200 });
+         return;
+      }
+
+      if (e.target.closest('[data-points-clear]')) {
+         if (usedPoints <= 0) return;
+         usedPoints = 0;
+         await paint();
+         toast.show('포인트 적용이 해제되었습니다.', { duration: 1200 });
+         return;
+      }
+
+      /* ==============================
+         Coupon flow
+         ============================== */
 
       const couponInput = e.target.closest('[data-coupon-radio]');
       if (couponInput) {
@@ -798,6 +1035,10 @@ export async function initCartPage() {
          return;
       }
 
+      /* ==============================
+         Checkout
+         ============================== */
+
       if (e.target.closest('[data-checkout]')) {
          const detailed = await cartStore.getDetailedItems();
          if (!detailed.length) return;
@@ -816,6 +1057,7 @@ export async function initCartPage() {
          const result = await handleCheckout({
             detailedItems: detailed,
             shippingAddress: addressGuard.address,
+            usedPoints,
          });
 
          if (!result?.ok) {
@@ -825,9 +1067,13 @@ export async function initCartPage() {
             return;
          }
 
+         // ✅ 결제 성공 후 포인트 입력 상태 초기화
+         usedPoints = 0;
+
          const pricing = result?.payload?.pricing;
          const coupon = result?.payload?.coupon;
          const orderId = String(result?.payload?.orderId || '').trim();
+         const pointsUsed = Number(result?.payload?.pointsUsed || 0);
 
          const granted = Array.isArray(result?.grantedUpgradeCoupons)
             ? result.grantedUpgradeCoupons
@@ -844,6 +1090,7 @@ export async function initCartPage() {
 
          const summaryLines = [
             coupon?.code ? `사용 쿠폰: ${coupon.code}` : '사용 쿠폰: 없음',
+            pointsUsed > 0 ? `포인트 사용: -${formatPrice(pointsUsed)}P` : '',
             `배송비: ₩ ${formatPrice(pricing?.shipping ?? 0)}`,
             `최종 결제: ₩ ${formatPrice(pricing?.total ?? 0)}`,
             upgradeLines,
@@ -887,6 +1134,10 @@ export async function initCartPage() {
 
          return;
       }
+
+      /* ==============================
+         Size pills
+         ============================== */
 
       const sizeBtn = e.target.closest('[data-cart-size-pill]');
       if (sizeBtn) {
@@ -932,6 +1183,10 @@ export async function initCartPage() {
          toast.show('사이즈가 변경되었습니다.', { duration: 1400 });
          return;
       }
+
+      /* ==============================
+         Item controls
+         ============================== */
 
       const itemEl = e.target.closest('[data-cart-item]');
       const key = itemEl?.getAttribute('data-cart-key');

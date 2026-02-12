@@ -2,15 +2,10 @@
  * =============================================
  * 📍 위치: src/store/authStore.js
  * 역할: 로그인 상태 전역 저장소 (MVP)
- * - localStorage 영속화
- * - authUi/guards가 쓰는 헬퍼 메서드 제공
- * - ✅ updateUser(patch)로 결제/포인트/등급 연동 확장
  *
- * ✅ 패치 요약
- * - points 필드 normalize에 포함
- * - number 정규화 강화 (NaN/음수 방지)
- * - localStorage 안전 접근
- * - ✅ NEW: reve_users_v1(SSOT) 동기화 + 덮어쓰기 방지 + 로그인 복구
+ * ✅ NEW (포인트 사용 기능)
+ * - usePoints(amount): 포인트 차감(0 미만 방지)
+ * - addPoints(amount): 포인트 적립(정수/0 이상)
  * =============================================
  */
 
@@ -191,7 +186,6 @@ function notify() {
 
 /**
  * ✅ 부팅 시 1회: 이미 로그인된 상태면 users SSOT에도 반영
- * - (특히 이전에 users가 0으로 덮였던 경우) 복구 트리거가 됨
  */
 if (state.user) {
    syncUserToUsersStorage(state.user);
@@ -229,19 +223,16 @@ export const authStore = {
     * ✅ users SSOT에서 기존 레코드 있으면 points/totalSpent 복구해서 로그인
     */
    login(user) {
-      // 1) 먼저 payload normalize
       const normalizedPayload = normalizeUser(user);
       if (!normalizedPayload) {
          console.warn('[authStore] invalid user payload:', user);
          return { ok: false, message: 'invalid user payload' };
       }
 
-      // 2) SSOT(users)에서 기존 레코드 탐색 후 합치기 (points 유실 방지)
       const fromUsers = findUserInUsersStorage(normalizedPayload.id);
 
       const merged = normalizeUser({
          ...normalizedPayload,
-         // users 쪽 값이 더 신뢰(SSOT) + payload에 points가 없던 케이스 방지
          points:
             normalizedPayload.points > 0
                ? normalizedPayload.points
@@ -250,16 +241,12 @@ export const authStore = {
             normalizedPayload.totalSpent,
             normalizeMoney(fromUsers?.totalSpent ?? 0),
          ),
-         // name/role은 payload 우선(로그인 UX)
       });
 
       if (!merged) return { ok: false, message: 'normalize failed' };
 
       state = { isLoggedIn: true, user: merged };
-
-      // ✅ users에도 upsert (덮어쓰기 방지 로직 포함)
       syncUserToUsersStorage(merged);
-
       notify();
       return { ok: true };
    },
@@ -284,12 +271,40 @@ export const authStore = {
       if (!next) return { ok: false, message: 'normalize failed' };
 
       state = { ...state, user: next };
-
-      // ✅ users에도 upsert
       syncUserToUsersStorage(next);
-
       notify();
       return { ok: true };
+   },
+
+   /**
+    * ✅ NEW: 포인트 차감
+    */
+   usePoints(amount) {
+      if (!state.user) return { ok: false, message: 'not logged in' };
+
+      const a = normalizeMoney(amount);
+      if (a <= 0) return { ok: true, used: 0 };
+
+      const current = normalizeMoney(state.user.points ?? 0);
+      const used = Math.min(current, a);
+      const nextPoints = normalizeMoney(current - used);
+
+      return this.updateUser({ points: nextPoints, __pointsUsed: used });
+   },
+
+   /**
+    * ✅ NEW: 포인트 적립
+    */
+   addPoints(amount) {
+      if (!state.user) return { ok: false, message: 'not logged in' };
+
+      const a = normalizeMoney(amount);
+      if (a <= 0) return { ok: true, added: 0 };
+
+      const current = normalizeMoney(state.user.points ?? 0);
+      const nextPoints = normalizeMoney(current + a);
+
+      return this.updateUser({ points: nextPoints, __pointsAdded: a });
    },
 
    clearAll() {

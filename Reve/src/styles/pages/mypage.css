@@ -956,6 +956,30 @@
    padding-top: 4px;
    border-top: 1px dashed rgba(0, 0, 0, 0.12);
 }
+.cart__points {
+   margin-top: 12px;
+   padding-top: 12px;
+   border-top: 1px solid rgba(0, 0, 0, 0.06);
+
+   border: 1px solid red;
+}
+
+.cart__pointsRow {
+   display: flex;
+   gap: 8px;
+   align-items: center;
+}
+
+.cart__pointsInput {
+   flex: 1;
+   height: 40px;
+   padding: 0 12px;
+   border-radius: 10px;
+   border: 1px solid rgba(0, 0, 0, 0.12);
+}
+.btn.subtle {
+   font-size: 12px;
+}
 
 @media (max-width: 420px) {
    .cart__couponactions {

@@ -3,6 +3,9 @@
  * 📍 위치: src/pages/checkoutSuccess/index.js
  * 역할: 결제 완료 페이지 (주문 요약/등급/쿠폰 보상 안내)
  * 경로: /checkout/success?orderId=...
+ *
+ * ✅ NEW
+ * - 포인트 사용(pointsUsed) 및 포인트 반영 전/후 금액 표기
  * =============================================
  */
 
@@ -32,10 +35,6 @@ function getQueryParam(name) {
    return url.searchParams.get(name);
 }
 
-/**
- * timestamp 파싱 방어
- * - 숫자(ms) / ISO 문자열 / Date 모두 대응한다.
- */
 function parseTime(input) {
    if (!input) return null;
 
@@ -104,10 +103,6 @@ function renderSuccess({ order, user }) {
    const pricing = order?.pricing ?? {};
    const coupon = order?.coupon ?? null;
 
-   /**
-    * paidAt은 receipt가 없을 수 있으므로 createdAt 기반으로 표시한다.
-    * - 향후 저장 구조 변경에도 대응할 수 있도록 우선순위를 둔다.
-    */
    const paidAt =
       parseTime(order?.receipt?.paidAt) ??
       parseTime(order?.paidAt) ??
@@ -116,10 +111,6 @@ function renderSuccess({ order, user }) {
 
    const items = Array.isArray(order?.items) ? order.items : [];
 
-   /**
-    * 결제 이후 최신 유저 상태 기준으로 멤버십을 안내한다.
-    * - checkoutTotal은 0으로 둔다(결제 반영이 이미 끝난 상태라는 전제).
-    */
    const totalSpent = Number(user?.totalSpent ?? 0);
    const snap = getMembershipSnapshot({ totalSpent, checkoutTotal: 0 });
 
@@ -133,6 +124,15 @@ function renderSuccess({ order, user }) {
       : '최고 등급을 유지 중입니다.';
 
    const points = Number(user?.points ?? 0);
+
+   const pointsUsed =
+      Math.max(
+         0,
+         Math.floor(Number(order?.pointsUsed ?? pricing?.pointsUsed ?? 0)),
+      ) || 0;
+
+   const totalBeforePoints = Number(pricing?.totalBeforePoints ?? 0);
+   const total = Number(pricing?.total ?? 0);
 
    return `
     <header class="page__header">
@@ -167,14 +167,36 @@ function renderSuccess({ order, user }) {
             <strong class="v">${coupon?.code ? escapeHtml(coupon.code) : '없음'}</strong>
           </div>
 
+          ${
+             pointsUsed > 0
+                ? `
+                <div class="success-row">
+                  <span class="k">포인트 사용</span>
+                  <strong class="v">-${formatPrice(pointsUsed)}P</strong>
+                </div>
+              `
+                : ''
+          }
+
           <div class="success-row">
             <span class="k">배송비</span>
             <strong class="v">₩ ${formatPrice(pricing?.shipping ?? 0)}</strong>
           </div>
 
+          ${
+             totalBeforePoints > 0 && pointsUsed > 0
+                ? `
+                <div class="success-row">
+                  <span class="k">포인트 적용 전</span>
+                  <strong class="v">₩ ${formatPrice(totalBeforePoints)}</strong>
+                </div>
+              `
+                : ''
+          }
+
           <div class="success-row total">
             <span class="k">최종 결제</span>
-            <strong class="v">₩ ${formatPrice(pricing?.total ?? 0)}</strong>
+            <strong class="v">₩ ${formatPrice(total)}</strong>
           </div>
         </div>
 
@@ -259,10 +281,6 @@ export function initCheckoutSuccessPage() {
    const orderId = String(getQueryParam('orderId') || '').trim();
    const user = authStore.getUser?.();
 
-   /**
-    * 유저별 분리 스토어라면 owner를 맞춘 뒤 주문을 조회한다.
-    * - app.js에서 처리해도, 여기서 재설정해도 부작용이 없다.
-    */
    const owner = user?.id || 'guest';
    orderStore.setOwner?.(owner);
 
@@ -271,11 +289,6 @@ export function initCheckoutSuccessPage() {
    root.innerHTML = order ? renderSuccess({ order, user }) : renderEmpty();
 
    root.addEventListener('click', (e) => {
-      /**
-       * 주문내역 딥링크
-       * - /mypage?tab=orders 로 탭을 강제한다.
-       * - open=detail&orderId=... 로 상세 모달을 자동 오픈한다(마이페이지 구현 전제).
-       */
       if (e.target.closest('[data-go-orders]')) {
          const href = orderId
             ? `/mypage?tab=orders&open=detail&orderId=${encodeURIComponent(orderId)}`
