@@ -25,6 +25,10 @@
  * - 딥링크(open/focus/orderId) URL 1회 실행 가드로 중복 모달 방지
  * - 초기 렌더는 "현재 탭만 paint"로 최적화 + 중복 트리거 감소
  * - 주문내역의 (테스트) 상태 변경 버튼 제거: 유저 영역은 조회 전용
+ *
+ * ✅ UI 개선(문고리닷컴 톤)
+ * - 좌측: 사이드 메뉴 느낌(타이틀 + 메뉴 버튼)
+ * - 우측 상단: 프로필 요약 카드(이름/등급/포인트/쿠폰/주문요약)
  * =============================================
  */
 
@@ -74,11 +78,20 @@ export const MyPage = () => {
 
       <div class="page__content">
         <div class="mypage__layout">
+          <!-- ✅ Left Sidebar -->
           <nav class="mypage__nav" aria-label="MyPage Tabs">
+            <div class="mypage__navHead">
+              <p class="mypage__navTitle">마이페이지</p>
+              <p class="mypage__navSub muted">나의 쇼핑</p>
+            </div>
             ${renderTabs(DEFAULT_TAB)}
           </nav>
 
+          <!-- ✅ Right Content -->
           <div class="mypage__main">
+            <!-- ✅ Top summary card (문고리닷컴 느낌) -->
+            ${renderTopSummarySkeleton()}
+
             ${renderPanelCoupon()}
             ${renderPanelProfile()}
             ${renderPanelAddress()}
@@ -150,6 +163,10 @@ function setQuery(paramsPatch, { replace = false } = {}) {
    else window.history.pushState({}, '', next);
 }
 
+/**
+ * ✅ Tabs UI: 모바일은 가로 스크롤, 데스크탑은 CSS로 세로 메뉴 느낌.
+ * (버튼 구조는 동일 유지)
+ */
 function renderTabs(activeKey = DEFAULT_TAB) {
    return `
     <ul class="mypage__tabs" role="tablist" aria-label="MyPage Menu">
@@ -168,7 +185,7 @@ function renderTabs(activeKey = DEFAULT_TAB) {
               data-tab="${t.key}"
               ${disabled ? 'disabled aria-disabled="true"' : ''}
             >
-              ${escapeHtml(t.label)}
+              <span class="mypage__tabLabel">${escapeHtml(t.label)}</span>
               ${disabled ? `<span class="mypage__soon">SOON</span>` : ''}
             </button>
           </li>
@@ -176,6 +193,128 @@ function renderTabs(activeKey = DEFAULT_TAB) {
       }).join('')}
     </ul>
   `;
+}
+
+/* ==============================
+   3-1) Top Summary (문고리닷컴 스타일용)
+============================== */
+
+function renderTopSummarySkeleton() {
+   return `
+     <section class="mypage__summary" aria-label="MyPage Summary" data-summary-wrap>
+       <div class="mypage__section">
+         <p class="loading">불러오는 중...</p>
+       </div>
+     </section>
+   `;
+}
+
+function getUserSafe() {
+   const user = authStore.getUser?.() ?? null;
+   if (!user || typeof user !== 'object') return null;
+   return user;
+}
+
+function getCouponStateSafe() {
+   const s = couponStore.getState?.() ?? {};
+   const owned = Array.isArray(s.owned) ? s.owned : [];
+   const appliedCode = String(s.appliedCode ?? '').trim();
+   return { owned, appliedCode };
+}
+
+function getOrdersSafe() {
+   const orders = orderStore.getOrders?.() ?? [];
+   return Array.isArray(orders) ? orders : [];
+}
+
+function countOrdersByStatus(orders) {
+   const safe = Array.isArray(orders) ? orders : [];
+   const map = { PAID: 0, SHIPPING: 0, DELIVERED: 0, CANCELED: 0 };
+
+   safe.forEach((o) => {
+      const s = String(o?.status || '').toUpperCase();
+      if (map[s] !== undefined) map[s] += 1;
+      else map.PAID += 0;
+   });
+
+   return map;
+}
+
+function renderTopSummaryCard() {
+   const user = getUserSafe();
+   const { owned } = getCouponStateSafe();
+   const orders = getOrdersSafe();
+
+   if (!user) {
+      return `
+        <div class="mypage__section">
+          <p class="empty__title">로그인이 필요합니다.</p>
+          <p class="empty__desc">로그인 후 마이페이지를 이용할 수 있어요.</p>
+        </div>
+      `;
+   }
+
+   const name = escapeHtml(user?.name || '회원');
+   const totalSpent = Number(user?.totalSpent || 0);
+   const points = Number(user?.points || 0);
+
+   const snap = getMembershipSnapshot({ totalSpent, checkoutTotal: 0 });
+   const current = snap?.current || snap?.tierInfo?.current || { name: '실버' };
+   const tierName = escapeHtml(current?.name || '실버');
+
+   const usableCoupons = owned.filter((c) => !Boolean(c?.used)).length;
+   const usedCoupons = owned.filter((c) => Boolean(c?.used)).length;
+
+   const statusCounts = countOrdersByStatus(orders);
+
+   return `
+     <div class="mypage__section mypage__summaryCard">
+       <div class="mypage__summaryTop">
+         <div class="mypage__avatar" aria-hidden="true"></div>
+         <div class="mypage__who">
+           <p class="mypage__whoName"><strong>${name}</strong></p>
+           <p class="mypage__whoMeta">
+             <span class="grade-pill">${tierName}</span>
+             <span class="dot" aria-hidden="true"></span>
+             <span class="muted">누적 ₩ ${formatKRW(totalSpent)}</span>
+           </p>
+         </div>
+
+         <div class="mypage__summaryActions">
+           <button type="button" class="btn subtle" data-tab="profile">내 정보</button>
+           <button type="button" class="btn subtle" data-tab="grade">등급</button>
+         </div>
+       </div>
+
+       <div class="mypage__sectionDivider" aria-hidden="true"></div>
+
+       <div class="mypage__summaryGrid" aria-label="Summary Quick Stats">
+         <div class="mypage__summaryItem">
+           <p class="k muted">포인트</p>
+           <p class="v"><strong>${formatKRW(points)}P</strong></p>
+         </div>
+
+         <div class="mypage__summaryItem">
+           <p class="k muted">쿠폰</p>
+           <p class="v"><strong>${usableCoupons}</strong><span class="muted"> / 사용 ${usedCoupons}</span></p>
+         </div>
+
+         <div class="mypage__summaryItem">
+           <p class="k muted">주문</p>
+           <p class="v"><strong>${orders.length}</strong></p>
+         </div>
+       </div>
+
+       <div class="mypage__sectionDivider" aria-hidden="true"></div>
+
+       <div class="mypage__summaryOrderMini" aria-label="Order Status Mini">
+         <button type="button" class="pill" data-tab="delivery">결제완료 ${statusCounts.PAID}</button>
+         <button type="button" class="pill" data-tab="delivery">배송중 ${statusCounts.SHIPPING}</button>
+         <button type="button" class="pill" data-tab="delivery">배송완료 ${statusCounts.DELIVERED}</button>
+         <button type="button" class="pill" data-tab="delivery">취소 ${statusCounts.CANCELED}</button>
+       </div>
+     </div>
+   `;
 }
 
 /* ==============================
@@ -374,13 +513,6 @@ function renderAddressPanelInner() {
 /* ==============================
    5) Coupon helpers
 ============================== */
-
-function getCouponStateSafe() {
-   const s = couponStore.getState?.() ?? {};
-   const owned = Array.isArray(s.owned) ? s.owned : [];
-   const appliedCode = String(s.appliedCode ?? '').trim();
-   return { owned, appliedCode };
-}
 
 function renderOwned(owned, appliedCode) {
    const list = Array.isArray(owned) ? owned : [];
@@ -777,12 +909,6 @@ function renderDeliveryList(orders, { filterKey = 'ALL' } = {}) {
    7) Profile / Grade helpers
 ============================== */
 
-function getUserSafe() {
-   const user = authStore.getUser?.() ?? null;
-   if (!user || typeof user !== 'object') return null;
-   return user;
-}
-
 function renderProfile(user) {
    const name = escapeHtml(user?.name || '회원');
    const role = escapeHtml(String(user?.role || 'MEMBER'));
@@ -1025,6 +1151,8 @@ export function initMyPage() {
    const addressWrap = root.querySelector('[data-address-wrap]');
    const deliveryListEl = root.querySelector('[data-delivery-list]');
 
+   const summaryWrap = root.querySelector('[data-summary-wrap]');
+
    /* ------------------------------
       A) Tab control
   ------------------------------ */
@@ -1052,6 +1180,11 @@ export function initMyPage() {
    /* ------------------------------
       B) Paint functions
   ------------------------------ */
+
+   const paintSummary = () => {
+      if (!summaryWrap) return;
+      summaryWrap.innerHTML = renderTopSummaryCard();
+   };
 
    const paintOwned = () => {
       if (!ownedWrap) return;
@@ -1191,6 +1324,8 @@ export function initMyPage() {
       D) Initial render (FINAL)
   ------------------------------ */
 
+   paintSummary();
+
    const initialTab = setActiveTab(getInitialTabKey());
    paintByTab(initialTab);
    runDeepLinkOnce();
@@ -1200,23 +1335,27 @@ export function initMyPage() {
   ------------------------------ */
 
    couponStore.subscribe?.(() => {
+      paintSummary();
       const tab = normalizeTab(readQuery().tab || getInitialTabKey());
       if (tab === 'coupon') paintOwned();
    });
 
    authStore.subscribe?.(() => {
+      paintSummary();
       const tab = normalizeTab(readQuery().tab || getInitialTabKey());
       if (tab === 'profile') paintProfile();
       if (tab === 'grade') paintGrade();
    });
 
    orderStore.subscribe?.(() => {
+      paintSummary();
       const tab = normalizeTab(readQuery().tab || getInitialTabKey());
       if (tab === 'orders') paintOrders();
       if (tab === 'delivery') paintDelivery();
    });
 
    addressStore.subscribe?.(() => {
+      paintSummary();
       const tab = normalizeTab(readQuery().tab || getInitialTabKey());
       if (tab === 'address') paintAddress();
    });
@@ -1226,6 +1365,7 @@ export function initMyPage() {
   ------------------------------ */
 
    const onPopState = () => {
+      paintSummary();
       const tab = setActiveTab(getInitialTabKey());
       paintByTab(tab);
       runDeepLinkOnce(); // 가드로 중복 모달 방지
@@ -1238,9 +1378,9 @@ export function initMyPage() {
   ------------------------------ */
 
    root.addEventListener('click', async (e) => {
-      // 1) Tab change
+      // ✅ data-tab이 붙은 모든 버튼(사이드탭/요약카드 버튼 포함)을 탭으로 처리
       const tabBtn = e.target.closest('[data-tab]');
-      if (tabBtn) {
+      if (tabBtn && tabBtn.tagName === 'BUTTON') {
          const tabKey = normalizeTab(
             String(tabBtn.getAttribute('data-tab') || '').trim(),
          );
@@ -1248,9 +1388,7 @@ export function initMyPage() {
          setActiveTab(tabKey);
          paintByTab(tabKey);
 
-         // 탭 이동 시 딥링크 가드 초기화(새 쿼리에서 정상 동작)
          lastDeepLinkKey = '';
-
          setQuery(
             { tab: tabKey, open: '', focus: '', orderId: '' },
             { replace: false },
@@ -1366,7 +1504,7 @@ export function initMyPage() {
 
       /* ==============================
        X) Delivery: filter / actions
-    ============================== */
+      ============================== */
 
       const filterBtn = e.target.closest('[data-delivery-filter]');
       if (filterBtn) {
@@ -1454,7 +1592,7 @@ export function initMyPage() {
 
       /* ==============================
        7) Address CRUD
-    ============================== */
+      ============================== */
 
       if (e.target.closest('[data-address-add]')) {
          const first = (addressStore.getAddresses?.() ?? []).length === 0;
@@ -1586,7 +1724,7 @@ export function initMyPage() {
 
       /* ==============================
        8) Order detail
-    ============================== */
+      ============================== */
 
       const detailBtn = e.target.closest('[data-order-detail]');
       if (detailBtn) {

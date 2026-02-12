@@ -8,7 +8,7 @@
 
 export const HomePage = () => {
    return `
-    <main class="main" aria-label="main">
+
       <section class="hero-section" aria-label="Hero">
         <div class="container" aria-label="Container">
           <div class="hero-title">
@@ -17,6 +17,6 @@ export const HomePage = () => {
           </div>
         </div>
       </section>
-    </main>
+
   `;
 };

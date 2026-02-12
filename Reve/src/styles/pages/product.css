@@ -1,317 +1,82 @@
-/* =====================================================================
-   Product Grid + Product Card
-   ===================================================================== */
+/* =========================================================
+ * Product Page + Product Detail + ProductCard (Mobile-first)
+ * Shopping mall tone: clean / neutral / crisp
+ * ========================================================= */
 
-.product-grid {
-   display: grid;
-   grid-template-columns: repeat(2, minmax(0, 1fr));
-   gap: 12px;
+/* --------------------------
+   0) Tokens (scope)
+--------------------------- */
+.product-page,
+.product-detail-page {
+   --header-h: clamp(56px, 6vh, 76px);
+
+   --bg: #f7f7f8;
+   --panel: rgba(255, 255, 255, 0.96);
+   --panel-solid: #ffffff;
+
+   --text: rgba(0, 0, 0, 0.88);
+   --muted: rgba(0, 0, 0, 0.62);
+   --soft: rgba(0, 0, 0, 0.04);
+
+   --line: rgba(0, 0, 0, 0.08);
+   --line-strong: rgba(0, 0, 0, 0.14);
+
+   --shadow: 0 10px 26px rgba(0, 0, 0, 0.06);
+   --shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.05);
+
+   --r12: 12px;
+   --r14: 14px;
+   --r18: 18px;
+   --r22: 22px;
+
+   --sp-8: 8px;
+   --sp-10: 10px;
+   --sp-12: 12px;
+   --sp-14: 14px;
+   --sp-16: 16px;
+   --sp-18: 18px;
+   --sp-20: 20px;
 }
 
-@media (min-width: 768px) {
-   .product-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 16px;
-   }
+/* ✅ 헤더에 첫 컨텐츠가 가리는 문제 해결 핵심
+   - 전역 헤더가 fixed/sticky 라면 페이지 자체에 padding-top을 줘야 안전함 */
+.page.product-page,
+.page.product-detail-page {
+   background: var(--bg);
+   padding-top: var(--header-h);
 }
 
-@media (min-width: 1200px) {
-   .product-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-   }
+/* 전역 page__content 패딩이 과하면 정리 */
+.product-page .page__content,
+.product-detail-page .page__content {
+   padding-top: 0;
 }
 
-/* ==============================
-       Card shell
-       ============================== */
-
-.product-card {
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   border-radius: 16px;
-   overflow: hidden;
-   position: relative;
-   background: #fff;
-   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
-   transition:
-      transform 160ms ease,
-      box-shadow 160ms ease;
-}
-
-.product-card:where(:hover, :focus-within) {
-   transform: translateY(-2px);
-   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
-}
-
-/* ==============================
-       Thumb
-       ============================== */
-
-.product-card__thumb {
-   display: block;
-   width: 100%;
-   aspect-ratio: 1 / 1;
-   overflow: hidden;
-
-   background-image:
-      url('https://placehold.co/800x800/png'),
-      radial-gradient(
-         120% 120% at 10% 0%,
-         rgba(0, 0, 0, 0.06) 0%,
-         rgba(0, 0, 0, 0.02) 45%,
-         rgba(0, 0, 0, 0) 100%
-      ),
-      linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0));
-
-   background-size: cover, auto, auto;
-   background-position: center, center, center;
-   background-repeat: no-repeat, no-repeat, no-repeat;
-}
-.product-card__img {
-   width: 100%;
-   height: 100%;
-   display: block;
-   object-fit: cover;
-}
-/* ==============================
-       Badges
-       ============================== */
-
-.product-badge {
-   position: absolute;
-   top: 10px;
-   left: 10px;
-   padding: 6px 8px;
-   border-radius: 999px;
-   font-size: 11px;
-   font-weight: 800;
-   line-height: 1;
-   background: rgba(0, 0, 0, 0.88);
-   color: #fff;
-}
-
-.product-badge--coupon {
-   left: auto;
-   right: 10px;
-   background: rgba(0, 0, 0, 0.7);
-}
-
-/* ==============================
-       Body layout
-       - floating 버튼(44px) + 여백(12px) 만큼 하단 공간 확보
-       ============================== */
-
-.product-card__body {
-   padding: 12px;
-   display: grid;
-   gap: 8px;
-
-   /* ✅ floating 버튼이 본문을 가리지 않게 */
-   padding-bottom: 68px;
-}
-
-/* ==============================
-       Name / Price
-       ============================== */
-
-.product-card__name {
-   font-size: 14px;
-   font-weight: 600;
-   line-height: 1.35;
-   margin: 0;
-
-   display: -webkit-box;
-   -webkit-line-clamp: 2;
-   -webkit-box-orient: vertical;
-   overflow: hidden;
-}
-
-.product-card__pricebox {
-   display: flex;
-   align-items: baseline;
-   gap: 8px;
-   flex-wrap: wrap;
-}
-
-.product-card__base {
-   font-size: 12px;
-   opacity: 0.55;
-   text-decoration: line-through;
-}
-
-.product-card__price {
-   font-size: 14px;
-   font-weight: 700;
-   letter-spacing: -0.01em;
-}
-
-.product-card__discount {
-   font-size: 16px;
-   font-weight: 800;
-   color: #ff3b30;
-   line-height: 1;
-}
-/* ==============================
-       Tags
-       ============================== */
-
-.product-card__tags {
-   display: flex;
-   flex-wrap: wrap;
-   gap: 6px;
-   padding: 0;
-   margin: 0;
-   list-style: none;
-}
-
-.product-tag {
-   font-size: 14px;
-   line-height: 1;
-   padding: 8px 8px;
-   border-radius: 999px;
-   border: 1px solid rgba(0, 0, 0, 0.1);
-   background: rgba(0, 0, 0, 0.02);
-   color: rgba(0, 0, 0, 0.72);
-}
-
-/* ==============================
-       Size pills
-       ============================== */
-
-.product-card__sizes {
-   display: flex;
-   flex-wrap: wrap;
-   gap: 10px;
-   padding-top: 10px;
-}
-
-.size-pill {
-   width: 34px;
-   height: 34px;
-   border-radius: 999px;
-   border: 1px solid rgba(0, 0, 0, 0.14);
-   background: #fff;
-   cursor: pointer;
-   font-weight: 600;
-   opacity: 0.94;
-
-   transition:
-      transform 120ms ease,
-      background-color 120ms ease,
-      border-color 120ms ease,
-      box-shadow 120ms ease;
-}
-
-.size-pill:hover {
-   transform: translateY(-1px);
-}
-
-/* ✅ 선택됨 */
-.size-pill.is-active {
-   border-color: rgba(0, 0, 0, 0.55);
-   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
-   background-color: #000;
-   color: #fff;
-   opacity: 1;
-}
-
-/* ✅ 담김(장바구니에 해당 사이즈 라인이 존재) */
-.size-pill.is-in-cart {
-   background: rgba(0, 0, 0, 0.86);
-   border-color: rgba(0, 0, 0, 0.86);
-   color: #fff;
-   opacity: 1;
-}
-
-/* (선택) 담김 + 선택이 동시에 오면 살짝 더 강조 */
-.size-pill.is-in-cart.is-active {
-   box-shadow: 0 10px 18px rgba(0, 0, 0, 0.14);
-}
-
-/* ==============================
-       Floating cart icon button
-       ============================== */
-
-.product-card__floating {
-   position: absolute;
-   right: 12px;
-   bottom: 12px;
-   z-index: 2;
-}
-
-/* ✅ 아이콘 버튼 */
-.cart-fav-btn {
-   width: 44px;
-   height: 44px;
-   border-radius: 999px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(255, 255, 255, 0.92);
-   display: inline-flex;
-   align-items: center;
-   justify-content: center;
-   cursor: pointer;
-
-   transition:
-      background-color 150ms ease,
-      border-color 150ms ease,
-      transform 120ms ease,
-      box-shadow 150ms ease;
-}
-
-.cart-fav-btn:hover {
-   transform: translateY(-1px);
-}
-
-.cart-fav-btn img {
-   width: 20px;
-   height: 20px;
-   display: block;
-}
-
-/* ✅ 담김 상태: 빨간 배경 + 살짝 글로우 */
-.cart-fav-btn.is-added {
-   background: #ff3b30;
-   border-color: #ff3b30;
-   box-shadow: 0 10px 22px rgba(255, 59, 48, 0.22);
-}
-
-.cart-fav-btn.is-added img {
-   filter: brightness(0) invert(1);
-}
-
-/* ✅ 클릭 피드백(선택) */
-.cart-fav-btn.is-pulse {
-   transform: scale(1.06);
-}
-
-/* =====================================================================
-   Product Toolbar (Filter / Sort)
-   ===================================================================== */
+/* =========================================================
+ * 1) Product Toolbar (filters)
+ * ========================================================= */
 
 .product-toolbar {
+   border: 1px solid var(--line);
+   background: var(--panel);
+   /* border-radius: var(--r22); */
+   box-shadow: var(--shadow-sm);
+   backdrop-filter: blur(6px);
+
+   padding: var(--sp-14);
    display: grid;
    gap: 10px;
-   margin-bottom: 14px;
-   padding: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   border-radius: 16px;
-   background: rgba(255, 255, 255, 0.9);
-   scroll-margin-top: 80px;
+
+   position: sticky;
+   top: calc(var(--header-h) + 10px);
+   z-index: 40;
+   max-width: 1440px;
+   margin: 0 auto;
 }
 
 .product-toolbar__row {
    display: grid;
-   grid-template-columns: 1fr 1fr 1fr auto;
    gap: 10px;
-   align-items: end;
-}
-
-@media (max-width: 768px) {
-   .product-toolbar__row {
-      grid-template-columns: 1fr 1fr;
-   }
-   .product-toolbar__actions {
-      grid-column: 1 / -1;
-   }
 }
 
 .product-toolbar__field {
@@ -321,77 +86,812 @@
 
 .product-toolbar__label {
    font-size: 12px;
-   font-weight: 700;
-   opacity: 0.72;
+   color: var(--muted);
+   font-weight: 900;
+   letter-spacing: -0.02em;
 }
 
 .product-toolbar__input,
 .product-toolbar__select {
-   height: 40px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.14);
+   height: 42px;
    padding: 0 12px;
-   background: #fff;
+   border-radius: var(--r14);
+   border: 1px solid var(--line);
+   background: rgba(255, 255, 255, 0.96);
+   color: var(--text);
+   font-weight: 900;
+   letter-spacing: -0.02em;
+}
+
+.product-toolbar__input:focus,
+.product-toolbar__select:focus {
+   outline: none;
+   border-color: rgba(0, 0, 0, 0.22);
+   box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.06);
 }
 
 .product-toolbar__actions {
-   display: flex;
+   display: grid;
+   grid-template-columns: 1fr 1fr;
    gap: 8px;
-   justify-content: flex-end;
 }
 
 .product-toolbar__meta {
-   display: flex;
-   justify-content: space-between;
-   align-items: center;
+   padding-top: 10px;
+   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .product-toolbar__summary {
    margin: 0;
-   font-size: 12px;
-   opacity: 0.72;
+   font-size: 12.5px;
+   color: var(--muted);
+   line-height: 1.45;
+   letter-spacing: -0.02em;
 }
 
-/* =====================================================================
-     Product Pager
-     ===================================================================== */
+@media (min-width: 768px) {
+   .product-toolbar {
+      top: calc(var(--header-h) + 16px);
+   }
+
+   .product-toolbar__row {
+      grid-template-columns: 1fr 1fr 1fr 220px;
+      align-items: end;
+      gap: 12px;
+   }
+}
+
+/* =========================================================
+ * 2) Product Grid
+ * ========================================================= */
+
+.product-grid {
+   margin-top: 14px;
+   display: grid;
+   gap: 12px;
+   padding-bottom: 18px;
+   padding-top: 20px;
+   max-width: 1440px;
+   margin: 0 auto;
+}
+
+@media (min-width: 480px) {
+   .product-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+   }
+}
+
+@media (min-width: 960px) {
+   .product-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+   }
+}
+
+@media (min-width: 1200px) {
+   .product-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+   }
+}
+
+/* loading/error/empty */
+.product-grid .loading,
+.product-grid .error {
+   margin: 0;
+   padding: 18px 14px;
+   border-radius: var(--r18);
+   border: 1px solid var(--line);
+   background: var(--panel);
+   color: var(--muted);
+   box-shadow: var(--shadow-sm);
+}
+
+.empty {
+   border: 1px solid var(--line);
+   background: var(--panel);
+   border-radius: var(--r18);
+   box-shadow: var(--shadow-sm);
+   padding: 22px 16px;
+   text-align: center;
+   color: var(--text);
+}
+
+.empty__title {
+   margin: 0;
+   font-weight: 1000;
+   letter-spacing: -0.02em;
+}
+
+.empty__desc {
+   margin: 8px 0 0;
+   color: var(--muted);
+   line-height: 1.5;
+}
+
+/* =========================================================
+ * 3) ProductCard (✅ your current markup)
+ * ========================================================= */
+
+.product-card {
+   border: 1px solid var(--line);
+   background: var(--panel);
+   border-radius: var(--r22);
+   box-shadow: var(--shadow-sm);
+   backdrop-filter: blur(6px);
+   overflow: hidden;
+
+   transition:
+      transform 140ms ease,
+      box-shadow 140ms ease,
+      border-color 140ms ease;
+}
+
+.product-card:hover {
+   transform: translateY(-2px);
+   border-color: var(--line-strong);
+   box-shadow: var(--shadow);
+}
+
+/* 상품 카드 내부 레이아웃 */
+.product-card__thumb {
+   display: block;
+   position: relative;
+   background: rgba(0, 0, 0, 0.03);
+}
+
+.product-card__img {
+   width: 100%;
+   aspect-ratio: 1 / 1;
+   object-fit: cover;
+   display: block;
+   position: relative;
+}
+
+/* body */
+.product-card__body {
+   padding: 12px 12px 14px;
+   display: grid;
+   gap: 10px;
+}
+
+/* name */
+.product-card__name {
+   letter-spacing: -0.02em;
+   line-height: 1.25;
+   color: var(--text);
+
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.product-card__name a {
+   color: inherit;
+   font-size: 12px;
+   font-weight: 1100;
+}
+
+.product-card__name a:hover {
+   text-decoration: underline;
+   text-underline-offset: 2px;
+}
+
+/* price */
+.product-card__pricebox {
+   display: grid;
+   gap: 2px;
+}
+
+.product-card__discount {
+   display: inline-flex;
+   align-items: center;
+   height: 22px;
+   /* padding: 0 10px; */
+   /* border-radius: 999px; */
+   font-size: 12px;
+   font-weight: 700;
+   letter-spacing: -0.01em;
+
+   /* background-color: ; */
+   color: rgb(232, 44, 64);
+   width: fit-content;
+}
+
+.product-card__pricebox .product-card__price {
+   margin: 0;
+   font-size: 12px;
+   font-weight: 700;
+   letter-spacing: -0.02em;
+   color: var(--text);
+}
+
+.product-card__base {
+   margin: 0;
+   font-size: 12.5px;
+   color: rgba(0, 0, 0, 0.45);
+   text-decoration: line-through;
+}
+
+/* tags */
+.product-card__tags {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 6px;
+}
+
+.product-card__tags .product-tag {
+   display: inline-flex;
+   align-items: center;
+   height: 24px;
+   padding: 0 10px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.06);
+   background: rgba(0, 0, 0, 0.03);
+
+   font-size: 12px;
+   font-weight: 700;
+   color: rgba(0, 0, 0, 0.72);
+   letter-spacing: -0.02em;
+}
+
+/* floating cart button */
+
+.product-card__floating {
+   position: absolute;
+   right: 10px;
+   top: -18px; /* 썸네일 아래로 살짝 떠있는 느낌 */
+   z-index: 2;
+}
+
+/* 버튼 자체 */
+.cart-fav-btn {
+   width: 44px;
+   height: 44px;
+   border-radius: 999px;
+   border: 1px solid rgba(0, 0, 0, 0.1);
+   /* background: rgba(255, 255, 255, 0.96); */
+   /* box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08); */
+   cursor: pointer;
+   position: absolute;
+   top: 25px;
+   left: 0;
+   /* border: 1px solid red; */
+
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+
+   transition:
+      transform 120ms ease,
+      background 120ms ease,
+      border-color 120ms ease,
+      opacity 120ms ease;
+}
+
+.cart-fav-btn:hover {
+   transform: translateY(-1px);
+   border-color: rgba(0, 0, 0, 0.18);
+   background: rgba(255, 255, 255, 1);
+}
+
+.cart-fav-btn:active {
+   transform: translateY(0);
+}
+
+.cart-fav-btn img {
+   width: 20px;
+   height: 20px;
+   display: block;
+   opacity: 0.9;
+}
+
+/* 카드가 장바구니 담김 상태일 때(네 initProductPage에서 is-in-cart 토글) */
+.product-card.is-in-cart {
+   border-color: rgba(0, 0, 0, 0.22);
+}
+
+.product-card.is-in-cart .cart-fav-btn {
+   border-color: rgba(0, 0, 0, 0.22);
+   background: rgba(0, 0, 0, 0.04);
+}
+
+/* 작은 화면에서 텍스트 숨통 */
+@media (max-width: 360px) {
+   .product-card__body {
+      padding: 12px;
+   }
+   .product-card__name {
+      font-size: 13.5px;
+   }
+}
+
+/* =========================================================
+ * 4) Pager
+ * ========================================================= */
 
 .product-pager {
-   margin-top: 14px;
+   margin: 8px 0 22px;
    display: flex;
    align-items: center;
    justify-content: center;
    gap: 10px;
-   flex-wrap: wrap;
 }
 
 .product-pager__numbers {
-   display: flex;
+   display: inline-flex;
    align-items: center;
    gap: 6px;
+   padding: 6px 8px;
+   border: 1px solid var(--line);
+   background: var(--panel);
+   border-radius: 999px;
+   box-shadow: var(--shadow-sm);
 }
 
 .pager-num {
-   min-width: 38px;
-   height: 38px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: #fff;
+   min-width: 34px;
+   height: 34px;
+   padding: 0 10px;
+   border-radius: 999px;
+   border: 1px solid transparent;
+   background: transparent;
    cursor: pointer;
-   font-weight: 700;
+   font-weight: 1100;
+   color: rgba(0, 0, 0, 0.82);
+   transition:
+      background 120ms ease,
+      transform 120ms ease,
+      border-color 120ms ease,
+      opacity 120ms ease;
+}
+
+.pager-num:hover {
+   transform: translateY(-1px);
+   background: rgba(0, 0, 0, 0.04);
+   border-color: rgba(0, 0, 0, 0.12);
 }
 
 .pager-num.is-active {
-   background: #000;
-   color: #fff;
-   border-color: #000;
+   background: rgba(0, 0, 0, 0.1);
+   border-color: rgba(0, 0, 0, 0.18);
 }
 
 .pager-ellipsis {
+   padding: 0 6px;
+   color: var(--muted);
+   font-weight: 1100;
+}
+
+/* =========================================================
+ * 5) Detail Page (your current markup)
+ * ========================================================= */
+
+.product-detail {
+   display: grid;
+   gap: 14px;
+}
+
+.product-detail__layout {
+   border: 1px solid var(--line);
+   background: var(--panel);
+   border-radius: var(--r22);
+   box-shadow: var(--shadow);
+   overflow: hidden;
+}
+
+/* media: 현재는 div(placeholder). 나중에 실제 이미지 넣어도 안전 */
+.product-detail__media {
+   width: 100%;
+   aspect-ratio: 1 / 1;
+   background:
+      radial-gradient(
+         1200px 400px at 20% 10%,
+         rgba(0, 0, 0, 0.06),
+         transparent 55%
+      ),
+      rgba(0, 0, 0, 0.03);
+}
+
+/* info */
+.product-detail__info {
+   padding: 16px;
+   display: grid;
+   gap: 12px;
+}
+
+.product-detail__brand {
+   font-size: 12px;
+   font-weight: 1100;
+   color: var(--muted);
+   letter-spacing: -0.02em;
+}
+
+.product-detail__name {
+   margin: 0;
+   font-size: 20px;
+   font-weight: 1200;
+   letter-spacing: -0.03em;
+   color: var(--text);
+   line-height: 1.25;
+}
+
+/* price */
+.product-detail__price {
+   display: flex;
+   align-items: baseline;
+   gap: 10px;
+   flex-wrap: wrap;
+}
+
+.pd-base {
+   font-size: 13px;
+   color: rgba(0, 0, 0, 0.45);
+   text-decoration: line-through;
+}
+
+.pd-final {
+   font-size: 20px;
+   font-weight: 1200;
+   color: var(--text);
+}
+
+.pd-rate {
    display: inline-flex;
    align-items: center;
-   justify-content: center;
-   height: 38px;
-   padding: 0 8px;
+   height: 22px;
+   padding: 0 10px;
+   border-radius: 999px;
+   font-size: 12px;
+   font-weight: 1200;
+   background: rgba(0, 0, 0, 0.08);
+   color: rgba(0, 0, 0, 0.86);
+}
+
+/* option */
+.product-detail__option {
+   padding-top: 10px;
+   border-top: 1px solid rgba(0, 0, 0, 0.06);
+   display: grid;
+   gap: 10px;
+}
+
+.pd-label {
+   margin: 0;
+   font-size: 12px;
+   font-weight: 1100;
+   color: var(--muted);
+   letter-spacing: -0.02em;
+}
+
+/* size pills: list와 동일 규칙 공유 (detail용 data-detail-size-pill) */
+.product-detail__sizes {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 8px;
+}
+
+/* =========================================================
+ * 6) Shared Size Pills (Detail only now)
+ * - ProductCard에서는 제거됐지만, Detail/Cart에서 계속 씀 ✅
+ * ========================================================= */
+
+.size-pill,
+[data-detail-size-pill],
+[data-cart-size-pill] {
+   height: 34px;
+   padding: 0 12px;
+   border-radius: 999px;
+   border: 1px solid var(--line);
+   background: rgba(255, 255, 255, 0.92);
+   color: rgba(0, 0, 0, 0.82);
+   font-weight: 1100;
+   font-size: 12px;
+   letter-spacing: -0.02em;
+   cursor: pointer;
+   user-select: none;
+
+   transition:
+      transform 120ms ease,
+      background 120ms ease,
+      border-color 120ms ease,
+      opacity 120ms ease;
+}
+
+.size-pill:hover,
+[data-detail-size-pill]:hover,
+[data-cart-size-pill]:hover {
+   transform: translateY(-1px);
+   border-color: var(--line-strong);
+   background: rgba(255, 255, 255, 1);
+}
+
+.size-pill.is-active,
+[data-detail-size-pill].is-active,
+[data-cart-size-pill].is-active {
+   border-color: rgba(0, 0, 0, 0.22);
+   background: rgba(0, 0, 0, 0.06);
+}
+
+/* 장바구니에서만 있는 is-in-cart도 자연스럽게 */
+.size-pill.is-in-cart,
+[data-cart-size-pill].is-in-cart {
+   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+/* actions */
+.product-detail__actions {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 10px;
+   padding-top: 6px;
+}
+
+.product-detail__actions .btn {
+   height: 46px;
+   border-radius: var(--r14);
+   font-weight: 1200;
+   letter-spacing: -0.02em;
+}
+
+.product-detail__actions .btn.primary {
+   border: 1px solid rgba(0, 0, 0, 0.14);
+   background: rgba(0, 0, 0, 0.14);
+   color: rgba(0, 0, 0, 0.92);
+}
+
+.product-detail__actions .btn.primary:hover {
+   background: rgba(0, 0, 0, 0.18);
+}
+
+.pd-hint {
+   margin: 0;
+   padding: 10px 12px;
+   border-radius: var(--r14);
+   border: 1px solid rgba(0, 0, 0, 0.06);
+   background: rgba(0, 0, 0, 0.02);
+   color: var(--muted);
+   font-size: 13px;
+   line-height: 1.45;
+   word-break: keep-all;
+}
+
+/* tablet+: 2 columns */
+@media (min-width: 768px) {
+   .product-detail__layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 440px;
+      align-items: stretch;
+   }
+
+   .product-detail__media {
+      aspect-ratio: auto;
+      min-height: 460px;
+   }
+}
+
+/* =========================================================
+ * 7) Page-local button polish
+ * - 전역 .btn 유지하면서 "쇼핑몰 버튼" 감성만 보강
+ * ========================================================= */
+
+.product-page .btn.subtle,
+.product-detail-page .btn.subtle,
+.product-page button.btn.subtle,
+.product-detail-page button.btn.subtle {
+   height: 42px;
+   border-radius: var(--r14);
+   border: 1px solid var(--line);
+   background: rgba(0, 0, 0, 0.04);
+   color: rgba(0, 0, 0, 0.82);
+   font-weight: 1100;
+   cursor: pointer;
+   transition:
+      background 120ms ease,
+      transform 120ms ease,
+      border-color 120ms ease,
+      opacity 120ms ease;
+}
+
+.product-page .btn.subtle:hover,
+.product-detail-page .btn.subtle:hover {
+   background: rgba(0, 0, 0, 0.06);
+   border-color: var(--line-strong);
+   transform: translateY(-1px);
+}
+
+.product-page .btn.subtle:disabled,
+.product-detail-page .btn.subtle:disabled {
    opacity: 0.55;
+   cursor: not-allowed;
+   transform: none;
+}
+
+/* =========================================================
+ * ProductCard - in cart favorite icon tint (filter)
+ * ========================================================= */
+
+/* 기본: 살짝 어둡게 */
+.product-card .cart-fav-btn img {
+   opacity: 0.92;
+   filter: grayscale(1) brightness(0.25);
+}
+
+/* hover: 약간 살아나게 */
+.product-card .cart-fav-btn:hover img {
+   filter: grayscale(0.2) brightness(0.35);
+}
+
+/* ✅ 담김 상태: 빨강톤(필터 조합) */
+.product-card.is-in-cart .cart-fav-btn img {
+   opacity: 1;
+   /* red-ish tint */
+   filter: invert(16%) sepia(88%) saturate(6800%) hue-rotate(350deg)
+      brightness(0.95) contrast(1.05);
+}
+
+/* 담김 + 버튼 배경도 살짝 강조 */
+.product-card.is-in-cart .cart-fav-btn {
+   background: rgba(255, 255, 255, 1);
+   border-color: rgba(0, 0, 0, 0.18);
+   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.1);
+}
+/* =========================================================
+ * ProductCard - in cart favorite icon (mask technique)
+ * - 정확한 컬러 제어 가능
+ * ========================================================= */
+
+/* 1) img는 접근성 유지하면서 시각적으로 숨김 */
+.product-card .cart-fav-btn img {
+   width: 20px;
+   height: 20px;
+   opacity: 0;
+}
+
+/* 2) 버튼에 마스크로 아이콘을 "칠함" */
+.product-card .cart-fav-btn {
+   position: relative;
+}
+
+/* 기본(미담김): 회색 아이콘 */
+.product-card .cart-fav-btn::before {
+   content: '';
+   position: absolute;
+   width: 20px;
+   height: 20px;
+
+   /* 아이콘 경로(지금 쓰는 favorite.svg 그대로) */
+   -webkit-mask: url('/src/icons/favorite.svg') no-repeat center / contain;
+   mask: url('/src/icons/favorite.svg') no-repeat center / contain;
+
+   background: rgba(0, 0, 0, 0.65);
+}
+
+/* hover: 조금 진하게 */
+.product-card .cart-fav-btn:hover::before {
+   background: rgba(0, 0, 0, 0.78);
+}
+
+/* ✅ 담김: 레드(채움 느낌) */
+.product-card.is-in-cart .cart-fav-btn::before {
+   background: rgb(232, 44, 64); /* 쇼핑몰 감성 레드 */
+}
+
+/* 담김 상태에서 버튼 배경도 살짝 톤업 */
+.product-card.is-in-cart .cart-fav-btn {
+   background: rgba(255, 255, 255, 1);
+   border-color: rgba(0, 0, 0, 0.18);
+}
+/* =========================================================
+ * Product Detail - Real image gallery (main + thumbs)
+ * ========================================================= */
+
+.product-detail__media {
+   padding: 12px;
+   background: rgba(0, 0, 0, 0.02);
+   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* main frame */
+.pd-gallery__main {
+   border-radius: var(--r22);
+   overflow: hidden;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: rgba(0, 0, 0, 0.03);
+   box-shadow: var(--shadow-sm);
+}
+
+.pd-gallery__img {
+   width: 100%;
+   aspect-ratio: 1 / 1;
+   display: block;
+   object-fit: cover;
+}
+
+/* thumbs row */
+.pd-gallery__thumbs {
+   margin-top: 10px;
+   display: flex;
+   gap: 8px;
+   overflow-x: auto;
+   padding-bottom: 2px;
+   -webkit-overflow-scrolling: touch;
+   scrollbar-width: none;
+}
+.pd-gallery__thumbs::-webkit-scrollbar {
+   display: none;
+}
+
+/* thumb button */
+.pd-thumb {
+   flex: 0 0 auto;
+   width: 64px;
+   height: 64px;
+   border-radius: 14px;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   background: rgba(255, 255, 255, 0.96);
+   overflow: hidden;
+   cursor: pointer;
+
+   transition:
+      transform 120ms ease,
+      border-color 120ms ease,
+      opacity 120ms ease;
+}
+
+.pd-thumb:hover {
+   transform: translateY(-1px);
+   border-color: rgba(0, 0, 0, 0.16);
+}
+
+.pd-thumb img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover;
+   display: block;
+}
+
+/* active thumb */
+.pd-thumb.is-active {
+   border-color: rgba(0, 0, 0, 0.22);
+   box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.06);
+}
+
+/* =========================================================
+  * Tablet+ : 왼쪽 미디어 영역을 더 "상품 상세"처럼
+  * - 썸네일을 세로로 바꿔서 진짜 쇼핑몰 느낌
+  * ========================================================= */
+
+@media (min-width: 768px) {
+   .product-detail__media {
+      padding: 16px;
+      border-bottom: 0;
+      border-right: 1px solid rgba(0, 0, 0, 0.06);
+   }
+
+   .pd-gallery {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+   }
+
+   .pd-gallery__thumbs {
+      margin-top: 0;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      max-height: 520px;
+      padding-right: 2px;
+   }
+
+   .pd-thumb {
+      width: 88px;
+      height: 88px;
+      border-radius: 16px;
+   }
+
+   .pd-gallery__img {
+      aspect-ratio: 1 / 1;
+      max-height: 620px;
+   }
 }

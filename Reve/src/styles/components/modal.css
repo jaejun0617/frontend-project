@@ -1,95 +1,234 @@
 /* =============================================
- * 📍 위치: src/styles/modal.css
- * 역할: Confirm 모달 스타일
+ * Confirm Modal (Promise 기반)
+ * - 대상: src/components/ConfirmModal.js markup
+ * - 목표: 예쁜 UI + 개행(\n) 지원 + 접근성/포커스/애니메이션
+ * - 버튼: radius 0 (요청 반영)
  * ============================================= */
 
+/* 모달 열리면 스크롤 잠금 */
 body.is-modal-open {
    overflow: hidden;
 }
 
+/* 루트 */
 .confirm-modal {
    position: fixed;
    inset: 0;
    z-index: 30000;
+   display: grid;
+   place-items: center;
+   padding: 18px;
 }
 
+/* hidden 속성 대응 */
 .confirm-modal[hidden] {
    display: none !important;
 }
 
+/* 오버레이 */
 .confirm-modal__overlay {
    position: absolute;
    inset: 0;
-   background: rgba(0, 0, 0, 0.38);
+   background: rgba(10, 10, 12, 0.42);
+   backdrop-filter: blur(10px);
+   -webkit-backdrop-filter: blur(10px);
+   opacity: 0;
+   transition: opacity 160ms ease;
 }
 
+/* 패널 */
 .confirm-modal__panel {
-   position: absolute;
-   left: 50%;
-   top: 50%;
-   width: min(92vw, 420px);
-   transform: translate(-50%, -50%);
-   background: rgba(255, 255, 255, 0.96);
-   border: 1px solid rgba(0, 0, 0, 0.08);
+   position: relative;
+   width: min(92vw, 440px);
+   max-height: min(84vh, 560px);
+   overflow: auto;
+
+   background: rgba(255, 255, 255, 0.94);
+   border: 1px solid rgba(0, 0, 0, 0.1);
+
+   /* ✅ radius: 모달은 둥글게, 버튼은 각지게 */
    border-radius: 18px;
-   padding: 14px;
-   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+
+   box-shadow:
+      0 24px 70px rgba(0, 0, 0, 0.22),
+      0 6px 18px rgba(0, 0, 0, 0.1);
+
+   transform: translateY(10px) scale(0.98);
+   opacity: 0;
+
+   transition:
+      transform 170ms ease,
+      opacity 170ms ease;
+
+   /* iOS 스크롤 부드럽게 */
+   -webkit-overflow-scrolling: touch;
 }
 
+/* show 상태 (hidden 제거되면 나타나도록) */
+.confirm-modal:not([hidden]) .confirm-modal__overlay {
+   opacity: 1;
+}
+
+.confirm-modal:not([hidden]) .confirm-modal__panel {
+   transform: translateY(0) scale(1);
+   opacity: 1;
+}
+
+/* 헤더 */
 .confirm-modal__header {
    display: flex;
    align-items: center;
    justify-content: space-between;
    gap: 12px;
-   margin-bottom: 10px;
+
+   padding: 14px 14px 10px;
+   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+/* 타이틀 */
 .confirm-modal__title {
    margin: 0;
-   font-size: 16px;
-   font-weight: 900;
+   font-size: 15px;
+   font-weight: 950;
+   letter-spacing: -0.02em;
+   color: rgba(0, 0, 0, 0.88);
 }
 
+/* 닫기 버튼 */
 .confirm-modal__x {
    appearance: none;
-   border: 0;
-   background: transparent;
+   border: 1px solid rgba(0, 0, 0, 0.1);
+   background: rgba(0, 0, 0, 0.02);
    cursor: pointer;
-   padding: 8px;
-   border-radius: 10px;
+
+   width: 36px;
+   height: 36px;
+
+   /* ✅ 요청 반영: radius 없이 */
+   border-radius: 0;
+
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+
+   font-size: 16px;
+   line-height: 1;
+   color: rgba(0, 0, 0, 0.78);
+
+   transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      transform 120ms ease;
 }
 
 .confirm-modal__x:hover {
    background: rgba(0, 0, 0, 0.06);
+   border-color: rgba(0, 0, 0, 0.14);
+   transform: translateY(-1px);
 }
 
+.confirm-modal__x:active {
+   transform: translateY(0);
+}
+
+/* 본문 */
 .confirm-modal__desc {
    margin: 0;
+   padding: 12px 14px 14px;
+
    font-size: 14px;
-   line-height: 1.45;
-   opacity: 0.9;
-   padding: 6px 0 12px;
+   font-weight: 650;
+   letter-spacing: -0.01em;
+   color: rgba(0, 0, 0, 0.76);
+
+   line-height: 1.55;
+
+   /* ✅ 핵심: <br> 없이도 줄바꿈 예쁘게 (\n → 줄바꿈) */
+   white-space: pre-line;
+
+   /* 긴 단어/URL도 깨지게 */
+   overflow-wrap: anywhere;
+   word-break: break-word;
 }
 
+/* 버튼 영역 */
 .confirm-modal__actions {
    display: grid;
    grid-template-columns: 1fr 1fr;
    gap: 10px;
+
+   padding: 0 14px 14px;
 }
 
+/* 버튼 공통 */
 .confirm-modal__btn {
+   appearance: none;
    height: 44px;
-   border-radius: 12px;
    border: 1px solid rgba(0, 0, 0, 0.14);
    background: rgba(0, 0, 0, 0.03);
+   color: rgba(0, 0, 0, 0.86);
+
+   /* ✅ 요청 반영: radius 없이 */
+   border-radius: 0;
+
    cursor: pointer;
-   font-weight: 800;
+   font-weight: 900;
+   font-size: 13px;
+   letter-spacing: -0.01em;
+
+   transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      transform 120ms ease,
+      box-shadow 150ms ease;
 }
 
 .confirm-modal__btn:hover {
    background: rgba(0, 0, 0, 0.06);
+   border-color: rgba(0, 0, 0, 0.18);
+   transform: translateY(-1px);
+   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.06);
 }
 
+.confirm-modal__btn:active {
+   transform: translateY(0);
+   box-shadow: none;
+}
+
+/* primary */
 .confirm-modal__btn.primary {
-   background: rgba(0, 0, 0, 0.1);
+   background: rgba(0, 0, 0, 0.92);
+   border-color: rgba(0, 0, 0, 0.92);
+   color: #fff;
+}
+
+.confirm-modal__btn.primary:hover {
+   background: rgba(0, 0, 0, 0.86);
+   border-color: rgba(0, 0, 0, 0.86);
+   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.14);
+}
+
+/* 키보드 포커스 */
+.confirm-modal__x:focus-visible,
+.confirm-modal__btn:focus-visible {
+   outline: none;
+   box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.12);
+   border-color: rgba(0, 0, 0, 0.24);
+}
+
+/* 모바일에서 버튼 세로 스택 */
+@media (max-width: 420px) {
+   .confirm-modal__actions {
+      grid-template-columns: 1fr;
+   }
+}
+
+/* 모션 선호 감소 */
+@media (prefers-reduced-motion: reduce) {
+   .confirm-modal__overlay,
+   .confirm-modal__panel,
+   .confirm-modal__btn,
+   .confirm-modal__x {
+      transition: none !important;
+   }
 }

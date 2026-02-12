@@ -1,3 +1,49 @@
+# REVE MVP (SPA + localStorage Stores)
+
+REVE는 MVP 전자상거래 흐름을 **라우터 기반 SPA + localStorage 기반 스토어**로 구현한 학습/실험용 프로젝트입니다.  
+인증/권한, 쿠폰, 장바구니(옵션 라인), 결제(mock), 주문/배송, 마이페이지, 관리자(Admin) 운영툴까지 하나의 흐름으로 연결됩니다. 🧩
+
+---
+
+## 빠른 실행
+
+> 프로젝트 구조에 따라 명령은 다를 수 있습니다. 아래는 일반적인 프론트 번들러(webpack/vite) 기준 예시입니다.
+
+- 설치
+   - `npm install`
+- 실행(개발)
+   - `npm run dev` 또는 `npm run start`
+- 빌드
+   - `npm run build`
+
+---
+
+## 계정(더미)
+
+- `admin / 1234` → `ADMIN`
+- `user / 1234` → `MEMBER`
+
+---
+
+## 로컬 데이터(Reset)
+
+브라우저 `localStorage` 기반이라 필요 시 아래 키들을 삭제하면 초기화됩니다.
+
+- users: `reve_users_v1`
+- auth: `reve_auth_v1`
+- cart: `reve_cart_v1:<ownerKey>`
+- coupons: `reve_coupons_v1:<ownerKey>`
+- orders: `reve_orders_v1:<ownerKey>`
+- addresses: `reve_addresses_v1:<ownerKey>`
+- recent searches: `reve_recent_searches_v1`
+- after signup modal: `sessionStorage.reve_after_signup_modal`
+
+(관리자 확장)
+
+- coupon ledger: `reve_admin_coupon_ledger_v1`
+
+---
+
 # REVE MVP 기능 구현 기록 (Auth / Cart / Product / Search / Admin)
 
 목적: MVP 전자상거래 흐름을 **라우터 기반 SPA + localStorage 기반 스토어**로 구현  
@@ -661,3 +707,5 @@
 - ✅ Admin 운영툴(상품/주문/쿠폰/감사/백업 + 타임라인 + 유저/배포/탈퇴 + 원장/통계) 완성
 - ⏳ 남은 건 “운영 안정화” 영역
    - 저장소 용량/백업 스키마/리포팅 등 운영 안정성 강화
+
+---

@@ -14,8 +14,7 @@
  */
 
 import { Header } from './src/components/Header.js';
-import { Footer } from './src/components/Footer.js';
-
+import { Footer, initFooter } from './src/components/Footer.js';
 // Pages
 import { HomePage } from './src/pages/home/index.js';
 import { SearchPage, initSearchPage } from './src/pages/search/index.js';
@@ -308,6 +307,8 @@ window.addEventListener('app:render', () => {
 
    runAfterSignupModalIfNeeded();
    syncProductCardsWithCart();
+
+   initFooter();
 });
 
 // 최초 1회

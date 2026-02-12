@@ -83,13 +83,94 @@ export const CartPage = () => {
 
 function renderEmpty() {
    return `
-    <div class="cart-empty">
-      <p class="empty">장바구니가 비어 있습니다.</p>
-      <a class="btn" href="/product" data-link>상품 보러가기</a>
-    </div>
-  `;
+     <div class="cart-empty" aria-label="빈 장바구니">
+       <div class="cart-empty__panel">
+         <div class="cart-empty__hero">
+           <div class="cart-empty__icon" aria-hidden="true">🛍️</div>
+           <div class="cart-empty__heroText">
+             <h2 class="cart-empty__title">장바구니가 비어 있어요</h2>
+             <p class="cart-empty__desc">
+               인기 상품을 담고, 쿠폰과 포인트로 똑똑하게 결제해 보세요.
+             </p>
+           </div>
+         </div>
+ 
+         <div class="cart-empty__cta">
+           <a class="btn cart-empty__btnPrimary" href="/product" data-link>
+             상품 보러가기
+           </a>
+           <a class="btn subtle cart-empty__btnSubtle" href="/search" data-link>
+             검색하기
+           </a>
+         </div>
+ 
+         <div class="cart-empty__benefits" aria-label="혜택 안내">
+           <div class="cart-empty__benefit">
+             <strong>무료배송</strong>
+             <span>30만원 이상 구매 시</span>
+           </div>
+           <div class="cart-empty__benefit">
+             <strong>포인트 적립</strong>
+             <span>멤버십 등급별 적립</span>
+           </div>
+           <div class="cart-empty__benefit">
+             <strong>빠른 교환/반품</strong>
+             <span>간편 접수 지원</span>
+           </div>
+         </div>
+       </div>
+ 
+       <div class="cart-empty__grid" aria-label="빠른 이동">
+         <a class="cart-empty__card" href="/product" data-link>
+           <div class="cart-empty__cardTop">
+             <strong>신상품</strong>
+             <span class="cart-empty__chip">NEW</span>
+           </div>
+           <p class="cart-empty__cardDesc">지금 가장 빠르게 업데이트된 라인업</p>
+           <span class="cart-empty__cardLink">보러가기 →</span>
+         </a>
+ 
+         <a class="cart-empty__card" href="/product?sort=popular" data-link>
+           <div class="cart-empty__cardTop">
+             <strong>베스트</strong>
+             <span class="cart-empty__chip">HOT</span>
+           </div>
+           <p class="cart-empty__cardDesc">많이 담긴 인기 상품 모음</p>
+           <span class="cart-empty__cardLink">보러가기 →</span>
+         </a>
+ 
+         <a class="cart-empty__card" href="/search?q=쿠폰" data-link>
+           <div class="cart-empty__cardTop">
+             <strong>쿠폰/혜택</strong>
+             <span class="cart-empty__chip">SAVE</span>
+           </div>
+           <p class="cart-empty__cardDesc">쿠폰 적용 가능한 상품 먼저 찾기</p>
+           <span class="cart-empty__cardLink">보러가기 →</span>
+         </a>
+ 
+         <a class="cart-empty__card" href="/mypage" data-link>
+           <div class="cart-empty__cardTop">
+             <strong>멤버십</strong>
+             <span class="cart-empty__chip">VIP</span>
+           </div>
+           <p class="cart-empty__cardDesc">등급별 적립/쿠폰 혜택 확인</p>
+           <span class="cart-empty__cardLink">보러가기 →</span>
+         </a>
+       </div>
+ 
+       <div class="cart-empty__help" aria-label="도움말">
+         <p class="cart-empty__helpText">
+           도움이 필요하신가요?
+           <a href="/search?q=배송" data-link>배송 안내</a>
+           ·
+           <a href="/search?q=교환" data-link>교환/반품</a>
+           ·
+           <a href="/search?q=FAQ" data-link>FAQ</a>
+         </p>
+       </div>
+     </div>
+   `;
 }
-
 function escapeHtml(value) {
    return String(value ?? '')
       .replaceAll('&', '&amp;')
@@ -509,51 +590,44 @@ function renderCart(detailedItems, { usedPoints = 0 } = {}) {
               const hasCouponDiscount = computed.couponDiscount > 0;
 
               return `
-                <article class="cart-item" data-cart-item data-cart-key="${escapeHtml(
-                   key,
-                )}">
-                  <div class="cart-item__info">
-                    <p class="cart-item__name">${escapeHtml(product.name)}</p>
+       <article class="cart-item" data-cart-item data-cart-key="${escapeHtml(key)}">
+    <div class="cart-item__top">
+      <div class="cart-item__media">
+        <img
+          class="cart-item__img"
+          src="${escapeHtml(product?.image?.src || product?.image || product?.thumbnail || '')}"
+          alt="${escapeHtml(product?.image?.alt || product?.name || '상품 이미지')}"
+          loading="lazy"
+        />
+      </div>
 
-                    <div class="cart-item__pricebox">
-                      ${
-                         hasBaseSale
-                            ? `<span class="cart-item__base">₩ ${formatPrice(
-                                 product.basePrice,
-                              )}</span>`
-                            : ''
-                      }
-                      <p class="cart-item__price">₩ ${formatPrice(
-                         product.price,
-                      )}</p>
-                      ${
-                         hasCouponDiscount
-                            ? `<p class="cart-item__coupon">쿠폰 -₩ ${formatPrice(
-                                 computed.couponDiscount,
-                              )}</p>`
-                            : ''
-                      }
-                    </div>
-                  </div>
+      <div class="cart-item__body">
+        <div class="cart-item__info">
+          <p class="cart-item__name">${escapeHtml(product.name)}</p>
 
-                  ${
-                     optionText
-                        ? `<p class="cart-item__meta">${escapeHtml(optionText)}</p>`
-                        : ''
-                  }
+          <div class="cart-item__pricebox">
+            ${hasBaseSale ? `<span class="cart-item__base">₩ ${formatPrice(product.basePrice)}</span>` : ''}
+            <p class="cart-item__price">₩ ${formatPrice(product.price)}</p>
+            ${hasCouponDiscount ? `<p class="cart-item__coupon">쿠폰 -₩ ${formatPrice(computed.couponDiscount)}</p>` : ''}
+          </div>
+        </div>
 
-                  ${renderSizePills({ product, currentSize, inCartSizeSet })}
+        ${optionText ? `<p class="cart-item__meta">${escapeHtml(optionText)}</p>` : ''}
 
-                  <div class="cart-item__controls" aria-label="Quantity Controls">
-                    <button type="button" data-qty-dec aria-label="Decrease quantity">-</button>
-                    <span class="cart-item__qty" data-qty>${qty}</span>
-                    <button type="button" data-qty-inc aria-label="Increase quantity">+</button>
-                  </div>
+        ${renderSizePills({ product, currentSize, inCartSizeSet })}
 
-                  <button type="button" class="cart-item__remove" data-remove aria-label="Remove item">
-                    삭제
-                  </button>
-                </article>
+        <div class="cart-item__controls" aria-label="Quantity Controls">
+          <button type="button" data-qty-dec aria-label="Decrease quantity">-</button>
+          <span class="cart-item__qty" data-qty>${qty}</span>
+          <button type="button" data-qty-inc aria-label="Increase quantity">+</button>
+        </div>
+
+        <button type="button" class="cart-item__remove" data-remove aria-label="Remove item">
+          삭제
+        </button>
+      </div>
+    </div>
+  </article>
               `;
            })
            .join('')}

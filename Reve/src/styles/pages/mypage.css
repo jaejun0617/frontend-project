@@ -1,159 +1,513 @@
-/* =============================================
- * REVE UI Styles (MyPage + Cart) - FULL MERGED
- * - MyPage + Address + Modal + Cart + Coupon
- * - scoped utilities to prevent global collisions
- * ============================================= */
+/* =========================================================
+   MyPage (MVP) - Mobile First Final CSS
+   Scope: .mypage ...
+   + Desktop: Sidebar layout + Summary card (문고리닷컴 톤)
+   ========================================================= */
 
-/* =============================================
- * 0) Shared (scoped utilities)
- * - DO NOT define .pill / .btn globally
- * ============================================= */
+/* ---------- Base tokens (safe defaults) ---------- */
+:root {
+   /* 앱 전역 헤더 높이: 실제 헤더 px로 맞추는 게 제일 정확함 */
+   --app-header-h: 6vh;
+   --safe-top: env(safe-area-inset-top, 0px);
+   --top-offset: calc(var(--app-header-h) + var(--safe-top));
 
-:where(.mypage, .cart-page) .pill {
-   display: inline-flex;
-   align-items: center;
-   padding: 6px 10px;
-   border-radius: 999px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(0, 0, 0, 0.03);
-   font-size: 12px;
-   font-weight: 900;
+   --mp-bg: #ffffff;
+   --mp-surface: #ffffff;
+   --mp-surface-2: #fafafa;
+
+   --mp-line: rgba(15, 23, 42, 0.1);
+   --mp-line-2: rgba(15, 23, 42, 0.07);
+
+   --mp-text: #0f172a;
+   --mp-muted: rgba(15, 23, 42, 0.62);
+   --mp-subtle: rgba(15, 23, 42, 0.05);
+
+   --mp-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+
+   --mp-radius: 16px;
+   --mp-radius-sm: 12px;
+   --mp-radius-xs: 10px;
+
+   --mp-gap: 14px;
+   --mp-gap-lg: 18px;
+
+   --mp-accent: #111827;
+   --mp-good: #10b981;
+   --mp-warn: #f59e0b;
+   --mp-bad: #ef4444;
+
+   --mp-focus: 0 0 0 3px rgba(59, 130, 246, 0.25);
+
+   /* ✅ Desktop container width */
+   --mp-container: 1120px;
 }
 
-:where(.mypage, .cart-page) .hint {
-   margin: 10px 0 0;
-   font-size: 12px;
-   opacity: 0.7;
-   line-height: 1.4;
+/* =========================================================
+   Page base
+   ========================================================= */
+.page.mypage {
+   scroll-padding-top: var(--top-offset);
+   margin-top: 100px;
 }
 
-:where(.mypage, .cart-page) .empty__title {
-   margin: 0;
-   font-weight: 900;
+.mypage .page__header {
+   padding-bottom: 10px;
 }
 
-:where(.mypage, .cart-page) .empty__desc {
-   margin: 6px 0 0;
-   opacity: 0.7;
+.mypage .page__title {
+   letter-spacing: -0.02em;
 }
 
-/* scoped button baseline (keeps existing .btn usage but avoids global pollution) */
-:where(.mypage, .cart-page) .btn {
-   height: 40px;
-   padding: 0 12px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.14);
-   background: transparent;
-   cursor: pointer;
-   font-weight: 800;
+.mypage .page__desc {
+   color: var(--mp-muted);
 }
 
-:where(.mypage, .cart-page) .btn.primary {
-   background: rgba(0, 0, 0, 0.1);
+/* ✅ 전체를 가운데로 모으는 핵심 (문고리닷컴 느낌) */
+.mypage .page__content {
+   width: 100%;
+   max-width: var(--mp-container);
+   margin: 0 auto;
 }
 
-:where(.mypage, .cart-page) .btn.subtle {
-   background: rgba(0, 0, 0, 0.04);
-}
-
-/* =============================================
- * 1) MyPage Layout / Tabs
- * ============================================= */
-
+/* ---------- Layout ---------- */
 .mypage__layout {
    display: grid;
-   gap: 16px;
+   gap: var(--mp-gap-lg);
 }
 
-@media (min-width: 900px) {
-   .mypage__layout {
-      grid-template-columns: 260px 1fr;
-      align-items: start;
-   }
-}
-
+/* =========================================================
+   Nav (Mobile)
+   ========================================================= */
 .mypage__nav {
    position: sticky;
-   top: 72px;
+   top: var(--top-offset);
+   z-index: 3;
+   /* background: var(--mp-bg); */
+   padding: 8px 0 10px;
+   border-bottom: 1px solid var(--mp-line-2);
 }
 
+/* ✅ JS에서 추가한 헤더 영역(사이드바 타이틀) */
+.mypage__navHead {
+   display: none; /* 모바일에선 숨김: 탭이 최상단이 더 깔끔 */
+}
+
+.mypage__navTitle {
+   font-size: 22px;
+   font-weight: 700;
+   letter-spacing: -0.02em;
+   color: var(--mp-text);
+   padding: 1rem 0rem;
+}
+
+.mypage__navHead .mypage__navSub {
+   margin: 6px 0 0;
+   font-size: 16px;
+   font-weight: 700;
+   color: var(--mp-muted);
+}
+
+/* Tabs: Mobile horizontal pills */
 .mypage__tabs {
-   list-style: none;
-   padding: 0;
-   margin: 0;
-   display: grid;
+   display: flex;
    gap: 10px;
+   overflow-x: auto;
+   padding: 0 2px 6px;
+   margin: 0;
+   list-style: none;
+   scroll-snap-type: x mandatory;
+   -webkit-overflow-scrolling: touch;
+}
+
+.mypage__tabs::-webkit-scrollbar {
+   height: 6px;
+}
+.mypage__tabs::-webkit-scrollbar-thumb {
+   background: rgba(15, 23, 42, 0.12);
+   /* border-radius: 999px; */
+}
+
+.mypage__tabitem {
+   scroll-snap-align: start;
+   /* background-color: #ffffff; */
 }
 
 .mypage__tab {
-   width: 100%;
-   height: 44px;
-   border-radius: 14px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(255, 255, 255, 0.9);
-   cursor: pointer;
-   display: flex;
+   position: relative;
+   display: inline-flex;
    align-items: center;
-   justify-content: space-between;
-   padding: 0 12px;
-   font-weight: 900;
+   gap: 8px;
+   white-space: nowrap;
+   border: 1px solid var(--mp-line);
+   /* background: var(--mp-surface); */
+   color: var(--mp-text);
+   /* border-radius: 999px; */
+   padding: 10px 12px;
+   font-size: 14px;
+   line-height: 1;
+   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+   transition:
+      transform 120ms ease,
+      background 120ms ease,
+      border-color 120ms ease;
+}
+
+.mypage__tab:active {
+   transform: scale(0.98);
 }
 
 .mypage__tab.is-active {
-   background: rgba(0, 0, 0, 0.06);
-   border-color: rgba(0, 0, 0, 0.2);
+   background: #111827;
+   color: #fff;
+   border-color: rgba(17, 24, 39, 0.6);
 }
 
-.mypage__tab:disabled {
+.mypage__tab[disabled] {
+   opacity: 0.55;
    cursor: not-allowed;
-   opacity: 0.6;
+   box-shadow: none;
+}
+
+.mypage__tabLabel {
+   display: inline-block;
 }
 
 .mypage__soon {
    font-size: 11px;
    padding: 4px 8px;
-   border-radius: 999px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(0, 0, 0, 0.03);
+   /* border-radius: 999px; */
+   background: rgba(15, 23, 42, 0.08);
+   color: rgba(15, 23, 42, 0.65);
 }
 
-/* Panels */
+.mypage__main {
+   min-width: 0;
+}
+
 .mypage__panel {
    display: none;
 }
+
 .mypage__panel.is-active {
    display: block;
 }
 
 .mypage__section {
+   /* background: var(--mp-surface); */
+   border: 1px solid var(--mp-line);
+   /* border-radius: var(--mp-radius); */
+   padding: 16px;
+   box-shadow: var(--mp-shadow);
+   margin-bottom: var(--mp-gap-lg);
+}
+
+.mypage__sectionTitle {
+   margin: 0 0 6px;
+   font-size: 16px;
+   letter-spacing: -0.02em;
+   padding: 0rem 1rem;
+}
+
+.mypage__sectionDesc {
+   margin: 0 0 12px;
+   color: var(--mp-muted);
+   font-size: 13px;
+   padding: 0rem 1rem;
+}
+
+.mypage__sectionDivider {
+   height: 1px;
+   background: var(--mp-line-2);
+   margin: 14px 0;
+   padding: 0rem 1rem;
+}
+
+/* ---------- Common micro components ---------- */
+
+.pill {
+   display: inline-flex;
+   align-items: center;
+   gap: 6px;
+   border: 1px solid var(--mp-line);
+   /* background: var(--mp-surface-2); */
+   padding: 6px 10px;
+   /* border-radius: 999px; */
+   font-size: 12px;
+   line-height: 1;
+   color: rgba(15, 23, 42, 0.75);
+}
+
+.grade-pill {
+   display: inline-flex;
+   align-items: center;
+   border-radius: 999px;
+   padding: 6px 10px;
+   background: #111827;
+   color: #fff;
+   font-size: 12px;
+   line-height: 1;
+}
+
+.pill--upgrade {
+   background: rgba(245, 158, 11, 0.12);
+   border-color: rgba(245, 158, 11, 0.28);
+   color: rgba(180, 83, 9, 0.95);
+}
+
+.dot {
+   display: inline-block;
+   width: 3px;
+   height: 3px;
+   /* border-radius: 999px; */
+   background: rgba(15, 23, 42, 0.25);
+   vertical-align: middle;
+   margin: 0 6px;
+}
+
+.hint {
+   margin: 12px 0 0;
+   font-size: 12px;
+   color: var(--mp-muted);
+   line-height: 1.45;
+   padding: 0rem 1rem;
+}
+
+.loading {
+   margin: 0;
+   color: var(--mp-muted);
+   font-size: 13px;
+}
+
+/* ---------- Empty ---------- */
+.empty {
+   border: 1px dashed rgba(15, 23, 42, 0.18);
+   background: rgba(15, 23, 42, 0.02);
+   /* border-radius: var(--mp-radius); */
+   padding: 16px;
+}
+
+.empty__title {
+   margin: 0 0 6px;
+   font-weight: 700;
+   letter-spacing: -0.02em;
+}
+
+.empty__desc {
+   margin: 0 0 12px;
+   color: var(--mp-muted);
+   font-size: 13px;
+   line-height: 1.45;
+}
+
+/* =========================================================
+   ✅ Summary Card (문고리닷컴 느낌)
+   - JS에서 .mypage__summary, .mypage__summaryCard 넣었음
+   ========================================================= */
+.mypage__summary {
+   margin-bottom: var(--mp-gap-lg);
+}
+
+.mypage__summaryCard {
+   overflow: hidden;
+}
+
+.mypage__summaryTop {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   padding: 0rem 1rem;
+}
+
+.mypage__avatar {
+   width: 44px;
+   height: 44px;
+   border-radius: 999px;
+   background: rgba(15, 23, 42, 0.06);
+   border: 1px solid rgba(15, 23, 42, 0.08);
+   flex: 0 0 auto;
+}
+
+.mypage__who {
+   min-width: 0;
+   flex: 1;
+}
+
+.mypage__whoName {
+   margin: 0;
+   font-size: 15px;
+   letter-spacing: -0.02em;
+}
+
+.mypage__whoMeta {
+   margin: 6px 0 0;
+   font-size: 12px;
+   color: var(--mp-muted);
+   display: flex;
+   align-items: center;
+   flex-wrap: wrap;
+   gap: 6px;
+}
+
+.mypage__summaryActions {
+   display: flex;
+   gap: 8px;
+   flex: 0 0 auto;
+   flex-wrap: wrap;
+   justify-content: flex-end;
+}
+
+.mypage__summaryGrid {
+   display: grid;
+   grid-template-columns: repeat(3, 1fr);
+   gap: 10px;
+}
+
+.mypage__summaryItem {
+   border: 1px solid var(--mp-line-2);
+   background: rgba(15, 23, 42, 0.02);
+   /* border-radius: 12px; */
+   padding: 12px;
+}
+
+.mypage__summaryItem .k {
+   margin: 0 0 6px;
+   font-size: 12px;
+   color: var(--mp-muted);
+}
+
+.mypage__summaryItem .v {
+   margin: 0;
+   font-size: 14px;
+   color: var(--mp-text);
+}
+
+.mypage__summaryOrderMini {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 8px;
+   padding: 0rem 1rem;
+}
+
+/* =========================================================
+   Coupon
+   ========================================================= */
+.coupon-box {
+   display: grid;
+   gap: 10px;
+   padding: 0rem 1rem;
+}
+
+.coupon-box__row {
+   display: grid;
+   grid-template-columns: 1fr auto;
+   gap: 10px;
+}
+
+.coupon-box__input {
+   width: 100%;
+   border: 1px solid var(--mp-line);
+   /* border-radius: 12px; */
+   padding: 12px 12px;
+   font-size: 14px;
+   outline: none;
+   /* background: var(--mp-surface); */
+}
+
+.coupon-box__input:focus {
+   box-shadow: var(--mp-focus);
+   border-color: rgba(59, 130, 246, 0.45);
+}
+
+.coupon-box__btn {
+   border: 1px solid rgba(17, 24, 39, 0.65);
+   background: #111827;
+   color: #fff;
+   /* border-radius: 12px; */
+   padding: 12px 14px;
+   font-size: 14px;
+   cursor: pointer;
+}
+
+.coupon-box__btn:active {
+   transform: scale(0.99);
+}
+
+.coupon-box__msg {
+   margin: 0;
+   color: var(--mp-muted);
+   font-size: 13px;
+   line-height: 1.45;
+}
+
+.coupon-owned__header {
+   display: grid;
+   gap: 10px;
+   margin-bottom: 12px;
+}
+
+.coupon-owned__headerActions {
+   display: flex;
+   gap: 8px;
+   flex-wrap: wrap;
+   justify-content: flex-start;
+}
+
+.coupon-owned__list {
+   list-style: none;
+   margin: 0;
+   padding: 0;
+   display: grid;
+   gap: 10px;
+}
+
+.coupon-item {
+   border: 1px solid var(--mp-line);
+   background: var(--mp-surface);
+   /* border-radius: 14px; */
+   padding: 14px;
    display: grid;
    gap: 12px;
 }
 
-.mypage__sectionTitle {
+.coupon-item.is-used {
+   opacity: 0.75;
+   background: rgba(15, 23, 42, 0.02);
+}
+
+.coupon-item__title {
+   margin: 0 0 6px;
+   font-weight: 800;
+   letter-spacing: -0.02em;
+}
+
+.coupon-item__meta {
    margin: 0;
-   font-size: 18px;
-   font-weight: 900;
+   font-size: 12px;
+   color: var(--mp-muted);
+   line-height: 1.4;
 }
 
-.mypage__sectionDesc {
-   margin: 0;
-   opacity: 0.7;
-   font-size: 13px;
+.coupon-item__status {
+   font-weight: 700;
 }
 
-/* =============================================
- * 2) MyPage Profile / Grade
- * ============================================= */
-
-.profile-card,
-.grade-card {
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   border-radius: 16px;
-   padding: 14px;
-   background: rgba(255, 255, 255, 0.95);
+.coupon-item__status.is-applied {
+   color: rgba(16, 185, 129, 0.95);
+}
+.coupon-item__status.is-used {
+   color: rgba(239, 68, 68, 0.95);
 }
 
+.coupon-item__actions {
+   display: flex;
+   gap: 8px;
+   justify-content: flex-end;
+}
+
+/* =========================================================
+   Profile / Grade (KV + bar)
+   ========================================================= */
 .kv {
    display: grid;
    gap: 10px;
@@ -165,126 +519,117 @@
    justify-content: space-between;
    gap: 12px;
    padding: 10px 12px;
-   border-radius: 14px;
-   background: rgba(0, 0, 0, 0.02);
-   border: 1px solid rgba(0, 0, 0, 0.06);
+   border: 1px solid var(--mp-line-2);
+   /* border-radius: 12px; */
+   background: rgba(15, 23, 42, 0.02);
 }
 
 .kv__key {
    font-size: 12px;
-   opacity: 0.72;
-   font-weight: 800;
+   color: var(--mp-muted);
 }
 
 .kv__val {
    font-size: 13px;
+   color: var(--mp-text);
 }
 
 .grade-top {
    display: grid;
+   grid-template-columns: 1fr;
    gap: 10px;
-}
-
-@media (min-width: 768px) {
-   .grade-top {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-   }
+   margin-bottom: 12px;
 }
 
 .grade-current {
+   border: 1px solid var(--mp-line-2);
+   background: rgba(15, 23, 42, 0.02);
+   /* border-radius: 12px; */
    padding: 12px;
-   border-radius: 14px;
-   background: rgba(0, 0, 0, 0.02);
-   border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .grade-current .label {
    margin: 0 0 6px;
    font-size: 12px;
-   opacity: 0.7;
-   font-weight: 800;
+   color: var(--mp-muted);
 }
 
 .grade-current .value {
    margin: 0;
-   font-size: 15px;
-}
-
-.grade-pill {
-   display: inline-flex;
-   align-items: center;
-   padding: 6px 10px;
-   border-radius: 999px;
-   border: 1px solid rgba(0, 0, 0, 0.14);
-   background: rgba(255, 255, 255, 0.9);
-   font-size: 13px;
-   font-weight: 900;
+   font-size: 14px;
+   color: var(--mp-text);
 }
 
 .grade-progress {
-   margin-top: 12px;
-   display: grid;
-   gap: 10px;
+   border: 1px solid var(--mp-line);
+   /* border-radius: 14px; */
+   padding: 14px;
+   background: var(--mp-surface);
 }
 
 .grade-progress__head {
    display: flex;
-   align-items: baseline;
    justify-content: space-between;
-   gap: 10px;
-   flex-wrap: wrap;
+   align-items: baseline;
+   gap: 12px;
+   margin-bottom: 10px;
 }
 
-.grade-progress__head .title,
+.grade-progress__head .title {
+   margin: 0;
+   font-weight: 800;
+   letter-spacing: -0.02em;
+}
+
 .grade-progress__head .meta {
    margin: 0;
-}
-
-.grade-progress__head .meta {
-   font-size: 13px;
-   opacity: 0.8;
+   font-size: 12px;
+   color: var(--mp-muted);
+   white-space: nowrap;
 }
 
 .bar {
-   height: 12px;
-   border-radius: 999px;
-   background: rgba(0, 0, 0, 0.08);
+   width: 100%;
+   height: 10px;
+   /* border-radius: 999px; */
+   background: rgba(15, 23, 42, 0.08);
    overflow: hidden;
-   border: 1px solid rgba(0, 0, 0, 0.08);
+   border: 1px solid rgba(15, 23, 42, 0.1);
 }
 
-.fill {
+.bar .fill {
    height: 100%;
    width: 0%;
-   background: rgba(0, 0, 0, 0.6);
+   /* border-radius: 999px; */
+   background: #111827;
+   transition: width 200ms ease;
 }
 
-/* =============================================
- * 3) MyPage Orders
- * ============================================= */
-
+/* =========================================================
+   Orders
+   ========================================================= */
 .order-list {
    list-style: none;
-   padding: 0;
    margin: 0;
+   padding: 0;
    display: grid;
    gap: 12px;
 }
 
 .order-card {
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   border-radius: 16px;
+   border: 1px solid var(--mp-line);
+   /* border-radius: 14px; */
+   background: var(--mp-surface);
    padding: 14px;
-   background: rgba(255, 255, 255, 0.95);
-   display: grid;
-   gap: 12px;
+   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .order-card__top {
    display: flex;
    align-items: flex-start;
    justify-content: space-between;
-   gap: 12px;
+   gap: 10px;
+   margin-bottom: 10px;
 }
 
 .order-card__id {
@@ -293,12 +638,14 @@
 }
 
 .order-card__time {
-   margin: 4px 0 0;
+   margin: 6px 0 0;
    font-size: 12px;
-   opacity: 0.7;
+   color: var(--mp-muted);
 }
 
 .order-card__body {
+   border-top: 1px solid var(--mp-line-2);
+   padding-top: 10px;
    display: grid;
    gap: 8px;
 }
@@ -306,89 +653,236 @@
 .order-card__line {
    margin: 0;
    display: flex;
+   align-items: center;
    justify-content: space-between;
    gap: 10px;
-   padding: 10px 12px;
-   border-radius: 14px;
-   background: rgba(0, 0, 0, 0.02);
-   border: 1px solid rgba(0, 0, 0, 0.06);
+   font-size: 13px;
+   color: var(--mp-text);
+}
+
+.order-card__line span {
+   color: var(--mp-muted);
+   font-size: 12px;
 }
 
 .order-card__actions {
+   margin-top: 12px;
    display: flex;
+   justify-content: flex-end;
+   gap: 8px;
+}
+
+/* =========================================================
+   Delivery (filters + timeline)
+   ========================================================= */
+.delivery__toolbar {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 8px;
+   margin-bottom: 12px;
+}
+
+.chip {
+   border: 1px solid var(--mp-line);
+   background: var(--mp-surface);
+   /* border-radius: 999px; */
+   padding: 8px 10px;
+   font-size: 12px;
+   cursor: pointer;
+   transition:
+      background 120ms ease,
+      border-color 120ms ease;
+}
+
+.chip.is-active {
+   background: #111827;
+   color: #fff;
+   border-color: rgba(17, 24, 39, 0.6);
+}
+
+.delivery-cards {
+   list-style: none;
+   margin: 0;
+   padding: 0;
+   display: grid;
+   gap: 12px;
+}
+
+.delivery-card {
+   border: 1px solid var(--mp-line);
+   /* border-radius: 14px; */
+   background: var(--mp-surface);
+   padding: 14px;
+   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.delivery-card__top {
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: 12px;
+   margin-bottom: 10px;
+}
+
+.delivery-card__id {
+   margin: 0;
+   font-size: 13px;
+}
+
+.delivery-card__sum {
+   text-align: right;
+   font-size: 12px;
+   color: var(--mp-muted);
+}
+
+.delivery-card__sum strong {
+   display: block;
+   font-size: 14px;
+   color: var(--mp-text);
+   margin-top: 4px;
+}
+
+.delivery-card__mid {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
    gap: 10px;
+   margin-top: 12px;
    flex-wrap: wrap;
 }
 
-/* =============================================
- * 4) MyPage Address Tab
- * ============================================= */
-
-.mypage [data-address-wrap] {
-   display: block;
+.delivery-card__track {
+   display: flex;
+   gap: 10px;
+   align-items: baseline;
 }
 
-.address-top {
+.delivery-card__actions {
+   display: flex;
+   gap: 8px;
+}
+
+.delivery-card__bottom {
+   margin-top: 12px;
+   border-top: 1px solid var(--mp-line-2);
+   padding-top: 12px;
+}
+
+/* Timeline */
+.timeline {
    display: grid;
-   gap: 16px;
+   grid-template-columns: repeat(3, 1fr);
+   gap: 10px;
+   padding: 12px;
+   border: 1px solid var(--mp-line-2);
+   /* border-radius: 14px; */
+   background: rgba(15, 23, 42, 0.02);
 }
 
+.timeline__step {
+   position: relative;
+   display: grid;
+   gap: 6px;
+   padding: 10px 10px 10px 12px;
+   /* border-radius: 12px; */
+   border: 1px solid rgba(15, 23, 42, 0.08);
+   background: rgba(255, 255, 255, 0.7);
+}
+
+.timeline__dot {
+   width: 10px;
+   height: 10px;
+   /* border-radius: 999px; */
+   background: rgba(15, 23, 42, 0.22);
+}
+
+.timeline__label {
+   font-size: 12px;
+   font-weight: 800;
+   letter-spacing: -0.01em;
+}
+
+.timeline__time {
+   font-size: 11px;
+}
+
+.timeline__step.is-done {
+   border-color: rgba(16, 185, 129, 0.25);
+   background: rgba(16, 185, 129, 0.06);
+}
+
+.timeline__step.is-done .timeline__dot {
+   background: rgba(16, 185, 129, 0.95);
+}
+
+.timeline__step.is-active {
+   border-color: rgba(17, 24, 39, 0.25);
+   background: rgba(17, 24, 39, 0.06);
+}
+
+.timeline__step.is-active .timeline__dot {
+   background: #111827;
+}
+
+.timeline.is-canceled {
+   opacity: 0.85;
+}
+
+.timeline__canceled {
+   grid-column: 1 / -1;
+   justify-self: start;
+   margin-top: 8px;
+   border-color: rgba(239, 68, 68, 0.25);
+   background: rgba(239, 68, 68, 0.08);
+   color: rgba(185, 28, 28, 0.95);
+}
+
+/* shipping snapshot */
+.ship__to {
+   margin: 0 0 6px;
+   font-size: 13px;
+}
+.ship__addr {
+   margin: 0;
+   font-size: 12px;
+   line-height: 1.45;
+}
+.ship__policy {
+   margin: 10px 0 0;
+   font-size: 11px;
+   line-height: 1.45;
+}
+
+/* =========================================================
+   Address
+   ========================================================= */
 .address-head {
    display: flex;
    align-items: flex-start;
    justify-content: space-between;
    gap: 12px;
-}
-
-.address-head .mypage__sectionTitle {
-   margin: 0;
-}
-
-.address-head .mypage__sectionDesc {
-   margin: 6px 0 0;
-   color: rgba(0, 0, 0, 0.6);
-}
-
-.address-empty {
-   padding: 20px;
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   border-radius: 16px;
-   background: #fff;
-   display: grid;
-   gap: 10px;
-}
-
-.address-empty .empty__title {
-   margin: 0;
-   font-weight: 700;
-   font-size: 16px;
-}
-
-.address-empty .empty__desc {
-   margin: 0;
-   color: rgba(0, 0, 0, 0.6);
-   line-height: 1.5;
+   margin-bottom: 12px;
 }
 
 .address-list {
    list-style: none;
-   padding: 0;
    margin: 0;
+   padding: 0;
    display: grid;
    gap: 12px;
 }
 
 .address-card {
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   border-radius: 16px;
-   background: #fff;
+   border: 1px solid var(--mp-line);
+   /* border-radius: 14px; */
+   background: var(--mp-surface);
    padding: 14px;
-   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
+   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .address-card.is-default {
-   border-color: rgba(0, 0, 0, 0.16);
-   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.06);
+   border-color: rgba(17, 24, 39, 0.35);
+   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
 }
 
 .address-card__top {
@@ -396,141 +890,102 @@
    align-items: flex-start;
    justify-content: space-between;
    gap: 12px;
+   margin-bottom: 10px;
 }
 
 .address-card__title {
    display: flex;
-   align-items: center;
-   flex-wrap: wrap;
    gap: 8px;
-   min-width: 0;
-}
-
-.address-card__title strong {
-   font-size: 15px;
-}
-
-.address-card__title .muted {
-   color: rgba(0, 0, 0, 0.6);
-   font-size: 13px;
-   white-space: nowrap;
+   flex-wrap: wrap;
+   align-items: center;
 }
 
 .address-card__actions {
    display: flex;
-   align-items: center;
    gap: 8px;
    flex-wrap: wrap;
    justify-content: flex-end;
 }
 
-.address-card__body {
-   margin-top: 10px;
-   display: grid;
-   gap: 6px;
-}
-
 .address-card__body p {
    margin: 0;
-   line-height: 1.5;
-}
-
-.address-card__body .muted {
-   color: rgba(0, 0, 0, 0.6);
-   font-size: 13px;
-}
-
-/* card-level pill stays consistent with scoped .pill */
-.address-card .pill {
-   height: 22px;
-   padding: 0 10px;
    font-size: 12px;
-   font-weight: 700;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(0, 0, 0, 0.04);
+   line-height: 1.5;
+   color: rgba(15, 23, 42, 0.86);
 }
 
-@media (max-width: 520px) {
-   .address-card__top {
-      flex-direction: column;
-      align-items: stretch;
-   }
-
-   .address-card__actions {
-      justify-content: flex-start;
-   }
-
-   .address-head {
-      flex-direction: column;
-      align-items: stretch;
-   }
+.address-empty .btn.primary {
+   width: 100%;
 }
 
-/* =============================================
- * 5) Address Form Modal
- * ============================================= */
-
-.address-form-overlay {
-   position: fixed;
-   inset: 0;
-   z-index: 9999;
-   display: grid;
-   place-items: center;
-   padding: 18px;
-   background: rgba(0, 0, 0, 0.45);
-}
-
-.address-form-modal {
-   width: min(560px, 100%);
-   border-radius: 18px;
-   background: #fff;
-   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+/* =========================================================
+   Address Form Modal (custom overlay)
+   uses: .reve-modal-overlay .reve-modal ...
+   ========================================================= */
+body.is-modal-open {
    overflow: hidden;
 }
 
-.address-form-modal .reve-modal__header {
+.reve-modal-overlay.address-form-overlay {
+   position: fixed;
+   inset: 0;
+   z-index: 9999;
+   background: rgba(15, 23, 42, 0.55);
+   display: grid;
+   place-items: center;
+   padding: 18px;
+}
+
+.reve-modal.address-form-modal {
+   width: min(680px, 100%);
+   background: var(--mp-surface);
+   /* border-radius: 18px; */
+   border: 1px solid rgba(255, 255, 255, 0.1);
+   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.35);
+   overflow: hidden;
+}
+
+.reve-modal__header {
    display: flex;
    align-items: center;
    justify-content: space-between;
-   gap: 12px;
-   padding: 16px;
-   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+   gap: 10px;
+   padding: 14px 16px;
+   border-bottom: 1px solid var(--mp-line-2);
 }
 
-.address-form-modal .reve-modal__title {
+.reve-modal__title {
    margin: 0;
-   font-size: 16px;
-   font-weight: 800;
-   letter-spacing: -0.2px;
+   font-size: 15px;
+   letter-spacing: -0.02em;
 }
 
-.address-form-modal .reve-modal__close {
+.reve-modal__close {
    width: 36px;
    height: 36px;
-   border-radius: 10px;
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   background: rgba(0, 0, 0, 0.03);
+   /* border-radius: 999px; */
+   border: 1px solid var(--mp-line);
+   background: var(--mp-surface);
    cursor: pointer;
-   font-size: 18px;
-   line-height: 1;
 }
 
-.address-form-modal .reve-modal__body {
-   padding: 16px 16px 12px;
+.reve-modal__body {
+   padding: 14px 16px 6px;
 }
 
-.address-form-modal .reve-modal__footer {
-   padding: 14px 16px 16px;
-   border-top: 1px solid rgba(0, 0, 0, 0.08);
+.reve-modal__footer {
+   padding: 12px 16px 16px;
    display: flex;
    justify-content: flex-end;
-   gap: 10px;
+   gap: 8px;
+   border-top: 1px solid var(--mp-line-2);
 }
 
+/* form */
 .form-grid {
    display: grid;
-   grid-template-columns: 1fr 1fr;
-   gap: 12px;
+   gap: 10px;
+   margin-bottom: 10px;
 }
 
 .form-field {
@@ -540,33 +995,26 @@
 
 .form-field .k {
    font-size: 12px;
-   font-weight: 700;
-   color: rgba(0, 0, 0, 0.7);
+   color: var(--mp-muted);
 }
 
 .form-field input[type='text'] {
-   height: 42px;
-   padding: 0 12px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: #fff;
+   border: 1px solid var(--mp-line);
+   /* border-radius: 12px; */
+   padding: 12px 12px;
+   font-size: 14px;
    outline: none;
+   background: var(--mp-surface);
 }
 
 .form-field input[type='text']:focus {
-   border-color: rgba(0, 0, 0, 0.28);
-   box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.06);
+   box-shadow: var(--mp-focus);
+   border-color: rgba(59, 130, 246, 0.45);
 }
 
 .form-field.checkbox {
-   grid-column: 1 / -1;
-   display: flex;
+   grid-template-columns: 18px 1fr;
    align-items: center;
-   gap: 10px;
-   padding: 10px 12px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   background: rgba(0, 0, 0, 0.02);
 }
 
 .form-field.checkbox input[type='checkbox'] {
@@ -574,744 +1022,168 @@
    height: 18px;
 }
 
-.address-form-modal .muted {
-   margin: 10px 0 0;
+/* =========================================================
+   Buttons (only when your global .btn is weak)
+   ========================================================= */
+.btn.small {
+   padding: 8px 10px;
    font-size: 12px;
-   color: rgba(0, 0, 0, 0.55);
+   /* border-radius: 10px; */
 }
 
-@media (max-width: 520px) {
-   .form-grid {
-      grid-template-columns: 1fr;
-   }
+.btn.danger {
+   border-color: rgba(239, 68, 68, 0.35);
+   color: rgba(185, 28, 28, 0.95);
 }
 
-/* =============================================
- * 6) Cart Layout / Items
- * ============================================= */
-
-.cart-layout {
-   display: grid;
-   gap: 16px;
-}
-
-@media (min-width: 768px) {
-   .cart-layout {
-      grid-template-columns: minmax(0, 1fr) 320px;
-      align-items: start;
-   }
-}
-
-@media (min-width: 768px) {
-   .cart__summary {
-      position: sticky;
-      top: calc(6svh + 16px);
-   }
-}
-
-.cart__list {
-   display: grid;
-   gap: 12px;
-}
-
-.cart-item {
-   display: grid;
-   gap: 10px;
-   padding: 14px;
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   background: rgba(255, 255, 255, 0.95);
-}
-
-.cart-item__info {
-   display: flex;
-   align-items: baseline;
-   justify-content: space-between;
-   gap: 12px;
-}
-
-.cart-item__name {
-   margin: 0;
-   font-weight: 700;
-   min-width: 0;
-   white-space: nowrap;
-   overflow: hidden;
-   text-overflow: ellipsis;
-}
-
-.cart-item__price {
-   margin: 0;
-   font-weight: 700;
-   opacity: 0.9;
-   flex: 0 0 auto;
-}
-
-.cart-item__controls {
-   display: inline-flex;
-   align-items: center;
-   gap: 10px;
-}
-
-.cart-item__controls button {
-   width: 36px;
-   height: 36px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(0, 0, 0, 0.03);
-   cursor: pointer;
-}
-
-.cart-item__qty {
-   min-width: 24px;
-   text-align: center;
-   font-weight: 700;
-}
-
-.cart-item__remove {
-   justify-self: end;
-   padding: 10px 12px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: transparent;
-   cursor: pointer;
-}
-
-.cart__summary {
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   padding: 14px;
-   background: rgba(255, 255, 255, 0.95);
-   display: grid;
-   gap: 12px;
-}
-
-.cart__row {
-   display: flex;
-   align-items: center;
-   justify-content: space-between;
-}
-
-.cart__clear,
-.cart__checkout {
-   width: 100%;
-   height: 44px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   cursor: pointer;
-}
-
-.cart__clear {
-   background: rgba(0, 0, 0, 0.03);
-}
-
-.cart__checkout {
-   background: rgba(0, 0, 0, 0.08);
-   font-weight: 700;
-}
-
-.cart__checkout:disabled {
-   opacity: 0.6;
-   cursor: not-allowed;
-}
-
-.cart__divider {
-   border: 0;
-   border-top: 1px solid rgba(0, 0, 0, 0.08);
-   margin: 4px 0;
-}
-
-.cart__shipping-hint {
-   margin: 0;
-   font-size: 12px;
-   opacity: 0.72;
-}
-
-.cart__membership {
-   display: grid;
-   gap: 8px;
-   padding: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   background: rgba(0, 0, 0, 0.02);
-   margin: 10px 0 12px;
-}
-
-.cart__row--muted {
-   opacity: 0.72;
-   font-size: 13px;
-}
-
-/* =============================================
- * 7) Cart - Shipping Address Summary
- * ============================================= */
-
-.cart__address {
-   margin-top: 12px;
-   padding: 14px;
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   background: #fff;
-   border-radius: 14px;
-}
-
-.cart__address .cart__row {
-   display: flex;
-   align-items: center;
-   justify-content: space-between;
-   gap: 12px;
-   margin: 0;
-}
-
-.cart__address .cart__row > span {
-   font-size: 12px;
-   color: rgba(0, 0, 0, 0.55);
-   letter-spacing: -0.2px;
-}
-
-.cart__address .cart__row > strong {
-   font-size: 14px;
-   font-weight: 800;
-   color: rgba(0, 0, 0, 0.9);
-   letter-spacing: -0.2px;
-   display: inline-flex;
-   align-items: center;
-   gap: 8px;
-   min-width: 0;
-}
-
-.cart__address .cart__row > strong > span,
-.cart__address .cart__row > strong {
-   white-space: nowrap;
-   overflow: hidden;
-   text-overflow: ellipsis;
-}
-
-.cart__address .cart__couponmsg {
-   margin: 10px 0 0;
-   padding: 10px 12px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.06);
-   background: rgba(0, 0, 0, 0.02);
-   font-size: 13px;
-   color: rgba(0, 0, 0, 0.7);
-   line-height: 1.45;
-   display: -webkit-box;
-   -webkit-line-clamp: 2;
-   -webkit-box-orient: vertical;
-   overflow: hidden;
-}
-
-.cart__address .btn.subtle,
-.cart__address .btn {
-   margin-top: 10px;
-   width: 100%;
-   height: 38px;
-   font-size: 13px;
-   font-weight: 700;
-   letter-spacing: -0.2px;
-}
-
-.cart__address .btn.subtle {
-   background: rgba(0, 0, 0, 0.04);
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   color: rgba(0, 0, 0, 0.82);
-}
-
-.cart__address .btn.subtle:hover {
-   background: rgba(0, 0, 0, 0.06);
-}
-
-.cart__address .pill {
-   height: 22px;
-   padding: 0 10px;
-   font-size: 12px;
-   font-weight: 800;
-   background: rgba(0, 0, 0, 0.05);
-   color: rgba(0, 0, 0, 0.75);
-}
-
-.cart__summary > .cart__address + .cart__membership {
-   margin-top: 12px;
-}
-
-/* =============================================
- * 8) Cart Coupon UI
- * - NOTE: .cart__couponmsg is also used in cart address summary
- *   So we keep it general, but refine inside .cart__coupon scope
- * ============================================= */
-
-.cart__coupon {
-   display: grid;
-   gap: 10px;
-   padding: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   background: rgba(0, 0, 0, 0.02);
-   border-radius: 14px;
-}
-
-.cart__coupon .cart__couponmsg {
-   margin: 0;
-   font-size: 13px;
-   opacity: 0.85;
-   line-height: 1.4;
-   padding: 0;
-   border: 0;
-   background: transparent;
-   display: block;
-}
-
-.cart__couponlist {
-   display: grid;
-   gap: 8px;
-}
-
-.cart__couponitem {
-   display: flex;
-   align-items: center;
-   gap: 10px;
-   padding: 10px 12px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   background: rgba(255, 255, 255, 0.9);
-   cursor: pointer;
-   user-select: none;
-   transition:
-      transform 120ms ease,
-      background 120ms ease,
-      border-color 120ms ease;
-}
-
-.cart__couponitem:hover {
-   transform: translateY(-1px);
-   border-color: rgba(0, 0, 0, 0.14);
-   background: rgba(255, 255, 255, 1);
-}
-
-.cart__couponitem input[type='radio'] {
-   width: 16px;
-   height: 16px;
-   accent-color: rgba(0, 0, 0, 0.85);
-   cursor: pointer;
-}
-
-.cart__couponitem:has(input[type='radio']:checked) {
-   border-color: rgba(0, 0, 0, 0.22);
-   background: rgba(0, 0, 0, 0.04);
-}
-
-.cart__couponitem:has(input[type='radio']:disabled) {
-   opacity: 0.55;
-   cursor: not-allowed;
-}
-
-.cart__couponitem:has(input[type='radio']:disabled):hover {
-   transform: none;
-   border-color: rgba(0, 0, 0, 0.08);
-   background: rgba(255, 255, 255, 0.9);
-}
-
-.cart__couponmeta {
-   display: inline-flex;
-   align-items: center;
-   gap: 8px;
-   min-width: 0;
-   font-size: 13px;
-}
-
-.cart__couponmeta strong {
-   font-size: 13px;
-   font-weight: 800;
-   letter-spacing: 0.2px;
-}
-
-.cart__couponactions {
-   display: grid;
-   grid-template-columns: 1fr 1fr;
-   gap: 8px;
-}
-
-.cart__couponbtn {
-   height: 40px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(255, 255, 255, 0.9);
-   cursor: pointer;
-   font-weight: 700;
-   transition:
-      transform 120ms ease,
-      background 120ms ease,
-      opacity 120ms ease;
-}
-
-.cart__couponbtn:hover {
-   transform: translateY(-1px);
-   background: rgba(255, 255, 255, 1);
-}
-
-.cart__couponbtn:disabled {
-   opacity: 0.55;
-   cursor: not-allowed;
-   transform: none;
-}
-
-.cart__couponstatus {
-   margin: 0;
-   font-size: 12.5px;
-   opacity: 0.85;
-   padding-top: 4px;
-   border-top: 1px dashed rgba(0, 0, 0, 0.12);
-}
-.cart__points {
-   margin-top: 12px;
-   padding-top: 12px;
-   border-top: 1px solid rgba(0, 0, 0, 0.06);
-
-   border: 1px solid red;
-}
-
-.cart__pointsRow {
-   display: flex;
-   gap: 8px;
-   align-items: center;
-}
-
-.cart__pointsInput {
-   flex: 1;
-   height: 40px;
-   padding: 0 12px;
-   border-radius: 10px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-}
 .btn.subtle {
-   font-size: 12px;
+   background: rgba(15, 23, 42, 0.03);
+   border-color: rgba(15, 23, 42, 0.12);
 }
 
-@media (max-width: 420px) {
-   .cart__couponactions {
-      grid-template-columns: 1fr;
-   }
-}
-
-/* =============================================
- * 9) MyPage Coupon UI
- * - Scope to MyPage to avoid cart collisions
- * ============================================= */
-
-.mypage .coupon-box {
-   border: 1px solid rgba(0, 0, 0, 0.1);
-   border-radius: 16px;
-   padding: 12px;
-   background: rgba(0, 0, 0, 0.02);
-   display: grid;
-   gap: 10px;
-}
-
-.mypage .coupon-box__row {
-   display: grid;
-   grid-template-columns: minmax(0, 1fr) 92px;
-   gap: 10px;
-   align-items: center;
-}
-
-.mypage .coupon-box__input {
-   height: 44px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   padding: 0 12px;
-   background: rgba(255, 255, 255, 0.9);
-   outline: none;
-}
-
-.mypage .coupon-box__input:focus {
-   border-color: rgba(0, 0, 0, 0.26);
-}
-
-.mypage .coupon-box__btn {
-   height: 44px;
-   border-radius: 12px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(0, 0, 0, 0.06);
-   cursor: pointer;
-   font-weight: 900;
-}
-
-.mypage .coupon-box__msg {
-   margin: 0;
-   font-size: 13px;
-   opacity: 0.78;
-}
-
-.mypage .coupon-owned {
-   display: grid;
-   gap: 12px;
-}
-
-.mypage .coupon-owned__header {
-   display: flex;
-   align-items: flex-start;
-   justify-content: space-between;
-   gap: 12px;
-}
-
-.mypage .coupon-owned__list {
-   list-style: none;
-   padding: 0;
-   margin: 0;
-   display: grid;
-   gap: 10px;
-}
-
-.mypage .coupon-item {
-   border: 1px solid rgba(0, 0, 0, 0.1);
-   border-radius: 16px;
-   padding: 12px;
-   background: rgba(255, 255, 255, 0.95);
-   display: grid;
-   gap: 10px;
-}
-
-.mypage .coupon-item.is-used {
-   opacity: 0.6;
-}
-
-.mypage .coupon-item__title {
-   margin: 0;
-   font-weight: 900;
-}
-
-.mypage .coupon-item__meta {
-   margin: 4px 0 0;
-   font-size: 13px;
-   opacity: 0.8;
-   display: flex;
-   align-items: center;
-   gap: 8px;
-   flex-wrap: wrap;
-}
-
-.mypage .dot {
-   opacity: 0.55;
-}
-
-.mypage .coupon-item__actions {
-   display: flex;
-   gap: 8px;
-   justify-content: flex-end;
-}
-
-/* =============================================
- * 10) MyPage Delivery (주문/배송 탭)
- * - filter chips + delivery cards + timeline
- * ============================================= */
-
-.mypage .delivery {
-   display: grid;
-   gap: 12px;
-}
-
-/* filter chips */
-.mypage .delivery__toolbar {
-   display: flex;
-   gap: 8px;
-   flex-wrap: wrap;
-}
-
-.mypage .chip {
-   height: 36px;
-   padding: 0 12px;
-   border-radius: 999px;
-   border: 1px solid rgba(0, 0, 0, 0.12);
-   background: rgba(255, 255, 255, 0.9);
-   cursor: pointer;
-   font-size: 12px;
-   font-weight: 900;
-   transition:
-      transform 120ms ease,
-      background 120ms ease,
-      border-color 120ms ease;
-}
-
-.mypage .chip:hover {
-   transform: translateY(-1px);
-   border-color: rgba(0, 0, 0, 0.18);
-   background: rgba(255, 255, 255, 1);
-}
-
-.mypage .chip.is-active {
-   background: rgba(0, 0, 0, 0.06);
-   border-color: rgba(0, 0, 0, 0.22);
-}
-
-.mypage .delivery__list {
-   display: block;
-}
-
-/* cards list */
-.mypage .delivery-cards {
-   list-style: none;
-   padding: 0;
-   margin: 0;
-   display: grid;
-   gap: 12px;
-}
-
-.mypage .delivery-card {
-   border: 1px solid rgba(0, 0, 0, 0.08);
-   border-radius: 16px;
-   padding: 14px;
-   background: rgba(255, 255, 255, 0.95);
-   display: grid;
-   gap: 12px;
-}
-
-.mypage .delivery-card__top {
-   display: flex;
-   align-items: flex-start;
-   justify-content: space-between;
-   gap: 12px;
-}
-
-.mypage .delivery-card__id {
-   margin: 0;
-   font-size: 13px;
-}
-
-.mypage .delivery-card__sum {
-   text-align: right;
-   display: grid;
-   gap: 4px;
-}
-
-.mypage .delivery-card__mid {
-   display: flex;
-   align-items: center;
-   justify-content: space-between;
-   gap: 12px;
-   flex-wrap: wrap;
-}
-
-.mypage .delivery-card__track {
-   display: inline-flex;
-   align-items: center;
-   gap: 10px;
-   padding: 10px 12px;
-   border-radius: 14px;
-   background: rgba(0, 0, 0, 0.02);
-   border: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.mypage .delivery-card__actions {
-   display: flex;
-   gap: 10px;
-   flex-wrap: wrap;
-}
-
-/* shipping snapshot */
-.mypage .ship {
-   padding: 12px;
-   border-radius: 14px;
-   background: rgba(0, 0, 0, 0.02);
-   border: 1px solid rgba(0, 0, 0, 0.06);
-   display: grid;
-   gap: 6px;
-}
-
-.mypage .ship__to {
-   margin: 0;
-   font-size: 13px;
-   font-weight: 900;
-}
-
-.mypage .ship__addr {
-   margin: 0;
-   font-size: 13px;
-   opacity: 0.75;
-   line-height: 1.45;
-}
-
-/* timeline */
-.mypage .timeline {
-   display: grid;
-   grid-template-columns: repeat(3, minmax(0, 1fr));
-   gap: 10px;
-}
-
-.mypage .timeline__step {
-   display: flex;
-   align-items: center;
-   gap: 10px;
-   padding: 10px 12px;
-   border-radius: 14px;
-   background: rgba(0, 0, 0, 0.02);
-   border: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.mypage .timeline__dot {
-   width: 10px;
-   height: 10px;
-   border-radius: 999px;
-   border: 2px solid rgba(0, 0, 0, 0.25);
-   background: rgba(255, 255, 255, 0.95);
-   flex: 0 0 auto;
-}
-
-.mypage .timeline__label {
-   font-size: 12px;
-   font-weight: 900;
-   opacity: 0.75;
-}
-
-/* done / active states */
-.mypage .timeline__step.is-done .timeline__dot {
-   background: rgba(0, 0, 0, 0.55);
-   border-color: rgba(0, 0, 0, 0.55);
-}
-
-.mypage .timeline__step.is-done .timeline__label {
-   opacity: 0.9;
-}
-
-.mypage .timeline__step.is-active {
-   background: rgba(0, 0, 0, 0.05);
-   border-color: rgba(0, 0, 0, 0.14);
-}
-
-.mypage .timeline__step.is-active .timeline__dot {
-   background: rgba(0, 0, 0, 0.85);
-   border-color: rgba(0, 0, 0, 0.85);
-}
-
-.mypage .timeline__step.is-active .timeline__label {
-   opacity: 1;
-}
-
-/* canceled */
-.mypage .timeline.is-canceled {
-   grid-template-columns: 1fr;
-}
-
-.mypage .timeline.is-canceled .timeline__step {
-   opacity: 0.6;
-}
-
-.mypage .timeline__canceled {
-   justify-self: start;
-   margin: 0;
-   padding: 6px 10px;
-   border-radius: 999px;
-   border: 1px solid rgba(0, 0, 0, 0.14);
-   background: rgba(0, 0, 0, 0.04);
-   font-size: 12px;
-   font-weight: 900;
-}
-
-/* mobile tweaks */
-@media (max-width: 520px) {
-   .mypage .timeline {
-      grid-template-columns: 1fr;
+/* =========================================================
+   ✅ Desktop enhancement (>= 960px)
+   - Sidebar menu 느낌으로 탭을 변환
+   - content/summary 카드 정리
+   ========================================================= */
+@media (min-width: 960px) {
+   /* 페이지 자체를 좀 더 "센터"로 안정화 */
+   .mypage .page__content {
+      padding-left: 12px;
+      padding-right: 12px;
    }
 
-   .mypage .delivery-card__top {
+   .mypage__layout {
+      grid-template-columns: 280px 1fr;
+      align-items: start;
+      gap: 18px;
+   }
+
+   /* Sidebar box */
+   .mypage__nav {
+      position: sticky;
+      top: var(--top-offset);
+      padding: 14px;
+      border: 1px solid var(--mp-line);
+      /* border-radius: var(--mp-radius); */
+      box-shadow: var(--mp-shadow);
+      background: var(--mp-surface);
+   }
+
+   .mypage__navHead {
+      display: block;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--mp-line-2);
+   }
+
+   /* Tabs -> Vertical menu list */
+   .mypage__tabs {
       flex-direction: column;
-      align-items: stretch;
+      overflow: visible;
+      padding: 0;
+      gap: 8px;
+      scroll-snap-type: none;
    }
 
-   .mypage .delivery-card__sum {
-      text-align: left;
+   .mypage__tabitem {
+      scroll-snap-align: none;
+   }
+
+   /* ✅ pill 제거하고 "메뉴 버튼" 느낌 */
+   .mypage__tab {
+      width: 100%;
+      justify-content: space-between;
+      /* border-radius: 12px; */
+      padding: 12px 12px;
+      box-shadow: none;
+      background: #fff;
+      border-color: var(--mp-line);
+      transition:
+         background 120ms ease,
+         border-color 120ms ease;
+   }
+
+   .mypage__tab:hover {
+      background: rgba(15, 23, 42, 0.02);
+      border-color: rgba(15, 23, 42, 0.16);
+   }
+
+   .mypage__tab.is-active {
+      background: rgba(17, 24, 39, 0.06);
+      color: var(--mp-text);
+      border-color: rgba(17, 24, 39, 0.22);
+   }
+
+   /* active indicator bar (문고리닷컴 좌측 메뉴 느낌) */
+   .mypage__tab.is-active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 10px;
+      bottom: 10px;
+      width: 3px;
+      /* border-radius: 999px; */
+      background: #111827;
+   }
+
+   /* 우측 영역: summary 카드 + 섹션 padding 확대 */
+   .mypage__section {
+      padding: 18px;
+   }
+
+   .mypage__summaryGrid {
+      grid-template-columns: repeat(3, 1fr);
+   }
+
+   .mypage__summaryTop {
+      gap: 14px;
+   }
+
+   .mypage__avatar {
+      width: 52px;
+      height: 52px;
+   }
+
+   /* coupon header 레이아웃 */
+   .coupon-owned__header {
+      grid-template-columns: 1fr auto;
+      align-items: end;
+   }
+
+   .coupon-owned__headerActions {
+      justify-content: flex-end;
+   }
+
+   /* form 2 column */
+   .form-grid {
+      grid-template-columns: 1fr 1fr;
+   }
+
+   .form-field.checkbox {
+      grid-column: 1 / -1;
+   }
+
+   .timeline__step {
+      padding: 12px 12px 12px 14px;
+   }
+}
+
+/* =========================================================
+   ✅ Wide desktop polish (>= 1200px)
+   - 좌측/우측 여백 조금 더 안정감
+   ========================================================= */
+@media (min-width: 1200px) {
+   .mypage .page__content {
+      padding-left: 0;
+      padding-right: 0;
+   }
+
+   .mypage__layout {
+      grid-template-columns: 300px 1fr;
+   }
+
+   .mypage__tab {
+      padding: 13px 14px;
    }
 }
