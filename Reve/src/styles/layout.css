@@ -24,10 +24,3 @@
    padding-bottom: 18px;
    box-sizing: border-box;
 }
-
-.hero-section {
-   background-color: #000;
-   width: 100%;
-   height: 100svh;
-   top: var(--top-offset);
-}

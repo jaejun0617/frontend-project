@@ -1,0 +1,203 @@
+/* =========================================================
+   Home Hero - Fade Swiper (FINAL)
+   File: Main.CSS
+   ========================================================= */
+
+:root {
+   /* header */
+   --app-header-h: 6vh;
+   --safe-top: env(safe-area-inset-top, 0px);
+   --top-offset: calc(var(--app-header-h) + var(--safe-top));
+
+   /* hero layout */
+   --hero-max: 1920px;
+   --hero-pad-x: 20px;
+
+   /* tone */
+   --hero-text: #0f172a;
+
+   /* timing */
+   --hero-fade: 700ms;
+}
+
+/* Hero wrapper */
+.hero {
+   position: relative;
+   width: 100%;
+}
+
+/* viewport: mobile ~50svh (header 제외) */
+.hero__viewport {
+   position: relative;
+   width: 100%;
+   height: calc(50svh - var(--top-offset));
+   min-height: 280px;
+   overflow: hidden;
+}
+
+/* tablet/pc: 100svh (header 제외) */
+@media (min-width: 768px) {
+   .hero__viewport {
+      height: calc(100svh - var(--top-offset));
+      min-height: 520px;
+   }
+}
+
+/* Slide (fade layer) */
+.hero__slide {
+   position: absolute;
+   inset: 0;
+
+   /* ✅ 핵심: --hero-bg는 inline에서 url('...') 형태로 들어오는 전제 */
+   background-image: var(--hero-bg, linear-gradient(120deg, #f4f4f5, #e5e7eb));
+   background-size: cover;
+   background-position: center;
+   background-repeat: no-repeat;
+
+   opacity: 0;
+   pointer-events: none;
+   transition: opacity var(--hero-fade) ease;
+
+   /* 미세한 안정성: 배경 로딩 중 깜빡임 방지 */
+   transform: translateZ(0);
+}
+
+.hero__slide.is-active {
+   opacity: 1;
+   pointer-events: auto;
+}
+
+/* readability overlay (white base, black text) */
+.hero__overlay {
+   position: absolute;
+   inset: 0;
+   background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* container */
+.hero__container {
+   position: relative;
+   height: 100%;
+   width: min(var(--hero-max), 100%);
+   margin: 0 auto;
+   padding: 0 var(--hero-pad-x);
+
+   display: grid;
+   align-items: center;
+}
+
+/* content */
+.hero__content {
+   max-width: 760px;
+   color: var(--hero-text);
+   padding: 34px 0;
+}
+
+/* brand */
+.hero__brand {
+   margin: 0 0 14px;
+   font-weight: 800;
+   letter-spacing: 0.12em;
+   text-transform: uppercase;
+   font-size: 12px;
+   opacity: 0.86;
+   color: #f4f4f5;
+   text-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.85),
+      0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+/* title */
+.hero__title {
+   margin: 0 0 16px;
+   font-size: clamp(28px, 4vw, 58px);
+   line-height: 1.06;
+   letter-spacing: -0.035em;
+   color: #f4f4f5;
+   text-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.85),
+      0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+/* bilingual */
+.hero__title .ko,
+.hero__sub .ko {
+   display: block;
+}
+
+.hero__title .en {
+   display: block;
+   margin-top: 10px;
+   font-weight: 700;
+   font-size: clamp(16px, 2.2vw, 22px);
+   opacity: 0.82;
+   letter-spacing: -0.02em;
+}
+
+.hero__sub {
+   margin: 0;
+   font-size: clamp(14px, 1.6vw, 18px);
+   line-height: 1.55;
+   opacity: 0.92;
+   color: #f4f4f5;
+   text-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.85),
+      0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+.hero__sub .en {
+   display: block;
+   margin-top: 8px;
+   font-weight: 600;
+   opacity: 0.78;
+}
+
+/* actions */
+.hero__actions {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 12px;
+   margin-top: 20px;
+   color: #f4f4f5;
+}
+
+.hero__actions .hero__btn {
+   padding: 12px 16px;
+   color: #f4f4f5;
+   border-radius: 0;
+   background-color: transparent;
+   border: 1px solid #f4f4f5;
+   cursor: pointer;
+}
+
+/* dots */
+.hero__dots {
+   width: min(var(--hero-max), 100%);
+   margin: 0 auto;
+
+   padding: 14px var(--hero-pad-x) 22px;
+   display: flex;
+   gap: 10px;
+   justify-content: center;
+}
+
+.hero__dot {
+   width: 10px;
+   height: 10px;
+   border-radius: 999px;
+   border: 1px solid rgba(15, 23, 42, 0.32);
+   background: rgba(15, 23, 42, 0.12);
+   cursor: pointer;
+}
+
+.hero__dot.is-active {
+   background: rgba(15, 23, 42, 0.9);
+   border-color: rgba(15, 23, 42, 0.9);
+}
+
+/* reduce motion */
+@media (prefers-reduced-motion: reduce) {
+   .hero__slide {
+      transition: none;
+   }
+}
