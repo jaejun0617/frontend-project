@@ -250,7 +250,7 @@
    border: 1px solid rgba(15, 23, 42, 0.12);
    padding: 18px;
    min-height: 260px;
-
+   border-radius: 18px;
    display: grid;
    align-items: end;
 
@@ -401,4 +401,227 @@
 
 .home-products__more:hover {
    background: rgba(15, 23, 42, 0.04);
+}
+
+/* =========================================================
+   WELCOME EVENT COUPON SECTION
+   - bg: /src/images/main/coupon/coupon__bg.png
+   - overlay text matches image tone (cream/gold)
+   ========================================================= */
+
+.home-welcome__event__coupon {
+   --coupon-cream: #fbd2a8; /* 이미지 타이틀 크림톤 */
+   --coupon-gold: #d39b57; /* 이미지 골드톤 */
+   --coupon-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+
+   width: 100%;
+   padding: 56px 0;
+}
+
+.home-welcome__event__coupon .coupon-banner {
+   width: min(1440px, 100%);
+   margin: 0 auto;
+   padding: 0 20px;
+
+   /* 배경 이미지 */
+   background-image: url('/src/images/main/coupon/coupon__bg.png');
+   background-size: cover;
+   background-position: center;
+   background-repeat: no-repeat;
+
+   border-radius: 18px;
+   overflow: hidden;
+   position: relative;
+
+   /* 배너 높이(16:9 감성 유지) */
+   min-height: clamp(260px, 28vw, 520px);
+
+   display: grid;
+   align-items: center;
+}
+
+/* 텍스트 가독성용 얇은 필름 (이미지 무드 유지하면서만) */
+.home-welcome__event__coupon .coupon-banner::before {
+   content: '';
+   position: absolute;
+   inset: 0;
+
+   /* 오른쪽 텍스트 영역 위주로 은근히 눌러주기 */
+   background:
+      radial-gradient(
+         900px 420px at 65% 45%,
+         rgba(0, 0, 0, 0.1),
+         transparent 60%
+      ),
+      linear-gradient(
+         90deg,
+         rgba(0, 0, 0, 0) 0%,
+         rgba(0, 0, 0, 0.18) 55%,
+         rgba(0, 0, 0, 0.22) 100%
+      );
+   pointer-events: none;
+}
+
+.home-welcome__event__coupon .coupon-banner__content {
+   position: relative;
+   z-index: 1;
+
+   /* ✅ “옆에 있는 글씨” 느낌: 오른쪽 정렬 */
+   margin-left: auto;
+   width: min(680px, 100%);
+   padding: clamp(18px, 2.6vw, 34px);
+
+   text-align: center;
+}
+
+/* 상단 작은 라인 */
+.home-welcome__event__coupon .coupon-banner__eyebrow {
+   margin: 0 0 10px;
+   font-weight: 800;
+   letter-spacing: 0.18em;
+   text-transform: uppercase;
+   font-size: clamp(11px, 1.3vw, 14px);
+
+   color: var(--coupon-gold);
+   text-shadow: var(--coupon-shadow);
+}
+
+/* 메인 타이틀 */
+.home-welcome__event__coupon .coupon-banner__title {
+   margin: 0 0 14px;
+   font-weight: 900;
+   letter-spacing: -0.03em;
+   line-height: 1.05;
+   font-size: clamp(22px, 3.6vw, 56px);
+
+   color: var(--coupon-cream);
+   text-shadow:
+      0 2px 18px rgba(0, 0, 0, 0.55),
+      0 0 2px rgba(0, 0, 0, 0.7);
+}
+
+/* 한글 라인 (가운데 ‘—’ 느낌은 pseudo로) */
+.home-welcome__event__coupon .coupon-banner__subtitle {
+   margin: 0 0 18px;
+   display: grid;
+   place-items: center;
+   gap: 10px;
+}
+
+.home-welcome__event__coupon .coupon-banner__subtitle-line {
+   position: relative;
+   display: inline-block;
+   padding: 0 18px;
+
+   font-size: clamp(14px, 1.8vw, 20px);
+   font-weight: 700;
+   letter-spacing: -0.02em;
+
+   color: rgba(255, 243, 224, 0.92);
+   text-shadow:
+      0 2px 18px rgba(0, 0, 0, 0.55),
+      0 0 2px rgba(0, 0, 0, 0.7);
+}
+
+.home-welcome__event__coupon .coupon-banner__subtitle-line::before,
+.home-welcome__event__coupon .coupon-banner__subtitle-line::after {
+   content: '';
+   position: absolute;
+   top: 50%;
+   width: 44px;
+   height: 1px;
+   background: rgba(251, 210, 168, 0.55);
+   transform: translateY(-50%);
+}
+
+.home-welcome__event__coupon .coupon-banner__subtitle-line::before {
+   left: -44px;
+}
+.home-welcome__event__coupon .coupon-banner__subtitle-line::after {
+   right: -44px;
+}
+
+/* 하단 CTA 문구 */
+.home-welcome__event__coupon .coupon-banner__desc {
+   margin: 0 0 18px;
+   font-size: clamp(13px, 1.5vw, 18px);
+   line-height: 1.55;
+   font-weight: 650;
+
+   color: rgba(255, 243, 224, 0.92);
+   text-shadow:
+      0 2px 18px rgba(0, 0, 0, 0.55),
+      0 0 2px rgba(0, 0, 0, 0.7);
+}
+
+/* 버튼 */
+.home-welcome__event__coupon .coupon-banner__actions {
+   display: inline-flex;
+   flex-wrap: wrap;
+   gap: 10px;
+   justify-content: center;
+}
+
+.home-welcome__event__coupon .coupon-banner__btn {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   font-size: clamp(13px, 1.5vw, 18px);
+   height: 44px;
+   padding: 0 32px;
+   text-decoration: none;
+   font-weight: 800;
+   letter-spacing: -0.02em;
+
+   border: 1px solid rgba(251, 210, 168, 0.55);
+   color: rgba(255, 246, 235, 0.95);
+   background: rgba(0, 0, 0, 0.22);
+
+   transition:
+      transform 140ms ease,
+      background 140ms ease,
+      border-color 140ms ease,
+      opacity 140ms ease;
+}
+
+.home-welcome__event__coupon .coupon-banner__btn:hover {
+   transform: translateY(-1px);
+   border-color: rgba(251, 210, 168, 0.78);
+   background: rgba(0, 0, 0, 0.28);
+}
+
+.home-welcome__event__coupon .coupon-banner__btn:active {
+   transform: translateY(0);
+}
+
+.home-welcome__event__coupon .coupon-banner__btn--primary {
+   border-color: rgba(211, 155, 87, 0.72);
+}
+
+.home-welcome__event__coupon .coupon-banner__btn--primary:hover {
+   border-color: rgba(211, 155, 87, 0.86);
+}
+
+.home-welcome__event__coupon .coupon-banner__btn--ghost {
+   background: rgba(0, 0, 0, 0.16);
+}
+
+/* 모바일에서 너무 오른쪽 느낌 나면 중앙 유지(이미지 무드 보호) */
+@media (max-width: 520px) {
+   .home-welcome__event__coupon .coupon-banner__content {
+      width: 100%;
+      margin-left: 0;
+   }
+
+   .home-welcome__event__coupon .coupon-banner__subtitle-line::before,
+   .home-welcome__event__coupon .coupon-banner__subtitle-line::after {
+      width: 28px;
+   }
+
+   .home-welcome__event__coupon .coupon-banner__subtitle-line::before {
+      left: -28px;
+   }
+   .home-welcome__event__coupon .coupon-banner__subtitle-line::after {
+      right: -28px;
+   }
 }

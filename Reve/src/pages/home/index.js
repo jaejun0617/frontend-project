@@ -1,8 +1,7 @@
 /**
  * =============================================
  * 📍 위치: src/pages/home/index.js
- * 역할: 홈(Home) - Hero Swiper(Fade) + Category + Featured Products
- * - 5초마다 자동 페이드 무한루프
+ * 역할: 홈(Home) - Hero Swiper(Fade) + Category + Featured Products + Welcome Coupon
  * - header 높이(6vh) 고려한 높이 계산
  * =============================================
  */
@@ -118,31 +117,31 @@ export const HomePage = () => {
           <p class="section-sub">명품 편집샵의 핵심 카테고리를 빠르게 탐색하세요.</p>
         </div>
 
-        <div class="category__grid">
-          <div class="category__item" role="button" tabindex="0" data-category="clothing">
-            <span class="category__tag">01</span>
-            <p class="category__itemTitle">Clothing</p>
-            <p class="category__itemSub">의류</p>
-          </div>
+          <div class="category__grid">
+            <div class="category__item" role="button" tabindex="0" data-search-q="clothing" data-category='clothing'>
+              <span class="category__tag">01</span>
+              <p class="category__itemTitle">Clothing</p>
+              <p class="category__itemSub">의류</p>
+            </div>
 
-          <div class="category__item" role="button" tabindex="0" data-category="bag">
-            <span class="category__tag">02</span>
-            <p class="category__itemTitle">Bags</p>
-            <p class="category__itemSub">가방</p>
-          </div>
+            <div class="category__item" role="button" tabindex="0" data-search-q="bag" data-category='bag'>
+              <span class="category__tag">02</span>
+              <p class="category__itemTitle">Bags</p>
+              <p class="category__itemSub">가방</p>
+            </div>
 
-          <div class="category__item" role="button" tabindex="0" data-category="shoes">
-            <span class="category__tag">03</span>
-            <p class="category__itemTitle">Shoes</p>
-            <p class="category__itemSub">신발</p>
-          </div>
+            <div class="category__item" role="button" tabindex="0" data-search-q="신발" data-category='shoes'>
+              <span class="category__tag">03</span>
+              <p class="category__itemTitle">Shoes</p>
+              <p class="category__itemSub">신발</p>
+            </div>
 
-          <div class="category__item" role="button" tabindex="0" data-category="acc">
-            <span class="category__tag">04</span>
-            <p class="category__itemTitle">Accessories</p>
-            <p class="category__itemSub">액세서리</p>
+            <div class="category__item" role="button" tabindex="0" data-search-q="acc" data-category='acc'>
+              <span class="category__tag">04</span>
+              <p class="category__itemTitle">Accessories</p>
+              <p class="category__itemSub">액세서리</p>
+            </div>
           </div>
-        </div>
       </div>
     </section>
 
@@ -162,6 +161,40 @@ export const HomePage = () => {
 
         <div class="home-products__action">
           <a class="home-products__more" href="/product" data-link>전체 상품 보기</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+      4) WELCOME / EVENT / COUPON SECTION
+    ========================================================= -->
+    <section class="home-welcome__event__coupon" aria-label="Welcome Coupon">
+      <div class="coupon-banner">
+        <div class="coupon-banner__content">
+          <p class="coupon-banner__eyebrow">REVE GRAND OPEN</p>
+
+          <h2 class="coupon-banner__title">WELCOME NEW MEMBERS!</h2>
+
+          <p class="coupon-banner__subtitle">
+            <span class="coupon-banner__subtitle-line">리브에 오신 것을 환영합니다</span>
+          </p>
+
+          <p class="coupon-banner__desc">지금 가입하고 몽환한 혜택을 만나보세요!</p>
+
+          <div class="coupon-banner__actions">
+<a
+  class="coupon-banner__btn coupon-banner__btn--primary"
+  href="/auth"
+  data-link
+  data-coupon-cta
+>
+  신규회원 쿠폰 받기
+</a>
+
+            <a class="coupon-banner__btn coupon-banner__btn--ghost" href="/product" data-link>
+              쇼핑하러 가기
+            </a>
+          </div>
         </div>
       </div>
     </section>
