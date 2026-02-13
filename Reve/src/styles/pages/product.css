@@ -212,6 +212,11 @@
  * 3) ProductCard (✅ your current markup)
  * ========================================================= */
 
+.product-card,
+.product-toolbar {
+   backdrop-filter: none !important;
+}
+
 .product-card {
    border: 1px solid var(--line);
    background: var(--panel);
@@ -228,7 +233,7 @@
 
 .product-card:hover {
    transform: translateY(-2px);
-   border-color: var(--line-strong);
+
    box-shadow: var(--shadow);
 }
 
@@ -404,7 +409,19 @@
       font-size: 13.5px;
    }
 }
+/* ✅ 이미지/카드 깜빡임 방지 */
+.product-card,
+.product-card__thumb,
+.product-card__img {
+   transform: translateZ(0);
+   backface-visibility: hidden;
+   -webkit-backface-visibility: hidden;
+}
 
+/* ✅ hover 시 transform이 걸릴 때 이미지가 같이 흔들리지 않게 */
+.product-card__thumb {
+   will-change: transform;
+}
 /* =========================================================
  * 4) Pager
  * ========================================================= */

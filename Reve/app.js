@@ -21,7 +21,7 @@ import { HomePage } from './src/pages/home/index.js';
 // ✅ 경로 통일: 지금 다른 페이지들처럼 src 밑으로 두는 게 맞음 (권장)
 // 만약 실제 파일이 ./pages/home/init.js 라면 기존 경로 유지해도 됨.
 import { initHomeHero } from './src/pages/home/init.js';
-
+import { initHomeProducts } from './src/pages/home/init.js';
 import { SearchPage, initSearchPage } from './src/pages/search/index.js';
 import { ProductPage, initProductPage } from './src/pages/product/index.js';
 import {
@@ -89,11 +89,14 @@ function layout(pageHtml) {
 const routes = {
    '/': {
       render: () => HomePage(),
-      // ✅ 추가: 홈 렌더 후 Hero Swiper(Fade) init
       afterRender: () => {
-         // HomeHero 내부에서 data-bound 가드로 중복 init 방지됨
          initHomeHero();
+         initHomeProducts({ limit: 16 });
       },
+   },
+   '/product': {
+      render: () => ProductPage(),
+      afterRender: () => initProductPage(),
    },
 
    '/product': {

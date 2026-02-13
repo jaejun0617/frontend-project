@@ -1,7 +1,7 @@
 /**
  * =============================================
  * 📍 위치: src/pages/home/index.js
- * 역할: 홈(Home) - Hero Swiper(Fade) 랜딩
+ * 역할: 홈(Home) - Hero Swiper(Fade) + Category + Featured Products
  * - 5초마다 자동 페이드 무한루프
  * - header 높이(6vh) 고려한 높이 계산
  * =============================================
@@ -9,7 +9,7 @@
 
 export const HERO_SLIDES = [
    {
-      key: 'max mara',
+      key: 'max-mara',
       brand: 'MAX MARA',
       titleKo: '절제의 우아함, 막스마라',
       titleEn: 'Quiet Elegance, MAX MARA',
@@ -48,64 +48,76 @@ export const HERO_SLIDES = [
 
 export const HomePage = () => {
    return `
-   <section class="hero" aria-label="Hero" data-hero>
-     <div class="hero__viewport" aria-label="Hero Swiper(Fade)" data-hero-viewport>
-       ${HERO_SLIDES.map(
-          (s, idx) => `
-           <article
-             class="hero__slide ${idx === 0 ? 'is-active' : ''}"
-             data-hero-slide
-             data-hero-key="${s.key}"
-            style="--hero-bg: url('${s.bg}');""
-             aria-hidden="${idx === 0 ? 'false' : 'true'}"
-           >
-             <div class="hero__overlay"></div>
+    <!-- =========================================================
+      1) HERO SECTION
+    ========================================================= -->
+    <section class="hero" aria-label="Hero" data-hero>
+      <div class="hero__viewport" aria-label="Hero Swiper(Fade)" data-hero-viewport>
+        ${HERO_SLIDES.map(
+           (s, idx) => `
+            <article
+              class="hero__slide ${idx === 0 ? 'is-active' : ''}"
+              data-hero-slide
+              data-hero-key="${s.key}"
+              style="--hero-bg: url('${s.bg}');"
+              aria-hidden="${idx === 0 ? 'false' : 'true'}"
+            >
+              <div class="hero__overlay"></div>
 
-             <div class="hero__container">
-               <div class="hero__content">
-                 <p class="hero__brand" aria-label="Brand">${s.brand}</p>
+              <div class="hero__container">
+                <div class="hero__content">
+                  <p class="hero__brand" aria-label="Brand">${s.brand}</p>
 
-                 <h1 class="hero__title">
-                   <span class="ko">${s.titleKo}</span>
-                   <span class="en">${s.titleEn}</span>
-                 </h1>
+                  <h1 class="hero__title">
+                    <span class="ko">${s.titleKo}</span>
+                    <span class="en">${s.titleEn}</span>
+                  </h1>
 
-                 <p class="hero__sub">
-                   <span class="ko">${s.subKo}</span>
-                   <span class="en">${s.subEn}</span>
-                 </p>
+                  <p class="hero__sub">
+                    <span class="ko">${s.subKo}</span>
+                    <span class="en">${s.subEn}</span>
+                  </p>
 
-                 <div class="hero__actions">
-                   <button type="button" class="hero__btn" data-hero-cta>
-                     쇼핑 시작하기 / Start Shopping
-                   </button>
-                   <button type="button" class="hero__btn" data-hero-cta-secondary>
-                     컬렉션 보기 / View Collection
-                   </button>
-                 </div>
-               </div>
-             </div>
-           </article>
-         `,
-       ).join('')}
-     </div>
+                  <div class="hero__actions">
+                    <button type="button" class="hero__btn" data-hero-cta>
+                      쇼핑 시작하기 / Start Shopping
+                    </button>
+                    <button type="button" class="hero__btn" data-hero-cta-secondary>
+                      컬렉션 보기 / View Collection
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </article>
+          `,
+        ).join('')}
+      </div>
 
-     <div class="hero__dots" aria-label="Hero Pagination" data-hero-dots>
-       ${HERO_SLIDES.map(
-          (_, idx) => `
-         <button
-           type="button"
-           class="hero__dot ${idx === 0 ? 'is-active' : ''}"
-           aria-label="Go to slide ${idx + 1}"
-           aria-pressed="${idx === 0 ? 'true' : 'false'}"
-           data-hero-dot="${idx}"
-         ></button>
-       `,
-       ).join('')}
-     </div>
-   </section>
+      <div class="hero__dots" aria-label="Hero Pagination" data-hero-dots>
+        ${HERO_SLIDES.map(
+           (_, idx) => `
+            <button
+              type="button"
+              class="hero__dot ${idx === 0 ? 'is-active' : ''}"
+              aria-label="Go to slide ${idx + 1}"
+              aria-pressed="${idx === 0 ? 'true' : 'false'}"
+              data-hero-dot="${idx}"
+            ></button>
+          `,
+        ).join('')}
+      </div>
+    </section>
+
+    <!-- =========================================================
+      2) CATEGORY SECTION
+    ========================================================= -->
     <section class="category" aria-label="Category">
       <div class="container">
+        <div class="section-head">
+          <h2 class="section-title">Browse by Category</h2>
+          <p class="section-sub">명품 편집샵의 핵심 카테고리를 빠르게 탐색하세요.</p>
+        </div>
+
         <div class="category__grid">
           <div class="category__item" role="button" tabindex="0" data-category="clothing">
             <span class="category__tag">01</span>
@@ -131,8 +143,27 @@ export const HomePage = () => {
             <p class="category__itemSub">액세서리</p>
           </div>
         </div>
-
       </div>
     </section>
- `;
+
+    <!-- =========================================================
+      3) FEATURED PRODUCTS SECTION
+    ========================================================= -->
+    <section class="home-products" aria-label="Featured Products">
+      <div class="container">
+        <div class="section-head">
+          <h2 class="section-title">Featured Picks</h2>
+          <p class="section-sub">지금 가장 반응 좋은 아이템을 먼저 만나보세요.</p>
+        </div>
+
+        <div class="home-products__grid" data-home-product-grid>
+          <p class="loading">불러오는 중...</p>
+        </div>
+
+        <div class="home-products__action">
+          <a class="home-products__more" href="/product" data-link>전체 상품 보기</a>
+        </div>
+      </div>
+    </section>
+  `;
 };

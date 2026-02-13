@@ -1,22 +1,33 @@
 /**
  * =============================================
- * 📍 위치 예시: src/pages/home/init.js (또는 home/index.js 하단)
- * 역할: Hero Fade Swiper - 5초 자동 루프 + dot 클릭
+ * 📍 위치: src/pages/home/init.js
+ * 역할:
+ * 1) Hero Fade Swiper - 5초 자동 루프 + dot 클릭
+ * 2) Home Featured Products - limit만큼 ProductCard 렌더
  * =============================================
  */
+
+import { getProducts } from '../../api/products.js';
+import { ProductCard } from '../../components/ProductCard.js';
+
+/* =========================================================
+   1) HERO: Fade Swiper
+   ========================================================= */
+
 export function initHomeHero() {
    const root = document.querySelector('[data-hero]');
    if (!root) return;
 
-   if (root.dataset.bound === '1') return;
-   root.dataset.bound = '1';
+   if (root.dataset.boundHero === '1') return;
+   root.dataset.boundHero = '1';
 
    const slides = Array.from(root.querySelectorAll('[data-hero-slide]'));
    const dots = Array.from(root.querySelectorAll('[data-hero-dot]'));
-
    if (!slides.length) return;
 
    const INTERVAL_MS = 5000;
+   const FADE_MS = 700; // CSS --hero-fade 와 맞추기
+
    let active = slides.findIndex((el) => el.classList.contains('is-active'));
    if (active < 0) active = 0;
 
@@ -43,10 +54,9 @@ export function initHomeHero() {
 
       active = next;
 
-      // 페이드 트랜지션 시간과 맞춤( CSS에서 700ms )
       window.setTimeout(() => {
          locked = false;
-      }, 7000);
+      }, FADE_MS);
    };
 
    const next = () => setActive(active + 1);
@@ -70,7 +80,7 @@ export function initHomeHero() {
       if (!Number.isFinite(idx)) return;
 
       setActive(idx);
-      start(); // 클릭 후 자동 재시작
+      start();
    });
 
    // 접근성/배터리: 탭 비활성 시 멈춤
@@ -79,7 +89,55 @@ export function initHomeHero() {
       else start();
    });
 
-   // 시작
+   // start
    setActive(active);
    start();
+}
+
+/* =========================================================
+   2) HOME: Featured products
+   ========================================================= */
+
+import { cartStore } from '../../store/cartStore.js';
+
+function syncHomeCartUi(gridEl) {
+   const cards = gridEl.querySelectorAll('[data-product-id]');
+   cards.forEach((card) => {
+      const productId = card.getAttribute('data-product-id');
+      if (!productId) return;
+
+      const inCart = cartStore.hasLine?.(productId) ?? false;
+      card.classList.toggle('is-in-cart', inCart);
+      card.dataset.inCart = inCart ? '1' : '0';
+   });
+}
+
+export async function initHomeProducts({ limit = 16 } = {}) {
+   const gridEl = document.querySelector('[data-home-product-grid]');
+   if (!gridEl) return;
+
+   try {
+      const res = await getProducts();
+      const products = Array.isArray(res)
+         ? res
+         : Array.isArray(res?.items)
+           ? res.items
+           : [];
+      const slice = products.slice(0, limit);
+
+      gridEl.innerHTML = slice.map(ProductCard).join('');
+
+      // ✅ 렌더 직후 1회 동기화 (색 변함)
+      syncHomeCartUi(gridEl);
+
+      // ✅ 장바구니 변경 시 홈도 같이 반영
+      cartStore.subscribe(() => {
+         const stillHere = document.querySelector('[data-home-product-grid]');
+         if (!stillHere) return;
+         syncHomeCartUi(stillHere);
+      });
+   } catch (e) {
+      gridEl.innerHTML = `<p class="error">상품을 불러오지 못했어요.</p>`;
+      console.error('[home] products load failed:', e);
+   }
 }

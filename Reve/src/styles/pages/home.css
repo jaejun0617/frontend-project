@@ -1,12 +1,10 @@
 /* =========================================================
    Main.CSS (Section Map)
-   - Hero > Category > Product Grid > Welcome+Event
-   - Collab > Reviews > (Extra ideas)
+   - Hero > Category > Home Products > (Next: Welcome+Event / Collab / Reviews)
    ========================================================= */
 
 /* =========================================================
    0) TOKENS / GLOBAL
-   - header offset, safe-area, common spacing
    ========================================================= */
 :root {
    /* header */
@@ -30,22 +28,39 @@
    --hero-fade: 700ms;
 }
 
-/* section container helper */
 .container {
    width: min(var(--max), 100%);
    margin: 0 auto;
+   padding: 0 var(--pad-x);
 }
 
-/* section spacing helper */
-.section {
-   padding: var(--section-gap) 0;
+/* section head */
+.section-head {
+   padding-top: 40px;
+   display: grid;
+   gap: 8px;
+}
+
+.section-title {
+   margin: 0;
+   font-size: clamp(18px, 2.2vw, 26px);
+   letter-spacing: -0.03em;
+   color: var(--text);
+}
+
+.section-sub {
+   margin: 0;
+   font-size: 13px;
+   color: var(--muted);
+   letter-spacing: -0.02em;
+   line-height: 1.5;
 }
 
 /* =========================================================
-    1) HERO SECTION (Fade Swiper)
-    - mobile: 50svh - header
-    - tablet+: 100svh - header
-    ========================================================= */
+     1) HERO SECTION (Fade Swiper)
+     - ⚠️ hero에 top 주면 레이아웃이 어긋날 수 있음
+     - 헤더가 fixed면: 보통 main/app-main에 padding-top을 주는게 정석
+     ========================================================= */
 .hero {
    position: relative;
    width: 100%;
@@ -54,7 +69,7 @@
 .hero__viewport {
    position: relative;
    width: 100%;
-   height: calc(50svh - var(--top-offset));
+   height: calc(70svh - var(--top-offset));
    min-height: 280px;
    overflow: hidden;
 }
@@ -70,7 +85,6 @@
    position: absolute;
    inset: 0;
 
-   /* ✅ inline: style="--hero-bg: url('...')" 형태가 정석 */
    background-image: var(--hero-bg, linear-gradient(120deg, #f4f4f5, #e5e7eb));
    background-size: cover;
    background-position: center;
@@ -112,7 +126,6 @@
 .hero__title,
 .hero__sub {
    color: #f4f4f5;
-   /* Netflix-ish readable shadow 느낌 */
    text-shadow:
       0 2px 4px rgba(0, 0, 0, 0.85),
       0 0 2px rgba(0, 0, 0, 0.9);
@@ -169,7 +182,7 @@
    margin-top: 20px;
 }
 
-/* 버튼 라운드 없게(요청) */
+/* 버튼 라운드 없게 */
 .hero__actions .hero__btn {
    padding: 12px 16px;
    border-radius: 0;
@@ -209,25 +222,22 @@
 }
 
 /* =========================================================
-    2) CATEGORY SECTION (cate-gory)
-    - quick entry chips/cards
-    ========================================================= */
+     2) CATEGORY SECTION
+     - ⚠️ height 고정은 아래 섹션 “안 보이는 착시” 만들기 쉬움
+     - 그래서 min-height로만 잡고, 자연스럽게 늘어나게 설계
+     ========================================================= */
 .category {
    width: 100%;
-   height: calc(80svh - var(--top-offset));
-   /* border: 1px solid red; */
-   display: flex;
-   align-items: center;
-   justify-content: center;
+   padding: 28px 0 10px;
 }
 
 .category__grid {
    display: grid;
    grid-template-columns: repeat(2, minmax(0, 1fr));
    gap: 14px;
+   padding: 18px 0 8px;
 }
 
-/* tablet */
 @media (min-width: 768px) {
    .category__grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -237,17 +247,14 @@
 
 .category__item {
    position: relative;
-   background: #fff;
    border: 1px solid rgba(15, 23, 42, 0.12);
    padding: 18px;
-   min-height: 300px;
+   min-height: 260px;
 
    display: grid;
    align-items: end;
 
    cursor: pointer;
-
-   /* 텍스트가 위로 살아있게 */
    overflow: hidden;
    isolation: isolate;
 
@@ -257,7 +264,6 @@
       background 140ms ease;
 }
 
-/* ✅ 이미지 레이어: 기본부터 항상 보이게 */
 .category__item::before {
    content: '';
    position: absolute;
@@ -273,7 +279,6 @@
    transition: transform 520ms ease;
 }
 
-/* ✅ 가독성 오버레이: 기본에도 깔고, hover에서만 조금 더 진하게 */
 .category__item::after {
    content: '';
    position: absolute;
@@ -285,54 +290,29 @@
       rgba(0, 0, 0, 0.18),
       rgba(0, 0, 0, 0.34)
    );
-
    opacity: 1;
    transition: opacity 240ms ease;
 }
 
-/* hover */
 .category__item:hover {
    transform: translateY(-2px);
    border-color: rgba(15, 23, 42, 0.22);
-   background: rgba(15, 23, 42, 0.02);
 }
 
 .category__item:hover::before {
    transform: scale(1.06);
 }
 
-.category__item:hover::after {
-   opacity: 1; /* 유지하면서 톤만 바꾸고 싶으면 아래처럼 */
-   background: linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.22),
-      rgba(0, 0, 0, 0.42)
-   );
-}
-
-/* active */
-.category__item:active {
-   transform: translateY(0);
-}
-
-/* 텍스트 레이어 올리기 */
 .category__tag,
 .category__itemTitle,
 .category__itemSub {
    position: relative;
    z-index: 1;
-}
-
-/* 넷플릭스 자막 느낌 살짝 */
-.category__itemTitle,
-.category__itemSub,
-.category__tag {
    text-shadow:
       0 2px 10px rgba(0, 0, 0, 0.35),
       0 0 2px rgba(0, 0, 0, 0.55);
 }
 
-/* Title */
 .category__itemTitle {
    margin: 0;
    font-weight: 800;
@@ -340,19 +320,15 @@
    font-size: 16px;
    line-height: 1.1;
    text-transform: uppercase;
-
-   /* 이미지 위라 기본 흰색이 자연스러움 */
    color: rgba(244, 244, 245, 0.96);
 }
 
-/* Sub label */
 .category__itemSub {
    margin: 8px 0 0;
    font-size: 12px;
    color: rgba(244, 244, 245, 0.86);
 }
 
-/* tag */
 .category__tag {
    position: absolute;
    top: 14px;
@@ -363,129 +339,66 @@
    color: rgba(244, 244, 245, 0.82);
 }
 
-/* =========================================================
-    Per-item image mapping
-    ========================================================= */
+/* per-item images */
 .category__item[data-category='clothing'] {
    --cat-img: url('/src/images/main/category/category_clothing_hover.jpg');
 }
-
 .category__item[data-category='bag'] {
    --cat-img: url('/src/images/main/category/category_bag_hover.png');
 }
-
 .category__item[data-category='shoes'] {
    --cat-img: url('/src/images/main/category/category_shoes_hover.jpeg');
 }
-
 .category__item[data-category='acc'] {
    --cat-img: url('/src/images/main/category/category_acc_hover.png');
 }
-/* =========================================================
-    3) PRODUCT GRID SECTION
-    - featured / best / new
-    ========================================================= */
-.product-grid {
-   /* TODO: 섹션 wrapper */
-}
-
-.product-grid__head {
-   /* TODO: 타이틀/필터/정렬 */
-}
-
-.product-grid__list {
-   /* TODO: 실제 그리드(카드) */
-}
-
-.product-card {
-   /* TODO: 카드 공통(전역에 있으면 생략) */
-}
 
 /* =========================================================
-    4) WELCOME + EVENT SECTION
-    - 가입 혜택 / 시즌 이벤트 / 쿠폰 강조
-    ========================================================= */
-.welcome-event {
-   /* TODO: 2열(모바일 1열) 구성 추천 */
+     3) HOME PRODUCTS SECTION
+     ========================================================= */
+.home-products {
+   width: 100%;
+   padding: 10px 0 50px;
 }
 
-.welcome-event__welcome {
-   /* TODO: 웰컴 카드 */
+.home-products__grid {
+   display: grid;
+   grid-template-columns: repeat(2, minmax(0, 1fr));
+   gap: 14px;
+   padding: 18px 0;
 }
 
-.welcome-event__event {
-   /* TODO: 이벤트 카드 */
+@media (min-width: 768px) {
+   .home-products__grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+   }
 }
 
-.welcome-event__cta {
-   /* TODO: CTA 버튼 */
+.home-products__grid .loading,
+.home-products__grid .error {
+   margin: 0;
+   padding: 14px 12px;
+   border: 1px solid var(--line);
+   background: rgba(255, 255, 255, 0.96);
+   color: var(--muted);
 }
 
-/* =========================================================
-    5) COLLAB SECTION
-    - 브랜드 콜라보, 컬렉션 프리뷰
-    ========================================================= */
-.collab {
-   /* TODO: 섹션 wrapper */
+/* action */
+.home-products__action {
+   text-align: center;
+   padding-top: 10px;
 }
 
-.collab__grid {
-   /* TODO: 이미지/텍스트 조합 */
+.home-products__more {
+   display: inline-block;
+   padding: 12px 22px;
+   border: 1px solid rgba(15, 23, 42, 0.18);
+   color: rgba(15, 23, 42, 0.92);
+   text-decoration: none;
+   border-radius: 0;
 }
 
-.collab__media {
-   /* TODO: 이미지 영역 */
-}
-
-.collab__content {
-   /* TODO: 텍스트 영역 */
-}
-
-/* =========================================================
-    6) REVIEWS SECTION
-    - 후기 카드 / 별점 / 스크롤 캐러셀(옵션)
-    ========================================================= */
-.reviews {
-   /* TODO */
-}
-
-.reviews__list {
-   /* TODO: 카드 리스트 or 가로 스크롤 */
-}
-
-.review-card {
-   /* TODO: 개별 리뷰 카드 */
-}
-
-.review-card__meta {
-   /* TODO: 작성자/날짜/평점 */
-}
-
-.review-card__text {
-   /* TODO: 후기 텍스트 */
-}
-
-/* =========================================================
-    7) EXTRA IDEAS (추천 섹션들)
-    ========================================================= */
-
-/* 7-1) TRUST / SERVICE STRIP
-    - 무료배송, 정품보장, 교환/반품, 빠른상담 등 아이콘 4개 띠
- */
-.trust-strip {
-   /* TODO */
-}
-
-/* 7-2) LOOKBOOK / STYLE GUIDE
-    - 스타일링 컷 + 태그(예: #minimal #classic)
- */
-.lookbook {
-   /* TODO */
-}
-
-/* 7-3) NEWSLETTER / APP DOWNLOAD
-    - 구독/알림/앱 설치 유도
- */
-.newsletter {
-   /* TODO */
+.home-products__more:hover {
+   background: rgba(15, 23, 42, 0.04);
 }
