@@ -8,7 +8,9 @@
    display: none !important;
 }
 
-/* Header */
+/* ==============================
+   0) Header Shell
+============================== */
 .site-header {
    width: 100%;
    height: 6svh;
@@ -16,7 +18,7 @@
    top: 0;
    left: 0;
    right: 0;
-   padding: 0rem 1rem;
+   padding: 0 1rem;
    z-index: 9999;
    background-color: rgba(255, 255, 255, 0.72);
    backdrop-filter: blur(12px);
@@ -29,6 +31,16 @@
    display: flex;
    align-items: center;
    justify-content: space-between;
+   gap: 12px;
+}
+
+/* ==============================
+   1) Brand
+============================== */
+.site-logo {
+   display: flex;
+   align-items: center;
+   flex: 0 0 auto;
 }
 
 .site-logo a {
@@ -43,11 +55,66 @@
    display: block;
 }
 
-/* 메뉴(데스크 확장용 자리) */
+/* ==============================
+   2) ✅ PC Main Menu
+   - 핵심: "PC 기본 보이기"
+   - 모바일에서만 숨김
+============================== */
 .nav-menu-list {
-   display: none;
+   /* ✅ PC 기준 기본값 */
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   gap: 8px;
+   padding: 0;
+   margin: 0;
+   list-style: none;
+
+   /* ✅ 가운데 영역으로 자연스럽게 확장 */
+   flex: 1 1 auto;
+   min-width: 0;
 }
 
+/* 각 메뉴 아이템 */
+.nav-menu-item {
+   display: inline-flex;
+}
+
+/* 링크 스타일 */
+.nav-menu-link {
+   display: inline-flex;
+   align-items: center;
+   height: 40px;
+   padding: 0 12px;
+   border-radius: 999px;
+   text-decoration: none;
+   color: inherit;
+   font-weight: 600;
+   letter-spacing: -0.2px;
+   transition: background-color 150ms ease;
+   white-space: nowrap;
+}
+
+.nav-menu-link:hover {
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+.nav-menu-link:focus-visible {
+   outline: 2px solid rgba(0, 0, 0, 0.35);
+   outline-offset: 2px;
+   background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* ✅ 모바일에서만 메뉴 숨김 */
+@media (max-width: 767px) {
+   .nav-menu-list {
+      display: none;
+   }
+}
+
+/* ==============================
+   3) Utility Icons
+============================== */
 .nav-menu-icons {
    display: flex;
    gap: 12px;
@@ -55,6 +122,8 @@
    padding: 0;
    margin: 0;
    list-style: none;
+
+   flex: 0 0 auto;
 }
 
 /* 공통 아이콘 버튼/링크 */
@@ -105,7 +174,9 @@
    display: block;
 }
 
-/* Cart badge */
+/* ==============================
+   4) Cart badge
+============================== */
 .nav-cart {
    position: relative;
 }
@@ -133,4 +204,20 @@
 
 .cart-badge[hidden] {
    display: none;
+}
+
+/* ==============================
+   5) PC/모바일: 햄버거 표시 제어
+   - 모바일에서만 햄버거 보이게
+============================== */
+@media (min-width: 768px) {
+   .menu-bar-item {
+      display: none;
+   }
+}
+
+@media (max-width: 767px) {
+   .menu-bar-item {
+      display: list-item;
+   }
 }

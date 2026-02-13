@@ -182,14 +182,14 @@ export const HomePage = () => {
           <p class="coupon-banner__desc">지금 가입하고 몽환한 혜택을 만나보세요!</p>
 
           <div class="coupon-banner__actions">
-<a
-  class="coupon-banner__btn coupon-banner__btn--primary"
-  href="/auth"
-  data-link
-  data-coupon-cta
->
-  신규회원 쿠폰 받기
-</a>
+            <a
+              class="coupon-banner__btn coupon-banner__btn--primary"
+              href="/auth"
+              data-link
+              data-coupon-cta
+            >
+              신규회원 쿠폰 받기
+            </a>
 
             <a class="coupon-banner__btn coupon-banner__btn--ghost" href="/product" data-link>
               쇼핑하러 가기
