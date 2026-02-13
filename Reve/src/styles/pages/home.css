@@ -1,32 +1,56 @@
 /* =========================================================
-   Home Hero - Fade Swiper (FINAL)
-   File: Main.CSS
+   Main.CSS (Section Map)
+   - Hero > Category > Product Grid > Welcome+Event
+   - Collab > Reviews > (Extra ideas)
    ========================================================= */
 
+/* =========================================================
+   0) TOKENS / GLOBAL
+   - header offset, safe-area, common spacing
+   ========================================================= */
 :root {
    /* header */
    --app-header-h: 6vh;
    --safe-top: env(safe-area-inset-top, 0px);
    --top-offset: calc(var(--app-header-h) + var(--safe-top));
 
-   /* hero layout */
+   /* layout */
+   --max: 1440px;
    --hero-max: 1920px;
-   --hero-pad-x: 20px;
+   --pad-x: 20px;
+   --section-gap: 56px;
 
    /* tone */
-   --hero-text: #0f172a;
+   --bg: #ffffff;
+   --text: #0f172a;
+   --muted: rgba(15, 23, 42, 0.62);
+   --line: rgba(15, 23, 42, 0.1);
 
-   /* timing */
+   /* hero timing */
    --hero-fade: 700ms;
 }
 
-/* Hero wrapper */
+/* section container helper */
+.container {
+   width: min(var(--max), 100%);
+   margin: 0 auto;
+}
+
+/* section spacing helper */
+.section {
+   padding: var(--section-gap) 0;
+}
+
+/* =========================================================
+    1) HERO SECTION (Fade Swiper)
+    - mobile: 50svh - header
+    - tablet+: 100svh - header
+    ========================================================= */
 .hero {
    position: relative;
    width: 100%;
 }
 
-/* viewport: mobile ~50svh (header 제외) */
 .hero__viewport {
    position: relative;
    width: 100%;
@@ -35,7 +59,6 @@
    overflow: hidden;
 }
 
-/* tablet/pc: 100svh (header 제외) */
 @media (min-width: 768px) {
    .hero__viewport {
       height: calc(100svh - var(--top-offset));
@@ -43,12 +66,11 @@
    }
 }
 
-/* Slide (fade layer) */
 .hero__slide {
    position: absolute;
    inset: 0;
 
-   /* ✅ 핵심: --hero-bg는 inline에서 url('...') 형태로 들어오는 전제 */
+   /* ✅ inline: style="--hero-bg: url('...')" 형태가 정석 */
    background-image: var(--hero-bg, linear-gradient(120deg, #f4f4f5, #e5e7eb));
    background-size: cover;
    background-position: center;
@@ -57,8 +79,6 @@
    opacity: 0;
    pointer-events: none;
    transition: opacity var(--hero-fade) ease;
-
-   /* 미세한 안정성: 배경 로딩 중 깜빡임 방지 */
    transform: translateZ(0);
 }
 
@@ -67,33 +87,37 @@
    pointer-events: auto;
 }
 
-/* readability overlay (white base, black text) */
 .hero__overlay {
    position: absolute;
    inset: 0;
-   background-color: rgba(0, 0, 0, 0.2);
+   background-color: rgba(0, 0, 0, 0.22);
 }
 
-/* container */
 .hero__container {
    position: relative;
    height: 100%;
    width: min(var(--hero-max), 100%);
    margin: 0 auto;
-   padding: 0 var(--hero-pad-x);
-
+   padding: 0 var(--pad-x);
    display: grid;
    align-items: center;
 }
 
-/* content */
 .hero__content {
    max-width: 760px;
-   color: var(--hero-text);
    padding: 34px 0;
 }
 
-/* brand */
+.hero__brand,
+.hero__title,
+.hero__sub {
+   color: #f4f4f5;
+   /* Netflix-ish readable shadow 느낌 */
+   text-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.85),
+      0 0 2px rgba(0, 0, 0, 0.9);
+}
+
 .hero__brand {
    margin: 0 0 14px;
    font-weight: 800;
@@ -101,25 +125,15 @@
    text-transform: uppercase;
    font-size: 12px;
    opacity: 0.86;
-   color: #f4f4f5;
-   text-shadow:
-      0 2px 4px rgba(0, 0, 0, 0.85),
-      0 0 2px rgba(0, 0, 0, 0.9);
 }
 
-/* title */
 .hero__title {
    margin: 0 0 16px;
    font-size: clamp(28px, 4vw, 58px);
    line-height: 1.06;
    letter-spacing: -0.035em;
-   color: #f4f4f5;
-   text-shadow:
-      0 2px 4px rgba(0, 0, 0, 0.85),
-      0 0 2px rgba(0, 0, 0, 0.9);
 }
 
-/* bilingual */
 .hero__title .ko,
 .hero__sub .ko {
    display: block;
@@ -139,10 +153,6 @@
    font-size: clamp(14px, 1.6vw, 18px);
    line-height: 1.55;
    opacity: 0.92;
-   color: #f4f4f5;
-   text-shadow:
-      0 2px 4px rgba(0, 0, 0, 0.85),
-      0 0 2px rgba(0, 0, 0, 0.9);
 }
 
 .hero__sub .en {
@@ -152,30 +162,27 @@
    opacity: 0.78;
 }
 
-/* actions */
 .hero__actions {
    display: flex;
    flex-wrap: wrap;
    gap: 12px;
    margin-top: 20px;
-   color: #f4f4f5;
 }
 
+/* 버튼 라운드 없게(요청) */
 .hero__actions .hero__btn {
    padding: 12px 16px;
-   color: #f4f4f5;
    border-radius: 0;
-   background-color: transparent;
-   border: 1px solid #f4f4f5;
+   background: transparent;
+   border: 1px solid rgba(244, 244, 245, 0.95);
+   color: rgba(244, 244, 245, 0.95);
    cursor: pointer;
 }
 
-/* dots */
 .hero__dots {
    width: min(var(--hero-max), 100%);
    margin: 0 auto;
-
-   padding: 14px var(--hero-pad-x) 22px;
+   padding: 14px var(--pad-x) 22px;
    display: flex;
    gap: 10px;
    justify-content: center;
@@ -195,9 +202,290 @@
    border-color: rgba(15, 23, 42, 0.9);
 }
 
-/* reduce motion */
 @media (prefers-reduced-motion: reduce) {
    .hero__slide {
       transition: none;
    }
+}
+
+/* =========================================================
+    2) CATEGORY SECTION (cate-gory)
+    - quick entry chips/cards
+    ========================================================= */
+.category {
+   width: 100%;
+   height: calc(80svh - var(--top-offset));
+   /* border: 1px solid red; */
+   display: flex;
+   align-items: center;
+   justify-content: center;
+}
+
+.category__grid {
+   display: grid;
+   grid-template-columns: repeat(2, minmax(0, 1fr));
+   gap: 14px;
+}
+
+/* tablet */
+@media (min-width: 768px) {
+   .category__grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+   }
+}
+
+.category__item {
+   position: relative;
+   background: #fff;
+   border: 1px solid rgba(15, 23, 42, 0.12);
+   padding: 18px;
+   min-height: 300px;
+
+   display: grid;
+   align-items: end;
+
+   cursor: pointer;
+
+   /* 텍스트가 위로 살아있게 */
+   overflow: hidden;
+   isolation: isolate;
+
+   transition:
+      transform 140ms ease,
+      border-color 140ms ease,
+      background 140ms ease;
+}
+
+/* ✅ 이미지 레이어: 기본부터 항상 보이게 */
+.category__item::before {
+   content: '';
+   position: absolute;
+   inset: 0;
+   z-index: 0;
+
+   background-image: var(--cat-img);
+   background-size: cover;
+   background-position: center;
+   background-repeat: no-repeat;
+
+   transform: scale(1.02);
+   transition: transform 520ms ease;
+}
+
+/* ✅ 가독성 오버레이: 기본에도 깔고, hover에서만 조금 더 진하게 */
+.category__item::after {
+   content: '';
+   position: absolute;
+   inset: 0;
+   z-index: 0;
+
+   background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.18),
+      rgba(0, 0, 0, 0.34)
+   );
+
+   opacity: 1;
+   transition: opacity 240ms ease;
+}
+
+/* hover */
+.category__item:hover {
+   transform: translateY(-2px);
+   border-color: rgba(15, 23, 42, 0.22);
+   background: rgba(15, 23, 42, 0.02);
+}
+
+.category__item:hover::before {
+   transform: scale(1.06);
+}
+
+.category__item:hover::after {
+   opacity: 1; /* 유지하면서 톤만 바꾸고 싶으면 아래처럼 */
+   background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.22),
+      rgba(0, 0, 0, 0.42)
+   );
+}
+
+/* active */
+.category__item:active {
+   transform: translateY(0);
+}
+
+/* 텍스트 레이어 올리기 */
+.category__tag,
+.category__itemTitle,
+.category__itemSub {
+   position: relative;
+   z-index: 1;
+}
+
+/* 넷플릭스 자막 느낌 살짝 */
+.category__itemTitle,
+.category__itemSub,
+.category__tag {
+   text-shadow:
+      0 2px 10px rgba(0, 0, 0, 0.35),
+      0 0 2px rgba(0, 0, 0, 0.55);
+}
+
+/* Title */
+.category__itemTitle {
+   margin: 0;
+   font-weight: 800;
+   letter-spacing: -0.02em;
+   font-size: 16px;
+   line-height: 1.1;
+   text-transform: uppercase;
+
+   /* 이미지 위라 기본 흰색이 자연스러움 */
+   color: rgba(244, 244, 245, 0.96);
+}
+
+/* Sub label */
+.category__itemSub {
+   margin: 8px 0 0;
+   font-size: 12px;
+   color: rgba(244, 244, 245, 0.86);
+}
+
+/* tag */
+.category__tag {
+   position: absolute;
+   top: 14px;
+   left: 14px;
+   font-size: 11px;
+   letter-spacing: 0.12em;
+   text-transform: uppercase;
+   color: rgba(244, 244, 245, 0.82);
+}
+
+/* =========================================================
+    Per-item image mapping
+    ========================================================= */
+.category__item[data-category='clothing'] {
+   --cat-img: url('/src/images/main/category/category_clothing_hover.jpg');
+}
+
+.category__item[data-category='bag'] {
+   --cat-img: url('/src/images/main/category/category_bag_hover.png');
+}
+
+.category__item[data-category='shoes'] {
+   --cat-img: url('/src/images/main/category/category_shoes_hover.jpeg');
+}
+
+.category__item[data-category='acc'] {
+   --cat-img: url('/src/images/main/category/category_acc_hover.png');
+}
+/* =========================================================
+    3) PRODUCT GRID SECTION
+    - featured / best / new
+    ========================================================= */
+.product-grid {
+   /* TODO: 섹션 wrapper */
+}
+
+.product-grid__head {
+   /* TODO: 타이틀/필터/정렬 */
+}
+
+.product-grid__list {
+   /* TODO: 실제 그리드(카드) */
+}
+
+.product-card {
+   /* TODO: 카드 공통(전역에 있으면 생략) */
+}
+
+/* =========================================================
+    4) WELCOME + EVENT SECTION
+    - 가입 혜택 / 시즌 이벤트 / 쿠폰 강조
+    ========================================================= */
+.welcome-event {
+   /* TODO: 2열(모바일 1열) 구성 추천 */
+}
+
+.welcome-event__welcome {
+   /* TODO: 웰컴 카드 */
+}
+
+.welcome-event__event {
+   /* TODO: 이벤트 카드 */
+}
+
+.welcome-event__cta {
+   /* TODO: CTA 버튼 */
+}
+
+/* =========================================================
+    5) COLLAB SECTION
+    - 브랜드 콜라보, 컬렉션 프리뷰
+    ========================================================= */
+.collab {
+   /* TODO: 섹션 wrapper */
+}
+
+.collab__grid {
+   /* TODO: 이미지/텍스트 조합 */
+}
+
+.collab__media {
+   /* TODO: 이미지 영역 */
+}
+
+.collab__content {
+   /* TODO: 텍스트 영역 */
+}
+
+/* =========================================================
+    6) REVIEWS SECTION
+    - 후기 카드 / 별점 / 스크롤 캐러셀(옵션)
+    ========================================================= */
+.reviews {
+   /* TODO */
+}
+
+.reviews__list {
+   /* TODO: 카드 리스트 or 가로 스크롤 */
+}
+
+.review-card {
+   /* TODO: 개별 리뷰 카드 */
+}
+
+.review-card__meta {
+   /* TODO: 작성자/날짜/평점 */
+}
+
+.review-card__text {
+   /* TODO: 후기 텍스트 */
+}
+
+/* =========================================================
+    7) EXTRA IDEAS (추천 섹션들)
+    ========================================================= */
+
+/* 7-1) TRUST / SERVICE STRIP
+    - 무료배송, 정품보장, 교환/반품, 빠른상담 등 아이콘 4개 띠
+ */
+.trust-strip {
+   /* TODO */
+}
+
+/* 7-2) LOOKBOOK / STYLE GUIDE
+    - 스타일링 컷 + 태그(예: #minimal #classic)
+ */
+.lookbook {
+   /* TODO */
+}
+
+/* 7-3) NEWSLETTER / APP DOWNLOAD
+    - 구독/알림/앱 설치 유도
+ */
+.newsletter {
+   /* TODO */
 }

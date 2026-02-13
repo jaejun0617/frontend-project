@@ -104,5 +104,35 @@ export const HomePage = () => {
        ).join('')}
      </div>
    </section>
+    <section class="category" aria-label="Category">
+      <div class="container">
+        <div class="category__grid">
+          <div class="category__item" role="button" tabindex="0" data-category="clothing">
+            <span class="category__tag">01</span>
+            <p class="category__itemTitle">Clothing</p>
+            <p class="category__itemSub">의류</p>
+          </div>
+
+          <div class="category__item" role="button" tabindex="0" data-category="bag">
+            <span class="category__tag">02</span>
+            <p class="category__itemTitle">Bags</p>
+            <p class="category__itemSub">가방</p>
+          </div>
+
+          <div class="category__item" role="button" tabindex="0" data-category="shoes">
+            <span class="category__tag">03</span>
+            <p class="category__itemTitle">Shoes</p>
+            <p class="category__itemSub">신발</p>
+          </div>
+
+          <div class="category__item" role="button" tabindex="0" data-category="acc">
+            <span class="category__tag">04</span>
+            <p class="category__itemTitle">Accessories</p>
+            <p class="category__itemSub">액세서리</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
  `;
 };
