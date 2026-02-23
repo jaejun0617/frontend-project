@@ -241,10 +241,14 @@ NURI는 **대표 웹 사이트(웹 서비스) → 이후 앱** 순서로 진행�
 - **TypeScript (권장)**
    - 데이터 모델(감정/구독/기록)이 커지면 TS가 유지보수 비용을 크게 줄임
 
-### ✅ Styling
+### ✅ Styling (Tailwind 제외 / CSS Modules 사용)
 
-- **Tailwind CSS** (생산성/일관성)
-- (선택) shadcn/ui (컴포넌트 속도 향상)
+- **CSS Modules (`*.module.css`)**
+   - 컴포넌트 단위 스타일링(클래스 충돌 방지)
+- **Global CSS (`globals.css`)**
+   - 폰트/리셋/공통 변수/테마 등 전역 스타일 관리
+- (선택) PostCSS / Autoprefixer
+   - 브라우저 호환성 보강(Next.js 기본 구성에 포함되는 경우가 많음)
 
 ### ✅ Backend / DB / Auth / Storage
 
@@ -342,5 +346,7 @@ src/
     auth/
     validators/
   styles/
+    globals.css                # 전역 스타일
+    variables.css              # (선택) CSS 변수/테마
   types/
 ```
