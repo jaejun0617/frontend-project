@@ -1,8 +1,10 @@
-import type { NextConfig } from "next";
+// 파일: next.config.ts
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  reactCompiler: true,
+  reactStrictMode: true,
+  // ✅ reactCompiler 설정 제거 (또는 false)
+  // reactCompiler: true
 };
 
 export default nextConfig;
